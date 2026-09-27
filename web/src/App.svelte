@@ -26,8 +26,8 @@
   } from "./lib/draft";
   import { parseFindings, type Finding } from "./lib/lens";
   import { buildPrompt } from "./lib/prompt";
-  import { setPreviewBuilder, previewState } from "./lib/preview.svelte";
-  import { setRadioHost, radioState } from "./lib/radio.svelte";
+  import { setPreviewBuilder } from "./lib/preview.svelte";
+  import { setRadioHost } from "./lib/radio.svelte";
   import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
   import {
     discoverBuild,
@@ -255,18 +255,15 @@
   });
 
   /**
-   * Take a new build as soon as there is nothing to interrupt.
+   * Take a new build as soon as it is seen.
    *
-   * A reload is the only mechanism a static host allows, so it is shown rather than silent — and it
-   * waits while a render, a preview or a station is running, because those are exactly what a
-   * reload would throw away. The guard stops a stale version answer from reloading in a loop.
+   * Nothing is allowed to hold it back. An earlier version waited for a render, a preview or a
+   * station to finish first, which reads as "never" for a station: a stream is always running, so
+   * waiting for it to be idle is waiting forever, and the update only ever appeared as a chip.
+   * The guard is what stops a stale version answer from reloading in a loop.
    */
   $effect(() => {
     if (!updateState.ready || reloadedFor(updateState.latest)) {
-      updateState.notice = null;
-      return;
-    }
-    if (renderQueue.busy || previewState.busy || radioState.on) {
       updateState.notice = null;
       return;
     }

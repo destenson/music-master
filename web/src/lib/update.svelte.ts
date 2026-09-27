@@ -25,6 +25,12 @@ import { asset, reloadUrl, setBuild } from "./paths";
 const POLL_MS = 10_000;
 /** Remembers that this tab already reloaded for a build, so a stale answer cannot loop it. */
 const GUARD_KEY = "mm.update.reloadedFor";
+/**
+ * How long a reload is trusted. A page that landed on a document the host had not replaced yet would
+ * otherwise be wedged: it would see the new build, refuse to reload again for it, and never arrive.
+ * Expiring the guard lets it try again, while still being far too slow to become a loop.
+ */
+const GUARD_MS = 30_000;
 
 export const updateState = $state({
   /** The build this page is running. */
@@ -91,10 +97,13 @@ export function watchForUpdates(): void {
   void check();
 }
 
-/** Whether this tab already reloaded for a build and is somehow still being offered it. */
+/** Whether this tab reloaded for this build recently, and is somehow still being offered it. */
 export function reloadedFor(build: string): boolean {
   try {
-    return sessionStorage.getItem(GUARD_KEY) === build;
+    const raw = sessionStorage.getItem(GUARD_KEY);
+    if (!raw) return false;
+    const guard = JSON.parse(raw) as { build?: string; at?: number };
+    return guard.build === build && Date.now() - (guard.at ?? 0) < GUARD_MS;
   } catch {
     return false;
   }
@@ -103,7 +112,10 @@ export function reloadedFor(build: string): boolean {
 /** Reload into the new build. The guard survives the reload and stops a mismatch from looping. */
 export function reloadNow(): void {
   try {
-    sessionStorage.setItem(GUARD_KEY, updateState.latest);
+    sessionStorage.setItem(
+      GUARD_KEY,
+      JSON.stringify({ build: updateState.latest, at: Date.now() }),
+    );
   } catch {
     /* the guard is a safety net, not a requirement */
   }
