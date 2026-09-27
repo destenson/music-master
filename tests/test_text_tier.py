@@ -268,6 +268,50 @@ class LyricsTest(unittest.TestCase):
         self.assertEqual(len(found), 2)
         self.assertTrue(all(f.get("section") for f in found))
 
+    def test_the_mechanical_rule_is_checked_not_deferred(self) -> None:
+        # Rule 4 is decidable, so an instrumental lead vocal must raise an error and must not also
+        # appear in the oracle list as a question the checker could have answered itself.
+        sample = ["[Chorus]", "[shouted]", "a line"]
+        report = lyrics.Report()
+        found = lyrics.analyse(sample, self.st, report)
+        lyrics.check_consistency(
+            found, self.st, lyrics.load(lyrics.VOCAB_PATH),
+            {"lead_vocal": {"options": ["instrumental"]}}, report,
+        )
+        self.assertTrue(any("vocal tag" in e for e in report.errors))
+        self.assertFalse(any("no_vocals_no_vocal_tags" in t for t in report.oracle_tasks))
+
+    def test_the_instrument_rule_defers_once_and_names_its_surfaces(self) -> None:
+        # An instrumental section is the same caption comparison as a standalone instrumental tag,
+        # so the rule produces one task that names where the lyric mentions the instrument.
+        sample = ["[Solo - guitar]", "", "[Chorus]", "a line"]
+        report = lyrics.Report()
+        found = lyrics.analyse(sample, self.st, report)
+        lyrics.check_consistency(
+            found, self.st, lyrics.load(lyrics.VOCAB_PATH),
+            {"harmony": {"options": ["distorted_guitar"]}}, report,
+        )
+        tasks = [t for t in report.oracle_tasks if "instruments_match_instrumental_tags" in t]
+        self.assertEqual(len(tasks), 1)
+        self.assertIn("[Solo - guitar]", tasks[0])
+
+    def test_a_lenient_rhyme_miss_is_a_note_not_a_deferral(self) -> None:
+        # 'abcb' is written to bend, so an approximate landing is the pattern working, not a
+        # verdict waiting on the oracle.
+        meter = {"sections": [{
+            "tag": "Pre-Chorus", "role": "pre_chorus", "counts": [6, 6, 6, 6], "scheme": "ABCD",
+            "phrases": [[6], [6], [6], [6]], "internal": 0, "allit": 0, "min": 6, "max": 6,
+            "standalone": [], "transitions": [], "modifier": None,
+        }]}
+        template = {"id": "t", "sections": [
+            {"role": "pre_chorus", "lines": 4, "rhyme_scheme": "abcb"},
+        ]}
+        report = lyrics.Report()
+        lyrics.check_template(meter, self.st, template, report)
+        self.assertTrue(any("rhyme scheme" in n for n in report.notes))
+        self.assertEqual(report.oracle_tasks, [])
+        self.assertEqual(report.warnings, [])
+
     def test_each_song_satisfies_its_own_template(self) -> None:
         for song, template_id, _bpm in SONGS:
             with self.subTest(song=song):

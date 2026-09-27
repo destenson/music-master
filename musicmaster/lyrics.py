@@ -199,9 +199,19 @@ def load(path: Path) -> dict:
 
 
 class Report:
+    """Findings, split by what can be done about them.
+
+    ``errors`` and ``warnings`` are defects the checker decided itself. ``oracle_tasks`` are
+    semantic comparisons the checker can pose but not answer. ``notes`` are observations about the
+    lyric that are neither: a rhyme scheme written to a lenient pattern is allowed to land
+    approximately, and reporting an approximate landing as work for the oracle would claim a
+    judgement is pending when the pattern already permits it.
+    """
+
     def __init__(self) -> None:
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        self.notes: list[str] = []
         self.oracle_tasks: list[str] = []
 
     def error(self, m: str) -> None:
@@ -209,6 +219,9 @@ class Report:
 
     def warn(self, m: str) -> None:
         self.warnings.append(m)
+
+    def note(self, m: str) -> None:
+        self.notes.append(m)
 
     def oracle(self, m: str) -> None:
         self.oracle_tasks.append(m)
@@ -346,22 +359,36 @@ def check_blank_lines(lines: list[str], st: dict, rep: Report) -> None:
             rep.warn(f"line {i + 1}: section tag is not preceded by a blank line")
 
 
-def check_consistency(found: list[dict], st: dict, vocab: dict, selections: dict, rep: Report) -> None:
-    """Enforce the mechanical consistency rule; hand the rest to the oracle."""
-    pools = {t["label"].casefold(): t for t in st["vocal_tags"]}
+def _instrumental_surfaces(found: list[dict], st: dict) -> list[str]:
+    """Where the lyric names an instrument, as "'[tag]' line N".
 
-    for section in found:
-        if section.get("section") is None:
-            continue
-        sid = section["section"]
-        meta = next((s for s in st["sections"] if s["id"] == sid), None)
+    Two surfaces do it, and the caption comparison covers both: a section the vocabulary flags as
+    instrumental -- ``[Instrumental]``, ``[Solo - guitar]`` -- and a standalone
+    ``instrumental_section_tags`` tag such as ``[Guitar Solo]``.
+    """
+    sections = {s["id"]: s for s in st["sections"]}
+    surfaces: list[str] = []
+    for sec in found:
+        meta = sections.get(sec.get("section") or "")
         if meta and meta.get("instrumental"):
-            rep.oracle(
-                f"line {section['line']}: caption instrumentation vs instrumental section "
-                f"'[{section['raw']}]' -- semantic, needs the oracle"
-            )
+            surfaces.append(f"'[{sec['raw']}]' line {sec['line']}")
+        for tag in sec.get("standalone", []):
+            if tag["pool"] == "instrumental_section_tags":
+                surfaces.append(f"'[{tag['raw']}]' line {tag['line']}")
+    return surfaces
 
-    # Rule 4 is exactly checkable: no vocal tag when the lead vocal is Instrumental/No Vocals.
+
+def check_consistency(found: list[dict], st: dict, vocab: dict, selections: dict, rep: Report) -> None:
+    """Enforce the exactly-checkable consistency rule; give each semantic rule one oracle task.
+
+    Rule 4 is decidable and never deferred: when the caption's lead vocal is Instrumental or No
+    Vocals, a vocal control tag in the lyric is an error, not a question. The other rules compare a
+    caption bin against a lyric tag pool, which is a judgement, so they are deferred -- once each.
+    The instrumentation rule is compared against two lyric surfaces, so naming both in its single
+    task keeps one rule from producing two deferrals.
+    """
+    surfaces = _instrumental_surfaces(found, st)
+
     lead = (selections.get("lead_vocal") or {}).get("options") or []
     instrumental = bool({"instrumental", "no_vocals"} & set(lead))
     if instrumental:
@@ -374,12 +401,19 @@ def check_consistency(found: list[dict], st: dict, vocab: dict, selections: dict
                     )
 
     for rule in st["consistency"]:
+        if rule["id"] == "no_vocals_no_vocal_tags":
+            continue  # decided in code above; nothing is left for the oracle
         bins_present = [b for b in rule["caption_bins"] if selections.get(b)]
-        if bins_present:
-            rep.oracle(
-                f"consistency rule '{rule['id']}': compare caption bins {bins_present} against "
-                f"{rule['section_pool']} tags in the lyrics"
-            )
+        if not bins_present:
+            continue
+        if rule["id"] == "instruments_match_instrumental_tags" and surfaces:
+            where = f" ({', '.join(surfaces)})"
+        else:
+            where = ""
+        rep.oracle(
+            f"consistency rule '{rule['id']}': compare caption bins {bins_present} against "
+            f"{rule['section_pool']} tags in the lyrics{where}"
+        )
 
     if not selections:
         rep.warn("no caption selections supplied; consistency rules not evaluated")
@@ -704,12 +738,13 @@ def check_template(meter: dict, st: dict, template: dict, rep: Report,
         ratio = hits / len(pattern)
         act["scheme_match"] = round(ratio, 2)
         if ratio < 1.0:
-            weight = "warn" if scheme["strictness"] == "strict" else "note"
+            # A strict scheme is a commitment, so a miss is a warning. A lenient one is written to
+            # bend, so an approximate landing is a note -- not a pending oracle verdict.
             message = (
                 f"[{act['tag']}]: rhyme scheme {detected} vs template '{scheme_id}' "
                 f"({pattern}), {hits}/{len(pattern)} positions match (approximate)"
             )
-            (rep.warn if weight == "warn" else rep.oracle)(message)
+            (rep.warn if scheme["strictness"] == "strict" else rep.note)(message)
 
     hooks = [s for s in expected if s.get("hook")]
     if hooks:
@@ -901,6 +936,8 @@ def main(argv: list[str]) -> int:
                         f"{(f'{rate:.2f}/s' if rate else '-'):>9}"
                     )
             print()
+    for n in rep.notes:
+        print(f"note:  {n}")
     for w in rep.warnings:
         print(f"warn:  {w}")
     for e in rep.errors:
@@ -911,7 +948,7 @@ def main(argv: list[str]) -> int:
     if rep.errors:
         print(f"\nFAILED with {len(rep.errors)} error(s)")
         return 1
-    print(f"\nOK; {len(rep.oracle_tasks)} consistency check(s) deferred to the oracle")
+    print(f"\nOK; {len(rep.oracle_tasks)} item(s) deferred to the oracle")
     return 0
 
 

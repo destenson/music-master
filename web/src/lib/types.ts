@@ -159,6 +159,8 @@ export interface LyricReport {
   outline: { line: number; role: string }[];
   errors: string[];
   warnings: string[];
+  /** Observations that are neither defects nor work for the oracle, e.g. a lenient rhyme landing. */
+  notes: string[];
   oracle_tasks: string[];
   conformance: Conformance | null;
 }

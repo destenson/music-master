@@ -380,9 +380,29 @@ code,
   color: var(--unknown);
 }
 
-/* Information about a render that is not trouble: a cache hit, an unrecognised event. */
+/* Information that is not trouble: a cache hit, an unrecognised event, a lyric observation. */
 .finding.note {
   color: var(--muted);
+}
+
+/* A finding that can jump to the line it is about. The whole row is the target, so the button
+   takes the row's shape rather than the app's default button chrome. */
+.finding.jumpable {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  padding: 3px 0;
+  font-size: 12px;
+}
+
+.finding.jumpable:hover {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-color: var(--line);
 }
 
 /* --- Timeline ---------------------------------------------------------------------- */
@@ -490,6 +510,13 @@ table.grid td {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
+/* The line a finding just jumped to. Stronger than the active line, since the caret alone is a
+   thin mark and the point of the jump is to be findable at a glance. */
+.editor .cm-flash {
+  background: color-mix(in srgb, var(--accent) 20%, transparent);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
 /* A section header is the spine of the lyric, so it should read as one. */
 .editor .cm-header-tag {
   color: var(--accent);
@@ -549,7 +576,10 @@ textarea.brief-input {
   line-height: 1.5;
 }
 
-button.jump {
+/* The line number on a finding that jumps. A label, not a control: the row it sits in is the
+   control, so this must not look like a separate button. */
+.jump {
+  display: inline-block;
   background: transparent;
   border: 1px solid var(--line);
   color: var(--accent);

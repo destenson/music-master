@@ -258,7 +258,10 @@ caption/lyric consistency rules. That is where the tutorial's checklist becomes 
 
 Keeping the mechanical one in code and the rest with the oracle is the same division the whole
 design uses, and it is why `check_lyrics.py` exits with a distinct "deferred to the oracle" list
-rather than pretending to have verified them.
+rather than pretending to have verified them. Its findings are split three ways for that reason:
+what the checker can decide is an error or a warning, what it can only pose is deferred to the
+oracle, and what a lenient rule already permits — a rhyme scheme landing approximately — is a note
+rather than a pending verdict.
 
 ```bash
 python3 vocabulary/check_lyrics.py vocabulary/examples/lyrics-late-night-trap.md \

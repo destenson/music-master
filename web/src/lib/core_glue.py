@@ -224,6 +224,7 @@ def check_lyric(payload):
             "outline": outline,
             "errors": report.errors,
             "warnings": report.warnings,
+            "notes": report.notes,
             "oracle_tasks": report.oracle_tasks,
             "conformance": conformance,
         }
