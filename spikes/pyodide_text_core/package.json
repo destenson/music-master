@@ -1,0 +1,15 @@
+{
+  "name": "pyodide-text-core-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runs the Music Master text core under Pyodide, to check that a static SPA can reuse the one implementation instead of reimplementing it.",
+  "license": "ISC",
+  "type": "module",
+  "scripts": {
+    "parity": "node parity.mjs",
+    "latency": "node latency.mjs"
+  },
+  "dependencies": {
+    "pyodide": "^314.0.7"
+  }
+}

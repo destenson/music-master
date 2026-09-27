@@ -187,6 +187,19 @@ since the prompt is the input to the generator and is being specified first.
     /home/dennis/src/comfyanonymous--ComfyUI/.venv/bin/python spikes/measurement_probe.py
   ```
 
+- [`spikes/pyodide_text_core/`](spikes/pyodide_text_core/README.md) — runs the text core under a
+  WebAssembly CPython, to check that a static SPA can use the same implementation the CLI does
+  instead of a rewrite that drifts. Seven CLI invocations came back **byte-identical** between native
+  CPython 3.12.3 and Pyodide 3.14.2, and the full per-caret lyric check measured ~12 ms median / ~17 ms
+  p95 — about twice native, and inside a frame. It also pins the invariant that makes it possible:
+  the text tier imports nothing outside the standard library.
+
+  ```bash
+  cd spikes/pyodide_text_core && npm install
+  node parity.mjs      # correctness, byte-for-byte
+  node latency.mjs     # is the per-caret check inside a frame budget?
+  ```
+
 ## Target model
 
 **ACE-Step 1.5** (XL turbo) is the reference generator, driven through its ComfyUI graph. All

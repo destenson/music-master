@@ -135,24 +135,63 @@ with the same logic and no duplicated rules:
 
 ```
 musicmaster/
+  # Text tier -- pure, stdlib only, JSON in / JSON out. Runs under CPython and under Pyodide.
   vocabulary.py   # load, validate, options, polarity, label maps
-  timeline.py     # build_timeline, check_fit, rates  (from vocabulary/timeline.py)
-  lyrics.py       # parse, check, template conformance       (from check_lyrics.py)
+  timeline.py     # build_timeline, check_fit, rates          (from vocabulary/timeline.py)
+  lyrics.py       # parse, check, template conformance        (from check_lyrics.py)
   render.py       # render tags, budget, negatives            (from render_tags.py)
   prompt.py       # canonical prompt, target rendering, hashing
+
+  # Boundary -- the manifest is pure (hashing, staleness); reading and writing the song directory is not.
+  bundle.py       # song directory, manifest, manifest hashes
+
+  # Execute tier -- needs a GPU, a filesystem or a network. Host only.
   generate.py     # Generator protocol, ComfyUI adapter       (from build_and_submit.py)
   measure.py      # mechanical, vocals, transitions, dynamics (from analyse_*.py)
   oracle.py       # Jev / local / replay
-  bundle.py       # song directory, manifest, manifest hashes
-  api.py          # the typed surface the UI is allowed to use
+
+  api.py          # what the local backend exposes; the SPA imports the text tier directly
   cli.py          # musicmaster brief|compose|lyrics|prompt|render|verify
 ```
 
-Then a thin local server exposes `api.py` over HTTP/JSON plus server-sent events for progress. The
-CLI and the UI are two clients of one core, which is also what makes the UI testable without a
-browser.
+Those three groups are not a filing convention; they are the seam, and the thing that varies across
+it is **runtime capability** — what a WebAssembly sandbox can do versus what needs a GPU, a
+filesystem and a network. Putting the seam there is what lets the UI be static without becoming a
+second implementation of the checks:
 
-The API the UI needs, at minimum:
+- **CPython** imports the text tier for the CLI, the tests and the local backend.
+- **Pyodide** imports the same source in the browser, as a WebAssembly CPython.
+
+Two adapters means a real seam, and the deletion test passes: remove the text tier and the checks
+reappear in TypeScript, which is the drift this section exists to prevent. It also makes the
+interface a handful of pure functions — `render`, `build_timeline`, the lyric checks — rather than a
+route list, which is far less for a caller to learn.
+
+**The invariant that keeps it true: the text tier imports nothing outside the standard library.**
+That is an interface fact, not a style preference — a Pyodide caller cannot install numpy — so it is
+asserted by a test rather than left to review. A dependency that breaks it means the module has
+crossed into the execute tier and should move.
+
+None of this is assumed. [`spikes/pyodide_text_core`](../../spikes/pyodide_text_core/README.md) runs
+the current scripts under both runtimes: **seven CLI invocations byte-identical** between native
+CPython 3.12.3 and Pyodide 3.14.2, and the full per-caret lyric check at **~12 ms median / ~17 ms
+p95** — about twice native, and inside a frame.
+
+The execute tier keeps an HTTP surface, because it genuinely needs one, but it is optional rather
+than the only way in: a thin local server exposes `api.py` over HTTP/JSON plus server-sent events for
+progress. The CLI, the SPA and the local backend are three clients of one core.
+
+What that buys, per surface:
+
+| Surface | Static SPA, nothing running | Optional local backend |
+| --- | --- | --- |
+| Workspace, brief & spec, builder, structure & time | live — vocabulary, rendering, timeline | — |
+| Lyric editor, prompt | live — grammar lens, checks, hashing | — |
+| Report — intent fidelity | live | — |
+| Report — realization fidelity | only if measurements were committed | live measurement |
+| Render console, takes, settings, oracle | unavailable, and says so | required |
+
+The API the local backend needs, at minimum:
 
 ```
 GET  /api/songs                          -> [{id, status, caption, updated}]
@@ -177,6 +216,11 @@ GET  /api/capabilities                   -> target capabilities (for gating cont
 Capability gating matters: `GET /api/capabilities` is how the builder knows to disable `5/4` and
 `7/8` with a reason, and how a future model swap changes the form without a code change.
 
+Several of those routes are text-tier work the SPA now does itself — vocabulary, templates, timeline
+and the lyric checks. They stay on the backend for callers that have no WASM core: a script, a CI job,
+another machine. That is deliberate duplication of the *transport*, never of the logic, which is the
+distinction the seam exists to keep.
+
 ## 6. The four surfaces that matter
 
 ### 6.1 Builder
@@ -191,7 +235,7 @@ Capability gating matters: `GET /api/capabilities` is how the builder knows to d
 │ ├ Groove ─────────────────┤ ├ Vocals ────────────────┤ │ Distorted Guitar, Downtuned …     │ │
 │ │ ☑ Syncopated ☑ Breakbeat│ │ Lead ☑ Male Rap Vocals  │ │                                   │ │
 │ │ ☑ Groovy     ☑ Offbeat  │ │      ☑ Spoken Word      │ │ tags 32 / 32    omitted 5 ⓘ       │ │
-│ └─────────────────────────┘ └─────────────────────────┘ │ [Copy] [Diff] [Save]              │ │
+│ └─────────────────────────┘ └─────────────────────────┘ │ [Copy] [Diff] [Export]            │ │
 │                                                          └───────────────────────────────────┘ │
 │ ⚠ 1 caution (5/4 unreliable)   ⛔ 2 unavailable on this target   ⚠ 1 coherence note            │
 └──────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -303,10 +347,16 @@ songs/rap-metal-groove/
   build_and_submit.py  verify_render.py  analyse_*.py  <- tooling
 ```
 
-The UI writes only the source files plus the manifest. Generated artifacts are rebuilt. The manifest
-records hashes, seeds, vocabulary version and environment, so the workspace listing can show "stale"
-when a source artifact changed after the last render — which is the UI's most valuable piece of
-bookkeeping and costs nothing because the hashes already exist.
+A static SPA cannot write to the song directory, so the loop is explicit: it edits in memory and
+**exports** the changed source files (`brief.md`, `selections.json`, `lyrics.md`, `prompt.json`), and
+they land in the repo as a commit. That is a real cost, and it is the honest one — the alternative is
+letting a browser hold the record. The local backend, when it is running, may write the files
+directly, which removes the copy step without changing where the truth lives.
+
+Where the UI does have the directory, it writes only the source files plus the manifest. Generated
+artifacts are rebuilt. The manifest records hashes, seeds, vocabulary version and environment, so the
+workspace listing can show "stale" when a source artifact changed after the last render — which is
+the UI's most valuable piece of bookkeeping and costs nothing because the hashes already exist.
 
 Git is the versioning system. The UI does not invent one; it offers "show diff" and "revert file".
 
@@ -322,34 +372,53 @@ Renders take ~60 s each on the 3090 and the GPU is shared with other work, so:
 
 ## 9. Honesty in affordances
 
-Three specific places where the UI must resist a nicer-looking lie:
+Four specific places where the UI must resist a nicer-looking lie:
 
 | Temptation | Instead |
 | --- | --- |
 | A green tick per requirement | `unverified` gets its own colour, its own heading, and a stated reason |
 | A quality number for the take | the number plus its expected direction, plus "advisory" where the detector is approximate |
 | An enabled transition control | enabled, but marked **declared — usually not honoured by this model** and always verified |
+| A page that looks complete with no backend running | the surfaces that need one read **unavailable, and why**, rather than rendering empty; the build stamps the artifact hashes and vocabulary version it was made from |
 
 ## 10. Tech stack
 
-**Recommended: local web app.** FastAPI serving the core API + SSE, and a Svelte or React front end;
-`wavesurfer.js` for the waveform. Reasons: audio in the browser is solved, the dense generated form
-is easier in a component framework than in a desktop toolkit, and Python is already the core.
+**Recommended: a static single-page app that is useful with no server at all**, plus an optional
+local backend for the work that needs a GPU.
+
+- **The SPA** is a component-framework build (Svelte or React) with `wavesurfer.js` for the waveform,
+  served as static files. It carries the text tier as a Pyodide runtime and calls it directly, so the
+  builder, the time budget and the lyric inspector are live on a page that has never talked to a
+  server.
+- **The local backend** is FastAPI over the same core: render submission and progress (SSE),
+  measurement, the audio files, and the oracle. It is optional. With it absent the SPA degrades to
+  the text tier and says so, in place of the surfaces it cannot populate.
+
+Reasons for the static default: it deploys anywhere or opens from a checkout, it has no port to keep
+and no service to leave running, and the checks the UI shows are the same code the CLI runs. It also
+keeps `unverified` honest — a page that never reached an oracle has nothing to fake it with.
 
 Rejected: Gradio/Streamlit (fast for a demo, cannot express the inspector-and-editor layout or the
-audition grid); Electron/Tauri (no benefit over a local page, more packaging); a native toolkit
+audition grid); Electron/Tauri (no benefit over a static page, more packaging); a native toolkit
 (would duplicate the audio and layout work for nothing).
 
-It runs as its own local service on a dedicated port (e.g. `127.0.0.1:8787`), started as a managed
-background job, and is entirely separate from the DSH Web GUI on 3080.
+"Static" means no *application* server, not `file://`: WASM and ES-module loading want to be served
+over HTTP, which any static host or `python3 -m http.server` provides. Hosting is undecided and
+nothing here depends on GitHub Pages specifically; the two things a project-page deploy would need —
+a configurable base path, and hash routing or a 404 fallback — are cheap and deferred.
+
+The local backend runs on a dedicated port (e.g. `127.0.0.1:8787`) and is separate from the DSH Web
+GUI on 3080. A deployed page reaching it is an enhancement, never a dependency: browsers treat
+`127.0.0.1` as a trustworthy origin so an HTTPS page may call it, but CORS and Chrome's Private
+Network Access preflight both apply, and the text tier must never assume the service is there.
 
 ## 11. Phasing
 
 | Milestone | Content | Done when |
 | --- | --- | --- |
 | **C** | **Captioner and evidence classes** — `describe.py`, the gauge, structured scoring, captions ([`captioner.md`](captioner.md)) | per-class gauge measured; genre, vocal and instrument classes either decided or explicitly not; `unverified` count falls by the classes that passed |
-| **M0** | Extract `musicmaster/` package + CLI; current scripts become thin wrappers | the two existing songs build, check and report **byte-identically** through the package, and one test asserts it |
-| **M1** | Read-only workspace + report viewer | opening either existing song shows its artifacts and verdicts, with `unverified` correct |
+| **M0** | Extract `musicmaster/` package + CLI into the text and execute tiers; current scripts become thin wrappers | the two existing songs build, check and report **byte-identically** through the package; one test asserts it, and one guard test asserts the text tier imports only the standard library |
+| **M1** | Read-only workspace + report viewer, shipped as a static build with nothing running | opening either existing song shows its artifacts and verdicts, with `unverified` correct and no backend required |
 | **M2** | Brief → spec → builder → structure/time | a new song can be authored to a valid prompt without touching a file |
 | **M3** | Lyric editor with grammar lens and inspector | the rap-metal lyric can be written in the UI, and every finding the CLI produces is reproduced |
 | **M4** | Render console, takes, audition, settings, oracle wiring | render 3 takes, compare, keep one, see the report |
@@ -376,24 +445,34 @@ the same checks, and the second one would drift.
    validator catches things a form would not. A read-only browser may be the whole answer.
 6. **How much audition UI?** Waveform, section markers, A/B and blind comparison is real work; a track
    list with an audio element is an afternoon. Start small.
-7. **Where does the UI live if the core moves to a box with the GPU?** The API boundary makes a remote
-   core possible, but file-path assumptions in the current scripts do not.
+7. **Where does the UI live, now that the core is split?** Resolved in shape: the text tier runs
+   wherever the page runs and so has no location, and only the execute tier does — reached over HTTP
+   wherever it is hosted. The file-path assumptions in the current scripts are what still has to go,
+   and M0 removes them.
+8. **How does an edit get back into the repo?** Export-and-commit works with no server and is the
+   default; the local backend may write files directly when it is running. Committing through the
+   GitHub API with a token would let a deployed page save, and is deferred rather than rejected.
 
 ## 13. Risks
 
 | Risk | Why it matters | Mitigation |
 | --- | --- | --- |
-| Two implementations of the checks | the UI's green tick and the CLI's verdict diverge | M0 first; the UI has no validation logic of its own |
+| Two implementations of the checks | the UI's green tick and the CLI's verdict diverge | M0 first, and the text tier runs in the browser as the same WASM Python the CLI uses, so there is no second implementation; a guard test keeps it stdlib-only |
 | The builder is a 792-option wall | users bounce off a form that looks like a spreadsheet | presets, search, progressive disclosure by group, and defaults from the brief |
 | Green ticks creep in | the exact failure the project exists to prevent | `unverified` styling is a review gate, and the count is asserted in tests |
 | ComfyUI is shared and external | renders fail or stall while the UI looks broken | preflight, explicit queue states, ComfyUI's own errors surfaced verbatim |
 | Scope | eleven surfaces is a large v1 | milestones, and M1 is genuinely useful alone |
 | Metric theatre | a dashboard of numbers nobody can act on | every metric shows its expected direction and its detector's reliability |
+| Pyodide is several MB before the first check runs | a cold cache makes the SPA feel broken before it does anything | load it after first paint, behind the first surface that needs it; the vocabulary payload itself is ~150 KB |
+| A deployed page looks finished while the execute tier is absent | overstating what was checked is the failure this project exists to prevent | the absent backend is a rendered state rather than an empty one, and `unverified` plus the build stamp stay visible |
+| The local backend is unreachable from a deployed page | the enhancement fails silently and the UI looks broken | optional by construction — the text tier never depends on it, and a CORS or private-network failure surfaces as "backend unavailable" |
 
 ## 14. First commit of the next session
 
-1. `musicmaster/` package skeleton with `vocabulary.py`, `timeline.py`, `render.py` extracted verbatim.
-2. A parity test that runs both the old scripts and the new package on both songs and asserts
-   identical output.
-3. `api.py` with five endpoints: vocabulary, templates, timeline, caption-render, lyrics-check.
-4. Nothing else. The UI starts once the core has one entry point.
+1. `musicmaster/` package skeleton, extracting the five text modules verbatim into the stdlib-only
+   tier, with the current files becoming thin wrappers.
+2. A parity test with two halves: the package against the old scripts on both songs, and the same
+   package under Pyodide. [`spikes/pyodide_text_core`](../../spikes/pyodide_text_core/README.md)
+   already proves the second half is achievable; point it at the package instead of the scripts.
+3. A guard test asserting the text tier imports nothing outside the standard library.
+4. Nothing else. The SPA starts once the core has one entry point and one proven runtime story.

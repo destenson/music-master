@@ -18,3 +18,8 @@ spikes/*.wav
 spikes/.numba/
 artifacts/
 .venv/
+
+# Node. The Pyodide spike installs its runtime here, and the SPA build will install here too.
+node_modules/
+.npm-cache/
+spikes/pyodide_text_core/*.log
