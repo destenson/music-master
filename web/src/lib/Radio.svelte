@@ -430,8 +430,8 @@
                   <span class="spacer" style="flex:1"></span>
                   {#if age}<span class="small muted">{age}</span>{/if}
                   {#if song.status === "ready" || song.status === "playing"}
-                    <span class="chip" class:meta={song.lyricSource === "instrumental"}>
-                      {song.lyricSource === "instrumental" ? "instrumental" : "sung"}
+                    <span class="chip" class:meta={song.instrumental}>
+                      {song.instrumental ? "instrumental" : "sung"}
                     </span>
                   {/if}
                   <span class="chip" class:warn={song.status === "failed"}>{STATUS[song.status]}</span>

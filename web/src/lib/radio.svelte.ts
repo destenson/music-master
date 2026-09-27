@@ -329,7 +329,8 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
     theme: take.theme,
     lyrics: "",
     instrumental: take.instrumental,
-    lyricSource: "instrumental",
+    // The take's own kind, not a default: a recovered sung take is not an instrumental one.
+    lyricSource: take.instrumental ? "instrumental" : "model",
     jobId: null,
     waited: 0,
     file: take.file,
