@@ -143,5 +143,15 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    proxy: {
+      // A development proxy so the page can reach ollama without the browser enforcing CORS. A
+      // static build has no proxy, so there it talks to ollama directly and the daemon has to allow
+      // the page's origin (OLLAMA_ORIGINS). The base URL is a setting either way.
+      "/ollama": {
+        target: "http://127.0.0.1:11434",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ollama/, ""),
+      },
+    },
   },
 });

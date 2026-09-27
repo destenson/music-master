@@ -14,6 +14,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { loadPyodide } from "pyodide";
+import { parseFindings, slotFor } from "../src/lib/lens.ts";
+import { stable } from "../src/lib/draft.ts";
+import { generate } from "../src/lib/ollama.ts";
+import { buildPrompt } from "../src/lib/prompt.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
 const REPO = path.resolve(WEB, "..");
@@ -91,6 +95,123 @@ check("coherence problems", [...rendered.problems].sort(), native.render.problem
 check("delivery profile", rendered.profile, native.profile);
 check("planned sections", plan.rows.length, native.plan.rows);
 check("timeline totals", plan.totals, native.plan.totals);
+
+// --- The generator: the brief must be the core's own, and the scaffold must be valid on arrival ---
+
+const templatesFile = JSON.parse(
+  fs.readFileSync(path.join(DIST, "repo", "vocabulary", "structure-templates.json"), "utf8"),
+);
+const template = templatesFile.templates.find((t) => t.id === song.template_id);
+const brief = call("brief", { template_id: song.template_id, bpm: song.bpm, selections });
+const scaffold = call("scaffold", { template_id: song.template_id });
+const checked = call("check_lyric", {
+  text: scaffold.text,
+  template_id: song.template_id,
+  bpm: song.bpm,
+  selections,
+});
+
+// A scaffold that needs fixing before it can be written into is not a useful starting point.
+const prose = scaffold.text
+  .split("\n")
+  .filter((line) => line.trim() !== "" && !/^\[[^\]]+\]$/.test(line.trim()));
+
+console.log("\ngenerator:\n");
+check("the brief is produced", brief.brief.length > 500, true);
+check("the brief names the template", brief.brief.includes(template.name), true);
+check("the brief states each section's line budget", brief.brief.includes("budget"), true);
+check("the scaffold is only tags and blank lines", prose, []);
+check("the scaffold names every section", checked.outline.length, template.sections.length);
+check("the scaffold passes the checker", checked.errors, []);
+
+if (process.argv.includes("--show")) {
+  console.log("\n--- scaffold ---\n" + scaffold.text.replace(/^/gm, "  "));
+  console.log("--- brief ---\n" + brief.brief.replace(/^/gm, "  "));
+}
+
+// --- The lens: the rules the editor enforces, which a build cannot check ---------------------
+
+const LABELS = new Set(["Intro", "Verse 1", "Chorus", "Solo"]);
+const slot = (lines, line, content = "") =>
+  slotFor({ lines, line, content, sectionLabels: LABELS });
+
+console.log("\nlens:\n");
+check(
+  "a positional finding keeps its line",
+  parseFindings({ errors: ["line 3: unknown tag '[X]'"], warnings: [] }),
+  [{ line: 3, severity: "error", message: "unknown tag '[X]'" }],
+);
+check(
+  "a finding about the whole song gets no line",
+  parseFindings({ errors: [], warnings: ["[Verse 1]: rhyme scheme AAAA vs template (approximate)"] }),
+  [],
+);
+check("an empty section is a header slot", slot(["[Verse 1]"], 1), "header");
+check("a tag under a header is a performance slot", slot(["[Verse 1]", "[rap]"], 2), "within");
+check(
+  "a tag after the words is a leaving slot",
+  slot(["[Verse 1]", "[rap]", "a line of words", "[build-up]"], 4),
+  "leaving",
+);
+check(
+  "a tag after a blank line is a leaving slot",
+  slot(["[Verse 1]", "[rap]", "[spoken word]", "", "[build-up]"], 5),
+  "leaving",
+);
+check("a new section after a blank is still a leaving slot", slot(["[Verse 1]", "[rap]", "words", "", "[Chorus]"], 5), "leaving");
+check("a hyphen opens the modifier slot", slot(["[Verse 1]"], 1, "Verse 1 - "), "modifier");
+
+// --- Draft state: the comparison the "local draft" badge rests on ------------------------------
+
+console.log("\ndraft state:\n");
+check(
+  "key order does not make two equal selections differ",
+  stable({ genre: { options: ["rap_metal"] }, tempo: { value: 92 } }),
+  stable({ tempo: { value: 92 }, genre: { options: ["rap_metal"] } }),
+);
+check(
+  "a changed selection is detected",
+  stable({ genre: { options: ["rap_metal"] } }) === stable({ genre: { options: ["pop"] } }),
+  false,
+);
+check("arrays keep their order", stable({ a: [1, 2, 3] }), '{"a":[1,2,3]}');
+check("values survive the round trip", JSON.parse(stable({ a: { b: [1, "x", null] } })), {
+  a: { b: [1, "x", null] },
+});
+
+// --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
+//
+// Opt-in because it costs a model call and, for a cloud model, sends the brief off this machine.
+
+if (process.argv.includes("--generate")) {
+  const flag = (name, fallback) => {
+    const found = process.argv.find((argument) => argument.startsWith(`--${name}=`));
+    return found ? found.slice(name.length + 3) : fallback;
+  };
+  const model = flag("model", "deepseek-v4.1-flash:cloud");
+  const theme = flag("theme", "a night shift that never ends");
+
+  const prompt = buildPrompt({ brief: brief.brief, caption: rendered.string, theme });
+  console.log(`\ngenerating with ${model} …`);
+  const started = Date.now();
+  const draft = await generate({ model, base: "http://127.0.0.1:11434", prompt });
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+
+  console.log(`\n--- draft (${seconds}s, ${draft.length} chars) ---\n${draft}`);
+  const verdict = call("check_lyric", {
+    text: draft,
+    template_id: song.template_id,
+    bpm: song.bpm,
+    selections,
+  });
+  console.log(
+    `\nchecker: ${verdict.errors.length} error(s), ${verdict.warnings.length} warning(s), ` +
+      `${verdict.conformance ? verdict.conformance.matched.length : 0}/` +
+      `${template.sections.length} sections matched, ${verdict.outline.length} sections found`,
+  );
+  for (const error of verdict.errors.slice(0, 6)) console.log(`  ERROR ${error}`);
+  for (const warning of verdict.warnings.slice(0, 6)) console.log(`  warn  ${warning}`);
+}
 
 // The runtime the page loads must have been copied, or the browser boot fails and nothing else does.
 const runtime = ["pyodide.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"];

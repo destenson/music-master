@@ -397,17 +397,7 @@ table.grid td {
   border-bottom: 1px solid color-mix(in srgb, var(--line) 50%, transparent);
 }
 
-/* --- Lyrics ------------------------------------------------------------------------ */
-
-textarea.lyrics {
-  width: 100%;
-  min-height: 60vh;
-  resize: vertical;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  padding: 10px;
-}
+/* --- Boot status ------------------------------------------------------------------- */
 
 .status {
   padding: 24px;
@@ -416,4 +406,107 @@ textarea.lyrics {
 
 .status.failed {
   color: var(--bad);
+}
+
+/* --- The lyric editor ------------------------------------------------------------------ */
+
+.editor {
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.editor .cm-editor {
+  background: var(--panel-2);
+  font-size: 13px;
+}
+
+.editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+.editor .cm-scroller {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.6;
+  max-height: 62vh;
+}
+
+.editor .cm-content {
+  padding: 8px 0;
+}
+
+.editor .cm-line {
+  padding: 0 10px;
+}
+
+.editor .cm-gutters {
+  background: var(--panel-2);
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.editor .cm-activeLine,
+.editor .cm-activeLineGutter {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+}
+
+/* A section header is the spine of the lyric, so it should read as one. */
+.editor .cm-header-tag {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* A caesura is a phrase break and is never sung, so it reads as a thin break rather than a word. */
+.editor .cm-caesura {
+  color: var(--muted);
+  border-left: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  padding-left: 3px;
+  margin-left: 2px;
+}
+
+.editor .cm-tooltip {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.editor .cm-tooltip-autocomplete ul li[aria-selected] {
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
+  color: var(--text);
+}
+
+/* --- The writing brief and the generator ------------------------------------------------ */
+
+pre.brief {
+  margin: 0;
+  padding: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.generate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+}
+
+button.jump {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--accent);
+  font-size: 11px;
+  padding: 0 5px;
+  margin-right: 6px;
+  border-radius: 3px;
 }

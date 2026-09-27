@@ -184,7 +184,8 @@ uses. No server is in the loop, and there is no second implementation to drift f
 cd web && npm install
 npx vite                 # http://127.0.0.1:5173/
 npx vite build           # static bundle in web/dist, repository and runtime copied in
-node scripts/smoke.mjs   # checks the browser glue against the CLI, without a browser
+node scripts/smoke.mjs   # checks the browser glue and the lens against the CLI, without a browser
+node scripts/smoke.mjs --generate --theme="…"   # one real draft, scored by the checker
 ```
 
 The page reads the vocabulary, the text tier and the songs out of the repository itself, so the form
@@ -193,8 +194,41 @@ control, and nothing in `web/` changes.
 
 What it does today: opens `rap-metal-groove`, generates the whole bin form from the vocabulary,
 renders the caption live with its tag budget, dropped tags, negatives and coherence notes, draws the
-timeline with its syllable budget, and checks a lyric with per-section syllable, phrase and rhyme
-numbers.
+timeline with its syllable budget, and gives the lyric a generator and an editor.
+
+**The generator has a deterministic half and a model half.** The deterministic half is the scaffold
+and the writing brief, both from the text tier: no network, and correct by construction — a fresh
+scaffold passes the checker immediately, with every section, performance tag and transition already
+in place. The model half sends that same brief, plus the caption and a one-line theme, to a model
+through ollama. Cloud models are listed first because the local ones compete for the GPU ComfyUI
+renders on, and the panel states which you have chosen and what leaves the machine.
+
+**The editor is a text file with a grammar lens**, not a structured form, because a lyric that cannot
+round-trip is a trap. The lens reads the same `section-tags.json` the checker reads, so it cannot
+invent a rule: tag autocomplete that offers a modifier only after a section header, findings shown on
+the line they are about, section headers and caesura breaks marked, and a per-section inspector that
+follows the caret. One rule is a gate and the rest is ordering — after a blank line a tag may be
+either the transition leaving a section or the header of the next, so both are offered rather than
+guessed between.
+
+**State is browser-local by design.** Selections, the lyric, the template, the tempo and the view are
+kept in `localStorage` so a reload does not throw an edit away, and a **local draft** marker with
+one-click revert appears whenever the working state differs from what the repository holds. The
+marker is there because the distinction is real: the song directory is the record, and a page cannot
+write to it.
+
+**The model server is a setting, not an assumption.** It defaults to this machine's daemon. A page
+served from somewhere else — GitHub Pages, say — reaches it over CORS, which ollama refuses by
+default, because its allow-list is localhost and a few app schemes and the deployed origin is not on
+it. Point the address somewhere you control, or let ollama allow the page:
+
+```
+OLLAMA_ORIGINS=https://you.github.io ollama serve
+```
+
+Chrome may additionally ask permission for a public page to reach a local address. When nothing
+answers, the panel says so and prints that command with the real origin filled in, rather than
+surfacing a bare "Failed to fetch".
 
 What it does not do yet, and says so rather than showing an empty pane: interpret a brief into typed
 requirements (no oracle is configured), show the canonical prompt (that logic still lives inside

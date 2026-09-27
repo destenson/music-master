@@ -1,14 +1,17 @@
 """The browser-side face of the text tier.
 
 Runs inside Pyodide against the same `musicmaster` package the CLI uses, with the repository
-mounted at /repo. Everything crosses the JS boundary as a JSON string: the page owns the form and
-the selection state, this owns the checks, and neither reimplements the other.
+mounted at /repo. Everything crosses the JS boundary as a JSON string: the page owns the form, the
+selection state and the editing, this owns the checks and the generated structure, and neither
+reimplements the other.
 
 It lives beside the SPA rather than in the package because it is presentation plumbing -- loading
 the vocabulary once and shaping results for a page -- not a rule about songs. Anything here that
 turns out to be a rule belongs in musicmaster/ instead.
 """
 
+import contextlib
+import io
 import json
 import sys
 
@@ -21,6 +24,8 @@ _vocab = render.load_vocabulary()
 _section_tags = timeline.load(timeline.SECTION_TAGS_PATH)
 _templates_doc = timeline.load(timeline.TEMPLATES_PATH)
 _rates = timeline.load_delivery_rates()
+_tag_labels = timeline.tag_label_map(_section_tags)
+_section_meta = timeline.section_meta(_section_tags)
 
 
 def _template(template_id):
@@ -31,30 +36,14 @@ def _profile(selections):
     return timeline.profile_for_vocals(selections, _rates)
 
 
-def render_selections(payload):
-    """The tag string, what the budget dropped, the negatives, and any coherence problems."""
-    selections = json.loads(payload)
-    profile = _profile(selections)
-    return json.dumps(
-        {
-            **render.render(_vocab, selections),
-            "problems": render.coherence_check(_vocab, selections),
-            "profile": profile["label"],
-            "band": list(profile["band"]),
-            "budget": _vocab["tag_budget"],
-        }
-    )
-
-
-def plan(payload):
-    """The time budget for a template at a tempo, optionally scaled to a target duration.
+def _build_plan(request):
+    """Build a timeline once, so the plan, the brief and the scaffold cannot disagree.
 
     The delivery profile is derived from the selections when they are supplied, because the budget
     is delivery-dependent: a rapped verse measured against the sung band (6-10 syllables a line)
     states a range nobody is aiming for, where the rapped band is 8-16. An explicit `profile_id`
     still wins, which is the precedence the lyric checker already uses.
     """
-    request = json.loads(payload)
     template_id = request["template_id"]
     bpm = float(request["bpm"])
     duration = request.get("duration_s")
@@ -77,20 +66,87 @@ def plan(payload):
     built = timeline.build_timeline(
         {**template, "sections": sections}, bpm, _section_tags, profile, _templates_doc
     )
+    return template, {
+        "template_id": template_id,
+        "template_name": template["name"],
+        "bpm": bpm,
+        "achieved_s": achieved,
+        "profile_label": profile["label"],
+        **built,
+    }
+
+
+def render_selections(payload):
+    """The tag string, what the budget dropped, the negatives, and any coherence problems."""
+    selections = json.loads(payload)
+    profile = _profile(selections)
     return json.dumps(
         {
-            "template_id": template_id,
-            "template_name": template["name"],
-            "bpm": bpm,
-            "achieved_s": achieved,
-            "profile_label": profile["label"],
-            **built,
+            **render.render(_vocab, selections),
+            "problems": render.coherence_check(_vocab, selections),
+            "profile": profile["label"],
+            "band": list(profile["band"]),
+            "budget": _vocab["tag_budget"],
         }
     )
 
 
+def plan(payload):
+    """The time budget for a template at a tempo, optionally scaled to a target duration."""
+    _, built = _build_plan(json.loads(payload))
+    return json.dumps(built)
+
+
+def brief(payload):
+    """The writing brief, captured from the same printer the CLI uses rather than re-worded here."""
+    request = json.loads(payload)
+    template, built = _build_plan(request)
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        templates.print_brief(built, template.get("notes"), _section_tags)
+    return json.dumps({"brief": buffer.getvalue()})
+
+
+def scaffold(payload):
+    """A structurally correct empty lyric: every section header in order, the performance tags that
+    section asks for, and the transition it leaves on.
+
+    No words and no line placeholders. An empty line is not a lyric the checker can count, and a
+    placeholder would be counted as one; the line counts and syllable budgets belong in the brief and
+    the inspector, where they read as targets. What the scaffold guarantees is the part that is
+    mechanical: the right sections, the right tags, the right order, and the blank-line discipline.
+    """
+    request = json.loads(payload)
+    template = _template(request["template_id"])
+
+    occurrences: dict[str, int] = {}
+    for section in template["sections"]:
+        occurrences[section["role"]] = occurrences.get(section["role"], 0) + 1
+
+    seen: dict[str, int] = {}
+    out: list[str] = []
+    for section in template["sections"]:
+        role = section["role"]
+        seen[role] = seen.get(role, 0) + 1
+        out.append(f"[{timeline.section_label(_section_meta, role, seen[role], occurrences[role])}]")
+
+        for tag_id in [*(section.get("vocals") or []), *(section.get("energy_tags") or [])]:
+            out.append(f"[{_tag_labels.get(tag_id, tag_id)}]")
+
+        transition = section.get("transition_out")
+        if transition:
+            # A transition belongs to the section it leaves, after the words. With no words yet it
+            # sits below the gap the writer is about to fill.
+            out.append("")
+            out.append(f"[{_tag_labels.get(transition, transition)}]")
+
+        out.append("")
+
+    return json.dumps({"text": "\n".join(out)})
+
+
 def check_lyric(payload):
-    """The checker's findings, plus the per-section numbers the inspector pane reads."""
+    """The checker's findings, the per-section numbers, and where each section starts."""
     request = json.loads(payload)
     lines = request["text"].splitlines()
     selections = request.get("selections") or {}
@@ -108,15 +164,24 @@ def check_lyric(payload):
     conformance = None
     if template_id:
         template = _template(template_id)
-        plan_ = json.loads(
-            plan(json.dumps({"template_id": template_id, "bpm": bpm, "selections": selections}))
+        _, built = _build_plan(
+            {"template_id": template_id, "bpm": bpm, "selections": selections}
         )
-        conformance = lyrics.check_template(meter, _section_tags, template, report, plan=plan_)
+        conformance = lyrics.check_template(meter, _section_tags, template, report, plan=built)
+
+    # Where each section starts, so the editor can tell which one the caret is in. Paired by index
+    # with `sections`, which walks the same boundaries.
+    outline = [
+        {"line": entry["line"], "role": entry.get("section")}
+        for entry in found
+        if entry.get("section")
+    ]
 
     return json.dumps(
         {
             "lines": len(lines),
             "sections": meter["sections"],
+            "outline": outline,
             "errors": report.errors,
             "warnings": report.warnings,
             "oracle_tasks": report.oracle_tasks,

@@ -155,8 +155,49 @@ export interface Conformance {
 export interface LyricReport {
   lines: number;
   sections: LyricSectionReport[];
+  /** Where each section header sits, paired by index with `sections`. */
+  outline: { line: number; role: string }[];
   errors: string[];
   warnings: string[];
   oracle_tasks: string[];
   conformance: Conformance | null;
+}
+
+/** One entry from any of the lyric tag pools. */
+export interface TagTerm {
+  id: string;
+  label: string;
+  axis?: string;
+  description?: string;
+  signature?: string;
+  instrumental?: boolean;
+  numbered?: boolean;
+}
+
+export interface SectionTagsFile {
+  section_tags_version: string;
+  note?: string;
+  grammar: {
+    section_tag: string;
+    max_modifiers: number;
+    max_tags_per_section: number;
+    max_transitions_per_section: number;
+    rules: string[];
+  };
+  sections: TagTerm[];
+  modifiers: TagTerm[];
+  transition_tags: TagTerm[];
+  vocal_tags: TagTerm[];
+  energy_tags: TagTerm[];
+  instrumental_section_tags: TagTerm[];
+}
+
+/** The pools the grammar lens offers, in the order a section is written. */
+export interface TagPools {
+  sections: TagTerm[];
+  modifiers: TagTerm[];
+  transition_tags: TagTerm[];
+  vocal_tags: TagTerm[];
+  energy_tags: TagTerm[];
+  instrumental_section_tags: TagTerm[];
 }

@@ -12,7 +12,9 @@ import type {
   LyricReport,
   RenderResult,
   Selections,
+  SectionTagsFile,
   StructureTemplate,
+  TagPools,
   TemplatesFile,
   TimelinePlan,
   VocabularyFile,
@@ -23,6 +25,8 @@ const MOUNT = "/repo";
 export interface StaticData {
   vocabulary: VocabularyFile;
   templates: StructureTemplate[];
+  /** The lyric tag pools, so the editor's lens and the checker read the same vocabulary. */
+  pools: TagPools;
 }
 
 /**
@@ -50,13 +54,25 @@ async function fetchJson<T>(url: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** The vocabulary and templates, read once so the form and the checkers agree on both. */
+/** The vocabulary, templates and tag pools, read once so the form, the lens and the checkers agree. */
 export async function loadStaticData(): Promise<StaticData> {
   const vocabulary = await fetchJson<VocabularyFile>(asset("repo/vocabulary/tag-bins.json"));
   const templatesFile = await fetchJson<TemplatesFile>(
     asset("repo/vocabulary/structure-templates.json"),
   );
-  return { vocabulary, templates: templatesFile.templates };
+  const tagFile = await fetchJson<SectionTagsFile>(asset("repo/vocabulary/section-tags.json"));
+  return {
+    vocabulary,
+    templates: templatesFile.templates,
+    pools: {
+      sections: tagFile.sections,
+      modifiers: tagFile.modifiers,
+      transition_tags: tagFile.transition_tags,
+      vocal_tags: tagFile.vocal_tags,
+      energy_tags: tagFile.energy_tags,
+      instrumental_section_tags: tagFile.instrumental_section_tags,
+    },
+  };
 }
 
 export class MusicMasterCore {
@@ -115,5 +131,20 @@ export class MusicMasterCore {
     bpm?: number | null;
   }): LyricReport {
     return this.call<LyricReport>("check_lyric", request);
+  }
+
+  /** A structurally correct empty lyric for the template: headers, tags and transitions only. */
+  scaffold(request: { template_id: string }): { text: string } {
+    return this.call<{ text: string }>("scaffold", request);
+  }
+
+  /** The writing brief, exactly as `structure_templates.py --brief` prints it. */
+  brief(request: {
+    template_id: string;
+    bpm: number;
+    duration_s?: number | null;
+    selections?: Selections;
+  }): { brief: string } {
+    return this.call<{ brief: string }>("brief", request);
   }
 }
