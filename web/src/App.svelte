@@ -5,13 +5,16 @@
   import Caption from "./lib/Caption.svelte";
   import Inspector from "./lib/Inspector.svelte";
   import Lyrics from "./lib/Lyrics.svelte";
+  import Render from "./lib/Render.svelte";
+  import Song from "./lib/Song.svelte";
   import Timeline from "./lib/Timeline.svelte";
+  import { freshSeed } from "./lib/comfy";
   import { asset, loadStaticData, MusicMasterCore, type StaticData } from "./lib/core";
   import { clear as clearDraft, read as readDraft, stable, write as writeDraft } from "./lib/draft";
   import { parseFindings, type Finding } from "./lib/lens";
   import { buildPrompt } from "./lib/prompt";
   import * as S from "./lib/selection";
-  import type { LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
+  import type { Artifacts, LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
 
   /** One song for now; the workspace listing comes with the next milestone. */
   const SONG = "rap-metal-groove";
@@ -23,8 +26,14 @@
     template?: string;
     bpm?: number;
     duration?: number | null;
-    view?: "builder" | "lyrics";
+    view?: View;
+    songId?: string;
+    seed?: number;
+    artists?: string;
+    brief?: string;
   }
+
+  type View = "builder" | "lyrics" | "render";
 
   let status = $state("starting up");
   let failure = $state<string | null>(null);
@@ -34,10 +43,13 @@
   let templateId = $state("");
   let bpm = $state(120);
   let duration = $state<number | null>(null);
+  let seed = $state(0);
+  let artists = $state("");
+  let briefText = $state("");
   let selections = $state<Selections>({});
   let lyricText = $state("");
   let caretLine = $state(1);
-  let view = $state<"builder" | "lyrics">("builder");
+  let view = $state<View>("builder");
 
   // What the repository gave us. Everything else is a draft, and the interface says so: the song
   // directory is the record and a static page cannot write to it.
@@ -47,6 +59,10 @@
     template: string;
     bpm: number;
     duration: number | null;
+    songId: string;
+    seed: number;
+    artists: string;
+    brief: string;
   } | null>(null);
 
   let dirty = $derived.by(() => {
@@ -56,7 +72,11 @@
       lyricText !== origin.lyric ||
       templateId !== origin.template ||
       bpm !== origin.bpm ||
-      duration !== origin.duration
+      duration !== origin.duration ||
+      songId !== origin.songId ||
+      seed !== origin.seed ||
+      artists !== origin.artists ||
+      briefText !== origin.brief
     );
   });
 
@@ -107,6 +127,29 @@
     }
   });
 
+  /** The render path: the canonical prompt, the composition it pins, and the ComfyUI graph. */
+  let artifact = $derived.by((): Artifacts | null => {
+    if (!core || !templateId) return null;
+    try {
+      return core.artifacts({
+        song_id: songId,
+        template_id: templateId,
+        bpm,
+        seed,
+        selections,
+        lyrics: lyricText,
+        brief: briefText,
+        artist_references: artists
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      });
+    } catch (error) {
+      console.error("artifacts failed", error);
+      return null;
+    }
+  });
+
   // Keep the working state across a reload. `stable` walks every property, which is what makes a
   // change deep inside a selection a dependency of this effect rather than an invisible one.
   let saveTimer: ReturnType<typeof setTimeout> | undefined;
@@ -118,6 +161,10 @@
       bpm,
       duration,
       view,
+      songId,
+      seed,
+      artists,
+      brief: briefText,
     };
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => writeDraft(DRAFT_KEY, snapshot), 250);
@@ -131,6 +178,26 @@
     templateId = origin.template;
     bpm = origin.bpm;
     duration = origin.duration;
+    songId = origin.songId;
+    seed = origin.seed;
+    artists = origin.artists;
+    briefText = origin.brief;
+    clearDraft(DRAFT_KEY);
+  }
+
+  /** A blank song in the browser. A page cannot make a directory, so this is a draft you export. */
+  function newSong(): void {
+    songId = "untitled-song";
+    seed = freshSeed();
+    artists = "";
+    briefText = "";
+    selections = {};
+    duration = null;
+    try {
+      lyricText = core?.scaffold({ template_id: templateId }).text ?? "";
+    } catch (error) {
+      console.error("scaffold failed", error);
+    }
     clearDraft(DRAFT_KEY);
   }
 
@@ -179,12 +246,18 @@
       status = "reading the vocabulary";
       data = await loadStaticData();
 
-      const song = await getJson<{ song_id: string; template_id: string; bpm: number }>(
-        `songs/${SONG}/song.json`,
-      );
+      const song = await getJson<{
+        song_id: string;
+        template_id: string;
+        bpm: number;
+        seed: number;
+        artist_references?: string[];
+      }>(`songs/${SONG}/song.json`);
       songId = song.song_id;
       templateId = song.template_id;
       bpm = song.bpm;
+      seed = song.seed;
+      artists = (song.artist_references ?? []).join(", ");
 
       const selectionFile = await getJson<{ selections: Selections }>(
         `songs/${SONG}/selections.json`,
@@ -193,6 +266,8 @@
 
       const response = await fetch(asset(`repo/songs/${SONG}/lyrics.md`));
       const loadedLyric = await response.text();
+      const briefResponse = await fetch(asset(`repo/songs/${SONG}/brief.md`));
+      const loadedBrief = await briefResponse.text();
 
       origin = {
         selections: stable(loadedSelections),
@@ -200,10 +275,15 @@
         template: song.template_id,
         bpm: song.bpm,
         duration: null,
+        songId: song.song_id,
+        seed: song.seed,
+        artists: artists,
+        brief: loadedBrief,
       };
 
       selections = loadedSelections;
       lyricText = loadedLyric;
+      briefText = loadedBrief;
 
       // A draft from a previous visit wins over the files, but only until it is reverted.
       const draft = readDraft<Draft>(DRAFT_KEY);
@@ -214,6 +294,10 @@
         if (typeof draft.bpm === "number") bpm = draft.bpm;
         if (draft.duration !== undefined) duration = draft.duration;
         if (draft.view) view = draft.view;
+        if (draft.songId) songId = draft.songId;
+        if (typeof draft.seed === "number") seed = draft.seed;
+        if (typeof draft.artists === "string") artists = draft.artists;
+        if (typeof draft.brief === "string") briefText = draft.brief;
       }
 
       core = await MusicMasterCore.boot((message) => (status = message));
@@ -248,6 +332,9 @@
       <button role="tab" aria-selected={view === "lyrics"} onclick={() => (view = "lyrics")}>
         Lyrics
       </button>
+      <button role="tab" aria-selected={view === "render"} onclick={() => (view = "render")}>
+        Render
+      </button>
     </div>
     <span class="small muted">{status}</span>
   </div>
@@ -274,7 +361,7 @@
         </div>
       </div>
     </div>
-  {:else}
+  {:else if view === "lyrics"}
     <div class="columns">
       <div class="column">
         <Lyrics
@@ -294,6 +381,27 @@
           <Brief text={brief} />
           <Caption {rendered} selected={S.selectedCount(selections)} />
         </div>
+      </div>
+    </div>
+  {:else}
+    <div class="columns">
+      <div class="column">
+        <div class="stack">
+          <Song
+            bind:songId
+            bind:templateId
+            bind:bpm
+            bind:seed
+            bind:artists
+            bind:brief={briefText}
+            templates={data.templates}
+            onNewSong={newSong}
+          />
+          <Brief text={brief} />
+        </div>
+      </div>
+      <div class="column">
+        <Render {artifact} />
       </div>
     </div>
   {/if}

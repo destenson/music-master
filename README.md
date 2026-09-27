@@ -211,6 +211,28 @@ follows the caret. One rule is a gate and the rest is ordering — after a blank
 either the transition leaving a section or the header of the next, so both are offered rather than
 guessed between.
 
+**The render path runs in the page too.** `musicmaster.prompt` builds the canonical `prompt.json`
+and the ComfyUI graph from the same inputs the CLI uses, so the Render tab shows the prompt hash,
+downloads the exact bytes that hash is taken over, and queues the graph itself — with the service's
+own rejection text shown verbatim rather than reduced to "failed". The smoke test asserts that the
+browser's `prompt.json` and `workflow.json` are byte-identical to the CLI's, so the prompt hash in
+the page is the prompt hash in the repository.
+
+**A render target is a preset, and the protocol follows from it, because there are two.** A
+self-hosted ComfyUI speaks `POST /prompt` and `/history/{id}`; [Comfy API
+v2](https://docs.comfy.org/api-reference/v2/overview) speaks `POST /api/v2/jobs` with a bearer token
+and returns a durable, pollable job. The presets are this project's service on `:8288`, ComfyUI's own
+default on `:8188`, a self-hosted [`comfy-api-proxy`](https://github.com/Comfy-Org/comfy-api-proxy)
+on `:8189`, [Comfy Cloud](https://cloud.comfy.org) on v2, or any address you supply. The graph is API
+format, which is the one v2 accepts — it rejects the `nodes`/`links` UI export. The dev server proxies
+`:8288` and `:8188` so a local render needs nothing; anything else is called directly and must allow
+the page. Comfy Cloud needs a paid subscription, and an API key typed there is held in the tab's
+session storage rather than saved, because a page cannot keep a secret.
+
+A **new take** is the same prompt with a different seed; a **new song** is a blank draft you name,
+with empty selections and no words, that you export and commit — the same loop as everything else,
+since a page cannot write a song directory.
+
 **State is browser-local by design.** Selections, the lyric, the template, the tempo and the view are
 kept in `localStorage` so a reload does not throw an edit away, and a **local draft** marker with
 one-click revert appears whenever the working state differs from what the repository holds. The

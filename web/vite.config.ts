@@ -152,6 +152,19 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/ollama/, ""),
       },
+      // The same for the renderer, so a local render needs no CORS on the ComfyUI side. Two ports
+      // are proxied because two are named as presets. The keys must not be prefixes of one another:
+      // Vite matches them with startsWith, so `/comfy` would swallow `/comfy-8188`.
+      "/comfy-8288": {
+        target: "http://127.0.0.1:8288",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/comfy-8288/, ""),
+      },
+      "/comfy-8188": {
+        target: "http://127.0.0.1:8188",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/comfy-8188/, ""),
+      },
     },
   },
 });

@@ -9,6 +9,7 @@
 import type { PyodideInterface } from "pyodide";
 import glueSource from "./core_glue.py?raw";
 import type {
+  Artifacts,
   LyricReport,
   RenderResult,
   Selections,
@@ -146,5 +147,22 @@ export class MusicMasterCore {
     selections?: Selections;
   }): { brief: string } {
     return this.call<{ brief: string }>("brief", request);
+  }
+
+  /**
+   * The canonical prompt, the composition it pins, and the ComfyUI graph — built by the same
+   * `musicmaster.prompt` the CLI uses, from what the page holds rather than from a song directory.
+   */
+  artifacts(request: {
+    song_id: string;
+    template_id: string;
+    bpm: number;
+    seed: number;
+    selections: Selections;
+    lyrics: string;
+    brief: string;
+    artist_references: string[];
+  }): Artifacts {
+    return this.call<Artifacts>("artifacts", request);
   }
 }

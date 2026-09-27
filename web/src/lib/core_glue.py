@@ -18,7 +18,7 @@ import sys
 if "/repo" not in sys.path:
     sys.path.insert(0, "/repo")
 
-from musicmaster import lyrics, render, templates, timeline  # noqa: E402
+from musicmaster import lyrics, prompt, render, templates, timeline  # noqa: E402
 
 _vocab = render.load_vocabulary()
 _section_tags = timeline.load(timeline.SECTION_TAGS_PATH)
@@ -143,6 +143,46 @@ def scaffold(payload):
         out.append("")
 
     return json.dumps({"text": "\n".join(out)})
+
+
+def artifacts(payload):
+    """The canonical prompt, the composition it pins, and the ComfyUI graph it renders to.
+
+    The same `musicmaster.prompt` the CLI writes, given what the page already holds: a static page
+    has no song directory to read, so the lyrics, the brief and the selections come from the editor
+    instead of from disk.
+    """
+    request = json.loads(payload)
+    built = prompt.build(
+        {
+            "song_id": request["song_id"],
+            "template_id": request["template_id"],
+            "bpm": request["bpm"],
+            "seed": request["seed"],
+            "selections": request["selections"],
+            "lyrics": request["lyrics"],
+            "brief": request.get("brief") or "",
+            "artist_references": request.get("artist_references") or [],
+            "vocabulary_path": "/repo/vocabulary/tag-bins.json",
+            "vocabulary": _vocab,
+            "section_tags": _section_tags,
+            "templates_doc": _templates_doc,
+            "rates": _rates,
+        }
+    )
+    return json.dumps(
+        {
+            "prompt": built["prompt"],
+            "composition": built["composition"],
+            "workflow": built["workflow"],
+            "prompt_sha256": built["prompt_sha256"],
+            # Serialised once, by the same function the hashes go through, so a download and a
+            # hash cannot disagree about what the artifact is.
+            "prompt_text": prompt.serialise(built["prompt"]),
+            "composition_text": prompt.serialise(built["composition"]),
+            "workflow_text": prompt.serialise(built["workflow"]),
+        }
+    )
 
 
 def check_lyric(payload):

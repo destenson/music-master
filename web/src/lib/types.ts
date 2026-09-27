@@ -163,6 +163,36 @@ export interface LyricReport {
   conformance: Conformance | null;
 }
 
+/** The artifacts the render path produces, serialised exactly as they would be written. */
+export interface Artifacts {
+  prompt: {
+    song_id: string;
+    seed: number;
+    style: { rendered_string: string; rendered_tags: string[] };
+    metadata: {
+      bpm: number;
+      duration_s: number;
+      key: string | null;
+      mode: string | null;
+      timesignature: string;
+      language: string;
+    };
+    form: {
+      composition_sha256: string;
+      sections: { name: string; bars: number; label: string }[];
+    };
+    target: { seed: number; graph_ref: string };
+    negative: { artist_references: string[] };
+  };
+  composition: Record<string, unknown>;
+  workflow: Record<string, unknown>;
+  prompt_sha256: string;
+  /** The bytes of each artifact, from the same serialiser the hashes go through. */
+  prompt_text: string;
+  composition_text: string;
+  workflow_text: string;
+}
+
 /** One entry from any of the lyric tag pools. */
 export interface TagTerm {
   id: string;

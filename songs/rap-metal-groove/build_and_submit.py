@@ -1,10 +1,10 @@
 """Build the prompt artifacts for this song and submit them to ComfyUI.
 
-Everything here is a pure function of files on disk: `selections.json` renders the caption,
-the template plus tempo renders the timeline, and `lyrics.md` is the words. The script writes
-`prompt.json` (the canonical artifact of record) and `workflow.json` (the target-specific
-rendering for ACE-Step 1.5), then optionally POSTs the workflow to a running ComfyUI and waits
-for the render.
+Everything here is a pure function of files on disk: `selections.json` renders the caption, the
+template plus tempo renders the timeline, and `lyrics.md` is the words. The artifacts themselves are
+built by `musicmaster.prompt`, so what is left here is the part that knows where the song lives — it
+reads the files, writes `composition.json`, `prompt.json` and `workflow.json` back, and optionally
+POSTs the workflow to a running ComfyUI and waits for the render.
 
     python3 songs/nu-metal-rap-rock/build_and_submit.py
     python3 songs/nu-metal-rap-rock/build_and_submit.py --submit --host 127.0.0.1:8288
@@ -13,7 +13,6 @@ for the render.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 import time
@@ -23,10 +22,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-sys.path.insert(0, str(ROOT / "vocabulary"))
+sys.path.insert(0, str(ROOT))
 
-import render_tags as RT  # noqa: E402
-import timeline as T  # noqa: E402
+from musicmaster import prompt as P  # noqa: E402
+from musicmaster import render as R  # noqa: E402
+from musicmaster import timeline as T  # noqa: E402
 
 SONG_ID = "nu-metal-rap-rock"
 TEMPLATE_ID = "nu_metal_rap_rock"
@@ -40,190 +40,43 @@ TEMPLATE_ID = _cfg.get("template_id", TEMPLATE_ID)
 BPM = _cfg.get("bpm", BPM)
 SEED = _cfg.get("seed", SEED)
 
-GRAPH = {
-    "unet": "acestep_v1.5_xl_turbo_bf16.safetensors",
-    "clip_small": "qwen_0.6b_ace15.safetensors",
-    "clip_large": "qwen_4b_ace15.safetensors",
-    "vae": "ace_1.5_vae.safetensors",
-}
-
-
-def sha256_bytes(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
-def sha256_file(path: Path) -> str:
-    return sha256_bytes(path.read_bytes())
-
-
-def canonical(obj) -> str:
-    return json.dumps(obj, sort_keys=True, separators=(",", ":"))
-
 
 def build():
+    """Read this song's files, build the artifacts through the package, and write them back."""
     selections = json.loads((HERE / "selections.json").read_text())["selections"]
     lyrics_text = (HERE / "lyrics.md").read_text()
-    lyrics_sha = sha256_bytes(lyrics_text.encode())
+    brief_text = (HERE / "brief.md").read_text()
 
-    vocab = RT.load_vocabulary()
-    rendered = RT.render(vocab, selections)
-    coherence = RT.coherence_check(vocab, selections)
-
-    templates_doc = T.load(T.TEMPLATES_PATH)
-    template = next(t for t in templates_doc["templates"] if t["id"] == TEMPLATE_ID)
-    rates = T.load_delivery_rates()
-    profile = T.profile_for_vocals(selections, rates)
-    section_tags = T.load(T.SECTION_TAGS_PATH)
-    plan = T.build_timeline(template, BPM, section_tags, profile, templates_doc)
-
-    duration_s = round(plan["totals"]["total_s"], 1)
-    key = selections.get("key_mode", {})
-    metadata = {
-        "bpm": BPM,
-        "key": key.get("key"),
-        "mode": key.get("mode"),
-        "timesignature": "4",
-        "duration_s": duration_s,
-        "language": "en",
-    }
-
-    prompt = {
-        "prompt_version": "1",
-        "song_id": SONG_ID,
-        "seed": SEED,
-        "style": {
-            "vocabulary_ref": {
-                "path": "vocabulary/tag-bins.json",
-                "version": vocab["vocabulary_version"],
-                "sha256": sha256_file(ROOT / "vocabulary" / "tag-bins.json"),
-            },
-            "selections": selections,
-            "rendered_tags": rendered["tags"],
-            "rendered_string": rendered["string"],
-            "omitted_tags": rendered["omitted"],
-            "free_text": "",
-        },
-        "metadata": metadata,
-        "form": {
-            "composition_ref": f"songs/{SONG_ID}/composition.json",
-            "composition_sha256": "",
-            "sections": [
-                {"name": r["role"], "bars": r["bars"], "label": r["label"]}
-                for r in plan["rows"]
-            ],
-        },
-        "lyrics": {"ref": f"songs/{SONG_ID}/lyrics.md", "sha256": lyrics_sha,
-                   "section_tags": True},
-        "negative": {
-            # Negative-polarity bins never become tags; they land here. On a target with no
-            # negative-caption input this is a record of intent rather than an instruction, which
-            # is why the corresponding positives are simply never selected.
-            "style": rendered.get("negatives", []),
-            "artist_references": _cfg.get("artist_references", ["Linkin Park"]),
-        },
-        "target": {
-            "generator_id": "ace_step_1_5_xl_turbo",
-            "runner": "comfyui",
-            "graph_ref": "songs/%s/workflow.json" % SONG_ID,
-            "sampler": {"steps": 8, "cfg": 1.0, "sampler_name": "euler",
-                        "scheduler": "simple", "denoise": 1.0,
-                        "model_sampling_shift": 3.0},
-            "lm": {"generate_audio_codes": True, "cfg_scale": 2.0,
-                   "temperature": 0.85, "top_p": 0.9, "top_k": 0, "min_p": 0.0},
+    artifacts = P.build(
+        {
+            "song_id": SONG_ID,
+            "template_id": TEMPLATE_ID,
+            "bpm": BPM,
             "seed": SEED,
-            "batch_size": 1,
-            "candidate_index": 0,
-        },
-        "notes": [
-            {"field": "style.selections", "why":
-             "Influence expressed as descriptive characteristics rather than a band name. "
-             "Genre fusion, instrumentation and vocal split do the work a name cannot."},
-            {"field": "metadata.bpm", "why":
-             "120 BPM, mid-tempo for the genre; carried in metadata, never in the caption."},
-            {"field": "target.seed", "why":
-             "Fixed so the render is re-derivable. With lm.temperature > 0 the LM's audio-code "
-             "sampling adds randomness, so this is re-derivable and diffable rather than "
-             "bit-identical."},
-            {"field": "negative.artist_references", "why":
-             "Recorded so the compliance report can prove what was excluded, and so the policy "
-             "check has something to verify against."},
-        ],
-        "provenance": {
-            "spec_sha256": sha256_file(HERE / "brief.md"),
-            "builder": "songs/%s/build_and_submit.py" % SONG_ID,
-        },
-    }
+            "selections": selections,
+            "lyrics": lyrics_text,
+            "brief": brief_text,
+            "artist_references": _cfg.get("artist_references", []),
+            "vocabulary_path": ROOT / "vocabulary" / "tag-bins.json",
+            "vocabulary": R.load_vocabulary(),
+            "section_tags": T.load(T.SECTION_TAGS_PATH),
+            "templates_doc": T.load(T.TEMPLATES_PATH),
+        }
+    )
 
-    # composition.json is the instantiated plan; the prompt references its hash.
-    composition = {
-        "song_id": SONG_ID,
-        "template_id": TEMPLATE_ID,
-        "bpm": BPM,
-        "profile": profile["id"],
-        "band": list(profile["band"]),
-        "totals": plan["totals"],
-        "sections": plan["rows"],
-    }
-    composition_path = HERE / "composition.json"
-    composition_path.write_text(json.dumps(composition, indent=2) + "\n")
-    prompt["form"]["composition_sha256"] = sha256_file(composition_path)
+    # The composition is written first because the prompt pins its hash, and P.serialise is the one
+    # function both the hash and the file go through, so they cannot disagree.
+    (HERE / "composition.json").write_text(P.serialise(artifacts["composition"]))
+    (HERE / "prompt.json").write_text(P.serialise(artifacts["prompt"]))
+    (HERE / "workflow.json").write_text(P.serialise(artifacts["workflow"]))
 
-    workflow = build_workflow(prompt, lyrics_text, duration_s)
-    (HERE / "prompt.json").write_text(json.dumps(prompt, indent=2) + "\n")
-    (HERE / "workflow.json").write_text(json.dumps(workflow, indent=2) + "\n")
-
-    prompt_hash = sha256_bytes(canonical(prompt).encode())
-    return prompt, rendered, plan, coherence, prompt_hash
-
-
-def build_workflow(prompt: dict, lyrics_text: str, duration_s: float) -> dict:
-    """Render the canonical prompt into an ACE-Step 1.5 graph in ComfyUI API format."""
-    md, style, target = prompt["metadata"], prompt["style"], prompt["target"]
-    keyscale = f"{md['key']} {md['mode']}" if md.get("key") else "D minor"
-    return {
-        "1": {"class_type": "UNETLoader",
-              "inputs": {"unet_name": GRAPH["unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "DualCLIPLoader",
-              "inputs": {"clip_name1": GRAPH["clip_small"],
-                         "clip_name2": GRAPH["clip_large"], "type": "ace"}},
-        "3": {"class_type": "VAELoader", "inputs": {"vae_name": GRAPH["vae"]}},
-        "4": {"class_type": "TextEncodeAceStepAudio1.5",
-              "inputs": {
-                  "clip": ["2", 0],
-                  "tags": style["rendered_string"],
-                  "lyrics": lyrics_text,
-                  "seed": target["seed"],
-                  "bpm": md["bpm"],
-                  "duration": duration_s,
-                  "timesignature": md["timesignature"],
-                  "language": md["language"],
-                  "keyscale": keyscale,
-                  "generate_audio_codes": target["lm"]["generate_audio_codes"],
-                  "cfg_scale": target["lm"]["cfg_scale"],
-                  "temperature": target["lm"]["temperature"],
-                  "top_p": target["lm"]["top_p"],
-                  "top_k": target["lm"]["top_k"],
-                  "min_p": target["lm"]["min_p"],
-              }},
-        "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
-        "6": {"class_type": "EmptyAceStep1.5LatentAudio",
-              "inputs": {"seconds": duration_s, "batch_size": target["batch_size"]}},
-        "7": {"class_type": "ModelSamplingAuraFlow",
-              "inputs": {"model": ["1", 0], "shift": target["sampler"]["model_sampling_shift"]}},
-        "8": {"class_type": "KSampler",
-              "inputs": {
-                  "model": ["7", 0], "seed": target["seed"],
-                  "steps": target["sampler"]["steps"], "cfg": target["sampler"]["cfg"],
-                  "sampler_name": target["sampler"]["sampler_name"],
-                  "scheduler": target["sampler"]["scheduler"],
-                  "positive": ["4", 0], "negative": ["5", 0],
-                  "latent_image": ["6", 0], "denoise": target["sampler"]["denoise"],
-              }},
-        "9": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
-        "10": {"class_type": "SaveAudioMP3",
-               "inputs": {"audio": ["9", 0],
-                          "filename_prefix": f"audio/{SONG_ID}", "quality": "V0"}},
-    }
+    return (
+        artifacts["prompt"],
+        artifacts["rendered"],
+        artifacts["plan"],
+        artifacts["coherence"],
+        artifacts["prompt_sha256"],
+    )
 
 
 def submit(host: str, workflow: dict, client_id: str, timeout_s: int) -> list[str]:

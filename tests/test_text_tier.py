@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parent.parent
 PACKAGE = REPO / "musicmaster"
 sys.path.insert(0, str(REPO))
 
-from musicmaster import TEXT_TIER, lyrics, render, templates, timeline  # noqa: E402
+from musicmaster import TEXT_TIER, lyrics, prompt, render, templates, timeline  # noqa: E402
 
 ALLOWED_LOCAL = {"musicmaster"}
 
@@ -279,6 +279,61 @@ class LyricsTest(unittest.TestCase):
                 self.assertEqual(report.errors, [])
                 self.assertEqual(conformance["missing"], [])
                 self.assertEqual(len(conformance["matched"]), len(template["sections"]))
+
+
+# --- The render path: the prompt and the graph it renders to ------------------------------
+
+class PromptTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        song = REPO / "songs/rap-metal-groove"
+        config = json.loads((song / "song.json").read_text())
+        cls.doc = {
+            "song_id": config["song_id"],
+            "template_id": config["template_id"],
+            "bpm": config["bpm"],
+            "seed": config["seed"],
+            "selections": json.loads((song / "selections.json").read_text())["selections"],
+            "lyrics": (song / "lyrics.md").read_text(),
+            "brief": (song / "brief.md").read_text(),
+            "artist_references": config.get("artist_references", []),
+            "vocabulary_path": REPO / "vocabulary" / "tag-bins.json",
+            "vocabulary": render.load_vocabulary(),
+            "section_tags": timeline.load(timeline.SECTION_TAGS_PATH),
+            "templates_doc": timeline.load(timeline.TEMPLATES_PATH),
+        }
+        cls.artifacts = prompt.build(cls.doc)
+
+    def test_the_prompt_pins_the_composition_it_references(self) -> None:
+        # Derived, not recorded: the hash is the hash of the bytes the composition is written as.
+        self.assertEqual(
+            self.artifacts["prompt"]["form"]["composition_sha256"],
+            prompt.sha256_bytes(prompt.serialise(self.artifacts["composition"]).encode()),
+        )
+
+    def test_the_graph_is_a_rendering_of_the_prompt(self) -> None:
+        # Every input the graph carries must come from the prompt; a second source of truth here is
+        # how a render stops matching the artifact of record.
+        graph = self.artifacts["workflow"]
+        recorded = self.artifacts["prompt"]
+        self.assertEqual(graph["4"]["inputs"]["tags"], recorded["style"]["rendered_string"])
+        self.assertEqual(graph["4"]["inputs"]["lyrics"], self.doc["lyrics"])
+        self.assertEqual(graph["4"]["inputs"]["bpm"], recorded["metadata"]["bpm"])
+        self.assertEqual(graph["4"]["inputs"]["duration"], recorded["metadata"]["duration_s"])
+        self.assertEqual(graph["6"]["inputs"]["seconds"], recorded["metadata"]["duration_s"])
+        self.assertEqual(graph["8"]["inputs"]["seed"], recorded["target"]["seed"])
+        self.assertEqual(graph["10"]["inputs"]["filename_prefix"], f"audio/{recorded['song_id']}")
+
+    def test_the_prompt_is_deterministic(self) -> None:
+        self.assertEqual(
+            prompt.build(self.doc)["prompt_sha256"], self.artifacts["prompt_sha256"]
+        )
+
+    def test_the_tempo_note_states_the_tempo_it_was_given(self) -> None:
+        # The note is documentation and used to be copied between songs, so a 92 BPM song claimed
+        # 120. Deriving it from the tempo is what stops that drifting again.
+        notes = {note["field"]: note["why"] for note in self.artifacts["prompt"]["notes"]}
+        self.assertIn(f"{self.doc['bpm']:g} BPM", notes["metadata.bpm"])
 
 
 # --- The entry points, and the wrappers --------------------------------------------------

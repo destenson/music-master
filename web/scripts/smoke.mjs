@@ -13,8 +13,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { loadPyodide } from "pyodide";
 import { parseFindings, slotFor } from "../src/lib/lens.ts";
+import { presetFor } from "../src/lib/comfy.ts";
 import { stable } from "../src/lib/draft.ts";
 import { generate } from "../src/lib/ollama.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
@@ -45,7 +47,7 @@ if (!fs.existsSync(path.join(DIST, "repo", "manifest.json"))) {
 const NATIVE = `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(REPO)})
-from musicmaster import render, timeline
+from musicmaster import prompt, render, timeline
 vocab = render.load_vocabulary()
 selections = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "selections.json"))}))["selections"]
 song = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "song.json"))}))
@@ -55,12 +57,29 @@ rates = timeline.load_delivery_rates()
 profile = timeline.profile_for_vocals(selections, rates)
 template = {t["id"]: t for t in doc["templates"]}[song["template_id"]]
 plan = timeline.build_timeline(template, song["bpm"], st, profile, doc)
+built = prompt.build({
+    "song_id": song["song_id"],
+    "template_id": song["template_id"],
+    "bpm": song["bpm"],
+    "seed": song["seed"],
+    "selections": selections,
+    "lyrics": open(${JSON.stringify(path.join(REPO, "songs", SONG, "lyrics.md"))}).read(),
+    "brief": open(${JSON.stringify(path.join(REPO, "songs", SONG, "brief.md"))}).read(),
+    "artist_references": song.get("artist_references", []),
+    "vocabulary_path": ${JSON.stringify(path.join(REPO, "vocabulary", "tag-bins.json"))},
+    "vocabulary": vocab,
+    "section_tags": st,
+    "templates_doc": doc,
+})
 print(json.dumps({
     "render": {**render.render(vocab, selections),
                "problems": sorted(render.coherence_check(vocab, selections))},
     "profile": profile["label"],
     "plan": {"totals": plan["totals"], "rows": len(plan["rows"]),
              "profile_label": plan["profile_label"]},
+    "artifacts": {"prompt_sha256": built["prompt_sha256"],
+                  "prompt_text": prompt.serialise(built["prompt"]),
+                  "workflow_text": prompt.serialise(built["workflow"])},
 }))
 `;
 
@@ -95,6 +114,96 @@ check("coherence problems", [...rendered.problems].sort(), native.render.problem
 check("delivery profile", rendered.profile, native.profile);
 check("planned sections", plan.rows.length, native.plan.rows);
 check("timeline totals", plan.totals, native.plan.totals);
+
+// --- The render path: the browser's artifacts must be the ones the CLI writes -----------------
+
+const lyricsText = fs.readFileSync(path.join(DIST, "repo", "songs", SONG, "lyrics.md"), "utf8");
+const briefText = fs.readFileSync(path.join(DIST, "repo", "songs", SONG, "brief.md"), "utf8");
+const artifact = call("artifacts", {
+  song_id: song.song_id,
+  template_id: song.template_id,
+  bpm: song.bpm,
+  seed: song.seed,
+  selections,
+  lyrics: lyricsText,
+  brief: briefText,
+  artist_references: song.artist_references ?? [],
+});
+
+console.log("\nrender path:\n");
+check("the prompt hash matches the CLI", artifact.prompt_sha256, native.artifacts.prompt_sha256);
+check("prompt.json matches the CLI", artifact.prompt_text, native.artifacts.prompt_text);
+check("workflow.json matches the CLI", artifact.workflow_text, native.artifacts.workflow_text);
+check(
+  "the workflow carries the seed it was built with",
+  JSON.parse(artifact.workflow_text)["8"]["inputs"]["seed"],
+  song.seed,
+);
+check(
+  "the prompt pins the composition it ships",
+  artifact.prompt.form.composition_sha256,
+  createHash("sha256").update(artifact.composition_text).digest("hex"),
+);
+
+// A new take is the same prompt with a different seed; a new song is the same machinery with
+// nothing in it yet. Both must go through the one builder rather than a second code path.
+const reseeded = call("artifacts", {
+  song_id: song.song_id,
+  template_id: song.template_id,
+  bpm: song.bpm,
+  seed: song.seed + 1,
+  selections,
+  lyrics: lyricsText,
+  brief: briefText,
+  artist_references: song.artist_references ?? [],
+});
+check(
+  "a new seed reaches the graph",
+  JSON.parse(reseeded.workflow_text)["8"]["inputs"]["seed"],
+  song.seed + 1,
+);
+check("a new seed changes the prompt hash", reseeded.prompt_sha256 !== artifact.prompt_sha256, true);
+
+const blank = call("artifacts", {
+  song_id: "untitled-song",
+  template_id: song.template_id,
+  bpm: 120,
+  seed: 1,
+  selections: {},
+  lyrics: "",
+  brief: "",
+  artist_references: [],
+});
+check("a blank song still builds a prompt", typeof blank.prompt_sha256, "string");
+check("a blank song names itself in the graph",
+  JSON.parse(blank.workflow_text)["10"]["inputs"]["filename_prefix"], "audio/untitled-song");
+
+// The v2 API accepts the API-format graph verbatim and rejects the UI export (`nodes`/`links`) with
+// `workflow_format_ui`. One graph serves both protocols, so it has to be the API format.
+const graph = JSON.parse(artifact.workflow_text);
+check(
+  "the graph is API format, which v2 requires",
+  !("nodes" in graph) &&
+    Object.values(graph).every(
+      (node) => node && typeof node === "object" && "class_type" in node && "inputs" in node,
+    ),
+  true,
+);
+check(
+  "Comfy Cloud is a v2 surface and needs a key",
+  (() => {
+    const cloud = presetFor("https://cloud.comfy.org");
+    return cloud ? [cloud.protocol, cloud.needsKey] : null;
+  })(),
+  ["v2", true],
+);
+check(
+  "the local presets are the native protocol",
+  ["http://127.0.0.1:8188", "http://127.0.0.1:8288"].map(
+    (base) => presetFor(base)?.protocol ?? null,
+  ),
+  ["native", "native"],
+);
 
 // --- The generator: the brief must be the core's own, and the scaffold must be valid on arrival ---
 

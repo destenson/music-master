@@ -1,7 +1,8 @@
 # Music Master — UI and front-end plan
 
 Status: plan. M0 (the core package) and a first slice of the UI — the builder, the live caption, the
-timeline and the lyric checker, all running in the browser — are built; the rest is not. Companion to
+timeline, the lyric checker, the generator and the render path, all running in the browser — are
+built; the takes grid, audition, and the live compliance battery are not. Companion to
 [`compliance-architecture.md`](compliance-architecture.md),
 [`tag-vocabulary.md`](tag-vocabulary.md) and [`lyric-templates.md`](lyric-templates.md).
 
@@ -143,7 +144,7 @@ musicmaster/
   templates.py    # template lookup, brief, bar plan, scaling        (from structure_templates.py)
   lyrics.py       # parse, check, template conformance               (from check_lyrics.py)
   render.py       # render tags, budget, negatives                   (from render_tags.py)
-  prompt.py       # canonical prompt, target rendering, hashing      (M2/M3; no source script yet)
+  prompt.py       # canonical prompt, graph rendering, hashing        (from build_and_submit.py)
 
   # Boundary -- the manifest is pure (hashing, staleness); reading and writing the song directory is not.
   bundle.py       # song directory, manifest, manifest hashes

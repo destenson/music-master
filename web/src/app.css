@@ -501,6 +501,14 @@ pre.brief {
   background: var(--panel-2);
 }
 
+textarea.brief-input {
+  width: 100%;
+  min-height: 9rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 button.jump {
   background: transparent;
   border: 1px solid var(--line);
