@@ -22,6 +22,7 @@ import { editorTheme } from "../src/lib/lens.ts";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { generate } from "../src/lib/ollama.ts";
+import { reloadUrl, setBuild, withBuild } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
@@ -446,6 +447,45 @@ check(
   ]).some((message) => message.text.includes("[object")),
   false,
 );
+
+// --- Updates: the build id a deployed page watches for ------------------------------------------
+//
+// A static host cannot push a change into a running tab, so the page watches a published version
+// file and stamps its repository fetches with the build it booted as. The stamp is what stops new
+// code from running against the previous build's cached data.
+
+console.log("\nupdates:\n");
+check("a URL with no build id is left alone", withBuild("repo/manifest.json"), "repo/manifest.json");
+setBuild("abc123");
+check(
+  "a known build id stamps a repository URL",
+  withBuild("repo/manifest.json"),
+  "repo/manifest.json?v=abc123",
+);
+check(
+  "an existing query is extended, not replaced",
+  withBuild("repo/x.json?a=1"),
+  "repo/x.json?a=1&v=abc123",
+);
+setBuild("");
+
+check(
+  "a reload goes to a different URL, so the cached document cannot be served",
+  reloadUrl("https://host/music-master/", "abc123"),
+  "https://host/music-master/?u=abc123",
+);
+check(
+  "a reload replaces the previous one rather than stacking them",
+  reloadUrl("https://host/music-master/?u=old", "abc123"),
+  "https://host/music-master/?u=abc123",
+);
+
+const versionPath = path.join(DIST, "version.json");
+const version = fs.existsSync(versionPath)
+  ? JSON.parse(fs.readFileSync(versionPath, "utf8"))
+  : null;
+check("the build publishes a version file", typeof version?.build, "string");
+check("the version file names a non-empty build", (version?.build ?? "").length > 0, true);
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //

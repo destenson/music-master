@@ -46,6 +46,17 @@ const MIME: Record<string, string> = {
   ".zip": "application/zip",
 };
 
+/**
+ * The id of the build being produced.
+ *
+ * A deployed page watches `version.json` for this and reloads when it changes, so it has to change
+ * whenever the deployed files do: the commit is the deployed content. A local build has no commit,
+ * so a timestamp stands in — nothing is watching a dev server's version file anyway.
+ */
+function buildId(): string {
+  return process.env.GITHUB_SHA?.slice(0, 12) || `local-${Date.now().toString(36)}`;
+}
+
 function collectRepoFiles(): string[] {
   const out: string[] = [];
   for (const { dir, exts } of REPO_SOURCES) {
@@ -78,6 +89,7 @@ function dropOrigin(proxy: Parameters<NonNullable<ProxyOptions["configure"]>>[0]
  */
 function sharedAssets(): Plugin {
   const repoFiles = collectRepoFiles();
+  const build = buildId();
   let outDir = path.join(WEB, "dist");
 
   return {
@@ -95,6 +107,13 @@ function sharedAssets(): Plugin {
         if (url === "/repo/manifest.json") {
           res.setHeader("Content-Type", MIME[".json"]);
           res.end(JSON.stringify(repoFiles));
+          return;
+        }
+        // The update watcher is off in development, but the endpoint exists there too so a
+        // `vite preview` of a built bundle behaves like the host it is imitating.
+        if (url === "/version.json") {
+          res.setHeader("Content-Type", MIME[".json"]);
+          res.end(JSON.stringify({ build: "dev", built_at: new Date().toISOString() }));
           return;
         }
         if (url.startsWith("/repo/")) {
@@ -123,6 +142,13 @@ function sharedAssets(): Plugin {
       fs.mkdirSync(path.dirname(manifest), { recursive: true });
       fs.writeFileSync(manifest, JSON.stringify(repoFiles));
 
+      // What a deployed page watches to notice it is out of date. Unhashed and tiny, so it is cheap
+      // to re-read; the page cache-busts the request itself.
+      fs.writeFileSync(
+        path.join(outDir, "version.json"),
+        JSON.stringify({ build, built_at: new Date().toISOString() }, null, 2) + "\n",
+      );
+
       for (const rel of PYODIDE_FILES) {
         const dest = path.join(outDir, "pyodide", rel);
         fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -130,7 +156,7 @@ function sharedAssets(): Plugin {
       }
 
       this.info(
-        `copied ${repoFiles.length} repository file(s) and ${PYODIDE_FILES.length} runtime file(s)`,
+        `build ${build}: copied ${repoFiles.length} repository file(s) and ${PYODIDE_FILES.length} runtime file(s)`,
       );
     },
   };

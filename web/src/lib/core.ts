@@ -8,6 +8,7 @@
  */
 import type { PyodideInterface } from "pyodide";
 import glueSource from "./core_glue.py?raw";
+import { asset, withBuild } from "./paths";
 import type {
   Artifacts,
   LyricReport,
@@ -25,6 +26,10 @@ import type {
 
 const MOUNT = "/repo";
 
+// `asset` moved to paths.ts, which the update watcher also needs and which the smoke test can
+// import without a browser. Kept exported here because the app has always imported it from here.
+export { asset } from "./paths";
+
 export interface StaticData {
   vocabulary: VocabularyFile;
   templates: StructureTemplate[];
@@ -32,19 +37,6 @@ export interface StaticData {
   pools: TagPools;
   /** The radio stations, so the picker and the planner read the same document. */
   stations: RadioStation[];
-}
-
-/**
- * Resolve a repository or runtime path against the page, not against this module.
- *
- * `import.meta.env.BASE_URL` is relative ("/") in dev but "./" in a build, and a relative specifier
- * inside a module is resolved against *that module's* URL — so `import("./pyodide/pyodide.mjs")`
- * from `/assets/index-*.js` looks in `/assets/pyodide/`, which is a 404. Resolving against
- * `document.baseURI` gives one absolute URL that is right in dev, at a domain root, and under a
- * subpath alike.
- */
-export function asset(path: string): string {
-  return new URL(path, document.baseURI).href;
 }
 
 async function fetchBytes(url: string): Promise<Uint8Array> {
@@ -61,13 +53,17 @@ async function fetchJson<T>(url: string): Promise<T> {
 
 /** The vocabulary, templates and tag pools, read once so the form, the lens and the checkers agree. */
 export async function loadStaticData(): Promise<StaticData> {
-  const vocabulary = await fetchJson<VocabularyFile>(asset("repo/vocabulary/tag-bins.json"));
-  const templatesFile = await fetchJson<TemplatesFile>(
-    asset("repo/vocabulary/structure-templates.json"),
+  const vocabulary = await fetchJson<VocabularyFile>(
+    withBuild(asset("repo/vocabulary/tag-bins.json")),
   );
-  const tagFile = await fetchJson<SectionTagsFile>(asset("repo/vocabulary/section-tags.json"));
+  const templatesFile = await fetchJson<TemplatesFile>(
+    withBuild(asset("repo/vocabulary/structure-templates.json")),
+  );
+  const tagFile = await fetchJson<SectionTagsFile>(
+    withBuild(asset("repo/vocabulary/section-tags.json")),
+  );
   const stationFile = await fetchJson<{ stations: RadioStation[] }>(
-    asset("repo/vocabulary/radio-stations.json"),
+    withBuild(asset("repo/vocabulary/radio-stations.json")),
   );
   return {
     vocabulary,
@@ -96,11 +92,13 @@ export class MusicMasterCore {
     const py = await runtime.loadPyodide({ indexURL: asset("pyodide/") });
 
     report("mounting the repository");
-    const manifest = await fetchJson<string[]>(asset("repo/manifest.json"));
+    // Stamped with the running build: a new build must not be handed the previous build's cached
+    // repository, which is how a page ends up running new code against old data.
+    const manifest = await fetchJson<string[]>(withBuild(asset("repo/manifest.json")));
     for (const rel of manifest) {
       const dest = `${MOUNT}/${rel}`;
       py.FS.mkdirTree(dest.slice(0, dest.lastIndexOf("/")));
-      py.FS.writeFile(dest, await fetchBytes(asset(`repo/${rel}`)));
+      py.FS.writeFile(dest, await fetchBytes(withBuild(asset(`repo/${rel}`))));
     }
 
     report("loading the text tier");

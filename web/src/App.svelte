@@ -26,9 +26,16 @@
   } from "./lib/draft";
   import { parseFindings, type Finding } from "./lib/lens";
   import { buildPrompt } from "./lib/prompt";
-  import { setPreviewBuilder } from "./lib/preview.svelte";
-  import { setRadioHost } from "./lib/radio.svelte";
+  import { setPreviewBuilder, previewState } from "./lib/preview.svelte";
+  import { setRadioHost, radioState } from "./lib/radio.svelte";
   import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
+  import {
+    discoverBuild,
+    reloadNow,
+    reloadedFor,
+    updateState,
+    watchForUpdates,
+  } from "./lib/update.svelte";
   import * as S from "./lib/selection";
   import type { Artifacts, LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
 
@@ -248,6 +255,27 @@
   });
 
   /**
+   * Take a new build as soon as there is nothing to interrupt.
+   *
+   * A reload is the only mechanism a static host allows, so it is shown rather than silent — and it
+   * waits while a render, a preview or a station is running, because those are exactly what a
+   * reload would throw away. The guard stops a stale version answer from reloading in a loop.
+   */
+  $effect(() => {
+    if (!updateState.ready || reloadedFor(updateState.latest)) {
+      updateState.notice = null;
+      return;
+    }
+    if (renderQueue.busy || previewState.busy || radioState.on) {
+      updateState.notice = null;
+      return;
+    }
+    updateState.notice = "updating to the new version…";
+    const timer = setTimeout(() => reloadNow(), 600);
+    return () => clearTimeout(timer);
+  });
+
+  /**
    * The render target is app-level state, so its persistence and its reachability check live here
    * rather than in a panel that only exists while its tab is open.
    */
@@ -443,6 +471,9 @@
   onMount(async () => {
     try {
       saved = listSaved();
+      // Before anything reads the repository: the build id is what stamps those requests, so a new
+      // build cannot be served the previous build's cached data.
+      await discoverBuild();
       status = "reading the vocabulary";
       data = await loadStaticData();
 
@@ -502,6 +533,9 @@
 
       core = await MusicMasterCore.boot((message) => (status = message));
       status = "ready";
+      // Only once the app works: watching for a new build before it boots would reload a broken
+      // page into the same broken page.
+      watchForUpdates();
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
       status = "failed";
@@ -571,6 +605,16 @@
       <span class="chip" title={renderQueue.outcome.outputs.join("\n")}>
         {renderQueue.outcome.outputs.length} file(s)
       </span>
+    {/if}
+
+    {#if updateState.ready}
+      <button
+        class="chip warn"
+        onclick={reloadNow}
+        title="A new build is deployed. It reloads itself as soon as no render, preview or station is running."
+      >
+        {updateState.notice ?? "new version — reload"}
+      </button>
     {/if}
 
     <div class="tabs" role="tablist">
