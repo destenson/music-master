@@ -338,9 +338,17 @@ export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promis
       if (!Array.isArray(value)) continue;
       for (const item of value) {
         if (item && typeof item === "object" && "filename" in item) {
-          const file = item as { subfolder?: string; filename: string };
+          const file = item as { subfolder?: string; filename: string; type?: string };
+          // A playable URL, so a preview can be listened to without writing anything: previews
+          // come back from the temp directory, renders from output.
+          const query = new URLSearchParams({
+            filename: file.filename,
+            subfolder: file.subfolder ?? "",
+            type: file.type ?? "output",
+          });
           outputs.push({
             name: file.subfolder ? `${file.subfolder}/${file.filename}` : file.filename,
+            url: `${endpoint(target.base)}/view?${query}`,
           });
         }
       }

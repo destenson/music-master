@@ -185,6 +185,58 @@ def artifacts(payload):
     )
 
 
+def preview(payload):
+    """A full-length, coarse preview graph: the current caption plus one row per variant.
+
+    The language model's cost is per pass, not per caption -- a full-length song is the same number
+    of sequential tokens whether one caption rides along or twelve -- so several captions in one
+    submission is how "what does this tag do" gets answered cheaply. The graph ends in
+    PreviewAudio, so a preview never lands in the render output directory.
+
+    Variants are given as bin/option pairs and applied to the page's own selections, so what is
+    previewed is the caption the page would actually send.
+    """
+    request = json.loads(payload)
+    built = prompt.build(
+        {
+            "song_id": request["song_id"],
+            "template_id": request["template_id"],
+            "bpm": request["bpm"],
+            "seed": request["seed"],
+            "selections": request["selections"],
+            "lyrics": request["lyrics"],
+            "brief": request.get("brief") or "",
+            "artist_references": request.get("artist_references") or [],
+            "vocabulary_path": "/repo/vocabulary/tag-bins.json",
+            "vocabulary": _vocab,
+            "section_tags": _section_tags,
+            "templates_doc": _templates_doc,
+            "rates": _rates,
+        }
+    )
+    captions = [built["prompt"]["style"]["rendered_string"]]
+    names = ["current"]
+    for variant in request.get("variants") or []:
+        selections = json.loads(json.dumps(request["selections"]))
+        entry = selections.setdefault(variant["bin"], {"options": []})
+        options = entry.setdefault("options", [])
+        if variant["option"] in options:
+            options.remove(variant["option"])
+        else:
+            options.append(variant["option"])
+        captions.append(render.render(_vocab, selections)["string"])
+        names.append(f"{variant['bin']}:{variant['option']}")
+
+    workflow = prompt.build_preview_workflow(
+        built["prompt"],
+        request["lyrics"],
+        captions,
+        seconds=request.get("seconds"),
+        steps=int(request.get("steps") or prompt.PREVIEW_STEPS),
+    )
+    return json.dumps({"workflow": workflow, "captions": captions, "names": names})
+
+
 def check_lyric(payload):
     """The checker's findings, the per-section numbers, and where each section starts."""
     request = json.loads(payload)

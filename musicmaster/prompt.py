@@ -200,12 +200,7 @@ def build_workflow(prompt: dict, lyrics: str, duration_s: float, graph: dict | N
     md, style, target = prompt["metadata"], prompt["style"], prompt["target"]
     keyscale = f"{md['key']} {md['mode']}" if md.get("key") else "D minor"
     return {
-        "1": {"class_type": "UNETLoader",
-              "inputs": {"unet_name": weights["unet"], "weight_dtype": "default"}},
-        "2": {"class_type": "DualCLIPLoader",
-              "inputs": {"clip_name1": weights["clip_small"],
-                         "clip_name2": weights["clip_large"], "type": "ace"}},
-        "3": {"class_type": "VAELoader", "inputs": {"vae_name": weights["vae"]}},
+        **_loader_nodes(weights, target["sampler"]["model_sampling_shift"]),
         "4": {"class_type": "TextEncodeAceStepAudio1.5",
               "inputs": {
                   "clip": ["2", 0],
@@ -227,21 +222,107 @@ def build_workflow(prompt: dict, lyrics: str, duration_s: float, graph: dict | N
         "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["4", 0]}},
         "6": {"class_type": "EmptyAceStep1.5LatentAudio",
               "inputs": {"seconds": duration_s, "batch_size": target["batch_size"]}},
-        "7": {"class_type": "ModelSamplingAuraFlow",
-              "inputs": {"model": ["1", 0], "shift": target["sampler"]["model_sampling_shift"]}},
-        "8": {"class_type": "KSampler",
-              "inputs": {
-                  "model": ["7", 0], "seed": target["seed"],
-                  "steps": target["sampler"]["steps"], "cfg": target["sampler"]["cfg"],
-                  "sampler_name": target["sampler"]["sampler_name"],
-                  "scheduler": target["sampler"]["scheduler"],
-                  "positive": ["4", 0], "negative": ["5", 0],
-                  "latent_image": ["6", 0], "denoise": target["sampler"]["denoise"],
-              }},
+        "8": _ksampler_node(prompt, ["4", 0], ["5", 0], ["6", 0]),
         "9": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
         "10": {"class_type": "SaveAudioMP3",
                "inputs": {"audio": ["9", 0],
                           "filename_prefix": f"audio/{prompt['song_id']}", "quality": "V0"}},
+    }
+
+
+def _loader_nodes(weights: dict, shift: float) -> dict:
+    """The model loaders every ACE-Step 1.5 graph needs, identical across the render paths."""
+    return {
+        "1": {"class_type": "UNETLoader",
+              "inputs": {"unet_name": weights["unet"], "weight_dtype": "default"}},
+        "2": {"class_type": "DualCLIPLoader",
+              "inputs": {"clip_name1": weights["clip_small"],
+                         "clip_name2": weights["clip_large"], "type": "ace"}},
+        "3": {"class_type": "VAELoader", "inputs": {"vae_name": weights["vae"]}},
+        "7": {"class_type": "ModelSamplingAuraFlow",
+              "inputs": {"model": ["1", 0], "shift": shift}},
+    }
+
+
+def _ksampler_node(prompt: dict, positive, negative, latent, steps: int | None = None) -> dict:
+    """The sampler node, taken from the prompt's target so every path denoises the same way.
+
+    ``steps`` overrides the target's count, which is what a preview does: the same arrangement and
+    the same seed, denoised coarsely, so it is a cheap look at the whole song rather than a short
+    clip of something else.
+    """
+    target = prompt["target"]
+    return {"class_type": "KSampler",
+            "inputs": {
+                "model": ["7", 0], "seed": target["seed"],
+                "steps": target["sampler"]["steps"] if steps is None else steps,
+                "cfg": target["sampler"]["cfg"],
+                "sampler_name": target["sampler"]["sampler_name"],
+                "scheduler": target["sampler"]["scheduler"],
+                "positive": positive, "negative": negative,
+                "latent_image": latent, "denoise": target["sampler"]["denoise"],
+            }}
+
+
+# A preview runs the whole song and cuts the sampler steps instead of the length. A short clip is
+# not the opening of the full render -- the model arranges to fit whatever length it is given -- so
+# only a full-length render shows what a tag does to the actual arrangement. Two steps tracks the
+# eight-step render closely (mel correlation 0.97) and is a fraction of the cost.
+PREVIEW_STEPS = 2
+PREVIEW_BATCH_NODE = "MyToolbox_AceStepBatchTextEncode"
+
+
+def build_preview_workflow(
+    prompt: dict,
+    lyrics: str,
+    captions: list[str],
+    *,
+    seconds: float | None = None,
+    steps: int = PREVIEW_STEPS,
+    graph: dict | None = None,
+) -> dict:
+    """A full-length, coarse preview: one caption per row, one LM pass and one sampler pass.
+
+    A full render is one graph per prompt. A preview wants several captions at once, so a base and
+    a variant go in as a single submission and differ only by their caption. The batch node emits
+    one conditioning and one latent per caption, and one KSampler renders them all -- ACE-Step
+    cannot sample a latent batch whose captions differ any other way.
+
+    Rows share the seed, so two previews differ by the caption rather than by the arrangement.
+    Nothing is saved to ``output/``: the graph ends in PreviewAudio, which writes to ComfyUI's temp
+    directory and is cleaned up there.
+    """
+    weights = graph or GRAPH
+    md, target = prompt["metadata"], prompt["target"]
+    keyscale = f"{md['key']} {md['mode']}" if md.get("key") else "D minor"
+    seconds = md["duration_s"] if seconds is None else seconds
+    return {
+        **_loader_nodes(weights, target["sampler"]["model_sampling_shift"]),
+        "11": {"class_type": PREVIEW_BATCH_NODE,
+               "inputs": {
+                   "clip": ["2", 0],
+                   "captions": "\n".join(captions),
+                   "lyrics": lyrics,
+                   "bpm": md["bpm"],
+                   "duration": seconds,
+                   "timesignature": md["timesignature"],
+                   "language": md["language"],
+                   "keyscale": keyscale,
+                   "seed": target["seed"],
+                   "cfg_scale": target["lm"]["cfg_scale"],
+                   "temperature": target["lm"]["temperature"],
+                   "top_p": target["lm"]["top_p"],
+                   "top_k": target["lm"]["top_k"],
+                   "min_p": target["lm"]["min_p"],
+               }},
+        "5": {"class_type": "ConditioningZeroOut", "inputs": {"conditioning": ["11", 0]}},
+        "6": {"class_type": "EmptyAceStep1.5LatentAudio",
+              "inputs": {"seconds": seconds, "batch_size": len(captions)}},
+        "8": _ksampler_node(prompt, ["11", 0], ["5", 0], ["6", 0], steps=steps),
+        "9": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
+        # PreviewAudio, not SaveAudio: it writes to ComfyUI's temp directory and is cleaned up
+        # there. A preview is transient and should not accumulate beside the renders.
+        "10": {"class_type": "PreviewAudio", "inputs": {"audio": ["9", 0]}},
     }
 
 

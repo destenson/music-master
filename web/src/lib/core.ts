@@ -165,4 +165,27 @@ export class MusicMasterCore {
   }): Artifacts {
     return this.call<Artifacts>("artifacts", request);
   }
+
+  /**
+   * A full-length, coarse preview: the current caption plus one row per bin/option variant, all in
+   * one graph. Cheap per caption because the LM runs once for the whole batch.
+   */
+  preview(request: {
+    song_id: string;
+    template_id: string;
+    bpm: number;
+    seed: number;
+    selections: Selections;
+    lyrics: string;
+    brief: string;
+    artist_references: string[];
+    variants?: { bin: string; option: string }[];
+    steps?: number;
+    seconds?: number | null;
+  }): { workflow: unknown; captions: string[]; names: string[] } {
+    return this.call<{ workflow: unknown; captions: string[]; names: string[] }>(
+      "preview",
+      request,
+    );
+  }
 }

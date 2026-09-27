@@ -1,5 +1,6 @@
 <script lang="ts">
   import Collapsible from "./Collapsible.svelte";
+  import { previewState, startPreview } from "./preview.svelte";
   import * as S from "./selection";
   import type { Bin, BinSelection } from "./types";
 
@@ -19,6 +20,13 @@
   const subtracts = $derived(bin.polarity === "negative");
   const count = $derived(S.chosen(selection).length);
   const atCap = $derived(bin.max_selections !== undefined && count >= bin.max_selections);
+  // Only a bin whose options become caption tags is worth A/B-ing: a metadata bin changes nothing
+  // audible, and a negative bin's options never reach the previewed caption at all.
+  const taggable = $derived(!metadataOnly && !subtracts);
+
+  function abTitle(label: string): string {
+    return `Preview the caption with and without “${label}”, both in one pass, sharing a seed`;
+  }
 </script>
 
 <Collapsible
@@ -43,27 +51,55 @@
     <div class="options">
       {#each bin.options ?? [] as option (option.id)}
         {@const on = S.has(selection, option.id)}
-        <label class="option" class:disabled={!on && atCap}>
-          <input
-            type="checkbox"
-            checked={on}
-            disabled={!on && atCap}
-            onchange={() => onchange(S.toggle(selection, option.id, bin.max_selections))}
-          />
-          {option.label}
-        </label>
+        <div class="option-cell">
+          <label class="option" class:disabled={!on && atCap}>
+            <input
+              type="checkbox"
+              checked={on}
+              disabled={!on && atCap}
+              onchange={() => onchange(S.toggle(selection, option.id, bin.max_selections))}
+            />
+            {option.label}
+          </label>
+          {#if taggable}
+            <button
+              class="ab"
+              aria-label={`A/B test ${option.label}`}
+              title={abTitle(option.label)}
+              onclick={() => startPreview({ bin: bin.id, option: option.id })}
+              disabled={previewState.busy}
+            >
+              A/B
+            </button>
+          {/if}
+        </div>
       {/each}
     </div>
   {:else if bin.control === "single_select"}
-    <select
-      value={S.chosen(selection)[0] ?? ""}
-      onchange={(event) => onchange(S.setSingle(selection, event.currentTarget.value))}
-    >
-      <option value="">—</option>
-      {#each bin.options ?? [] as option (option.id)}
-        <option value={option.id}>{option.label}</option>
-      {/each}
-    </select>
+    <div class="row">
+      <select
+        value={S.chosen(selection)[0] ?? ""}
+        onchange={(event) => onchange(S.setSingle(selection, event.currentTarget.value))}
+      >
+        <option value="">—</option>
+        {#each bin.options ?? [] as option (option.id)}
+          <option value={option.id}>{option.label}</option>
+        {/each}
+      </select>
+      {#if taggable && S.chosen(selection)[0]}
+        {@const chosen = S.chosen(selection)[0]}
+        {@const label = (bin.options ?? []).find((o) => o.id === chosen)?.label ?? chosen}
+        <button
+          class="ab"
+          aria-label={`A/B test ${label}`}
+          title={abTitle(label)}
+          onclick={() => startPreview({ bin: bin.id, option: chosen })}
+          disabled={previewState.busy}
+        >
+          A/B
+        </button>
+      {/if}
+    </div>
   {:else if bin.control === "numeric_with_descriptor"}
     <div class="row">
       <input
@@ -132,6 +168,19 @@
         value={selection?.text ?? ""}
         oninput={(event) => onchange(S.setText(selection, event.currentTarget.value))}
       />
+      {#if taggable && S.chosen(selection)[0]}
+        {@const chosen = S.chosen(selection)[0]}
+        {@const label = (bin.options ?? []).find((o) => o.id === chosen)?.label ?? chosen}
+        <button
+          class="ab"
+          aria-label={`A/B test ${label}`}
+          title={abTitle(label)}
+          onclick={() => startPreview({ bin: bin.id, option: chosen })}
+          disabled={previewState.busy}
+        >
+          A/B
+        </button>
+      {/if}
     </div>
   {/if}
 </Collapsible>

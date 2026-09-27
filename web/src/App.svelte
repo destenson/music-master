@@ -6,6 +6,7 @@
   import Inspector from "./lib/Inspector.svelte";
   import Lyrics from "./lib/Lyrics.svelte";
   import Render from "./lib/Render.svelte";
+  import Preview from "./lib/Preview.svelte";
   import Song from "./lib/Song.svelte";
   import Timeline from "./lib/Timeline.svelte";
   import { freshSeed } from "./lib/comfy";
@@ -24,6 +25,7 @@
   } from "./lib/draft";
   import { parseFindings, type Finding } from "./lib/lens";
   import { buildPrompt } from "./lib/prompt";
+  import { setPreviewBuilder } from "./lib/preview.svelte";
   import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
   import * as S from "./lib/selection";
   import type { Artifacts, LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
@@ -180,6 +182,45 @@
   }
 
   let artifact = $derived.by(() => artifactsFor(seed));
+
+  /**
+   * The preview graph: the same caption the page would send, at full song length and coarse steps.
+   * `variants` are bin/option pairs, each its own row in the batch, so an A/B of a tag is one
+   * submission and differs only by that tag.
+   */
+  function buildPreview(
+    forSelections: Selections,
+    steps: number,
+    variants: { bin: string; option: string }[],
+  ): { workflow: unknown; captions: string[]; names: string[] } | null {
+    if (!core || !templateId) return null;
+    try {
+      return core.preview({
+        song_id: songId,
+        template_id: templateId,
+        bpm,
+        seed,
+        selections: forSelections,
+        lyrics: lyricText,
+        brief: briefText,
+        artist_references: artists
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+        variants,
+        steps,
+      });
+    } catch (error) {
+      console.error("preview failed", error);
+      return null;
+    }
+  }
+
+  // The preview queue is shared by the top-bar panel and the per-checkbox A/B buttons, so the one
+  // builder that reads the page's current state is registered here rather than rebuilt in each.
+  $effect(() => {
+    setPreviewBuilder((steps, variants) => buildPreview(selections, steps, variants));
+  });
 
   /**
    * The render target is app-level state, so its persistence and its reachability check live here
@@ -497,6 +538,7 @@
     >
       re-render {seed}
     </button>
+    <Preview bins={data?.vocabulary.bins ?? []} ready={!!core && !!data} />
     {#if renderQueue.error}
       <span class="chip warn" title={renderQueue.error}>render failed</span>
     {/if}
