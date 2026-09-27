@@ -242,10 +242,57 @@ export interface RenderOutcome {
   ok: boolean;
   status: string;
   outputs: RenderOutput[];
-  messages: string[];
+  messages: RenderMessage[];
 }
 
 const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
+
+/** A line worth showing about a render, and whether it is trouble or just information. */
+export interface RenderMessage {
+  text: string;
+  kind: "note" | "error";
+}
+
+/**
+ * ComfyUI reports a run as `[event, payload]` pairs, so `String()` over one gives
+ * `execution_start,[object Object]` — the payload thrown away and the event name kept, which is
+ * exactly backwards: the name is the part you already know.
+ *
+ * Only the events that carry information survive, and each is described rather than dumped. Severity
+ * is carried rather than assumed, because painting "5 nodes came from cache" in the same red as a
+ * failed render would be a lie about what happened.
+ */
+export function describeMessages(messages: unknown[]): RenderMessage[] {
+  const out: RenderMessage[] = [];
+  for (const entry of messages) {
+    if (!Array.isArray(entry) || typeof entry[0] !== "string") continue;
+    const [name, payload] = entry as [string, Record<string, unknown> | undefined];
+    const data = payload && typeof payload === "object" ? payload : {};
+
+    if (name === "execution_start" || name === "execution_success") continue;
+
+    if (name === "execution_cached") {
+      const nodes = Array.isArray(data.nodes) ? data.nodes.length : 0;
+      if (nodes) out.push({ kind: "note", text: `${nodes} node(s) came from ComfyUI's cache` });
+      continue;
+    }
+
+    if (name === "execution_error") {
+      const where = data.node_type ?? data.node_id ?? "an unnamed node";
+      const kind = data.exception_type ?? "error";
+      const why = data.exception_message ?? "";
+      out.push({ kind: "error", text: `${kind} at ${where}: ${why}`.trim() });
+      const trace = Array.isArray(data.traceback) ? data.traceback : [];
+      const last = trace.length ? String(trace[trace.length - 1]).trim() : "";
+      if (last) out.push({ kind: "error", text: last });
+      continue;
+    }
+
+    // An event this code does not know is reported as a note rather than as a failure.
+    out.push({ kind: "note", text: name });
+  }
+  return out.slice(-5).map((message) => ({ ...message, text: message.text.slice(0, 300) }));
+}
 
 /** The render's state, or `{done: false}` while it is still going. */
 export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promise<RenderOutcome> {
@@ -269,7 +316,9 @@ export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promis
       ok: status === "succeeded",
       status,
       outputs,
-      messages: job.error ? [`${job.error.code ?? "error"}: ${job.error.message ?? ""}`] : [],
+      messages: job.error
+        ? [{ kind: "error" as const, text: `${job.error.code ?? "error"}: ${job.error.message ?? ""}` }]
+        : [],
     };
   }
 
@@ -304,7 +353,7 @@ export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promis
     ok: status === "success",
     status,
     outputs,
-    messages: (entry.status?.messages ?? []).slice(-3).map((m) => String(m).slice(0, 300)),
+    messages: describeMessages(entry.status?.messages ?? []),
   };
 }
 

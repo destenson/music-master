@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { loadPyodide } from "pyodide";
 import { parseFindings, slotFor } from "../src/lib/lens.ts";
-import { presetFor, freshSeed } from "../src/lib/comfy.ts";
+import { presetFor, freshSeed, describeMessages } from "../src/lib/comfy.ts";
 import { freeName, stable } from "../src/lib/draft.ts";
 import { editorTheme } from "../src/lib/lens.ts";
 import { EditorState } from "@codemirror/state";
@@ -325,6 +325,59 @@ check(
   "chorus idea 3",
 );
 check("an empty name still gets one", freeName("   ", []), "draft");
+
+// --- What a render reports back ------------------------------------------------------------------
+//
+// ComfyUI answers with [event, payload] pairs. Stringifying one keeps the event name and destroys the
+// payload, which is exactly backwards — hence execution_start,[object Object] in the panel.
+
+console.log("\nrender status messages:\n");
+check(
+  "routine events are dropped, not stringified",
+  describeMessages([
+    ["execution_start", { prompt_id: "x", timestamp: 1 }],
+    ["execution_success", { prompt_id: "x", timestamp: 2 }],
+  ]),
+  [],
+);
+check(
+  "a partly cached run says how much was reused",
+  describeMessages([["execution_cached", { nodes: ["1", "2", "3"], prompt_id: "x" }]]),
+  [{ kind: "note", text: "3 node(s) came from ComfyUI's cache" }],
+);
+check(
+  "a cache hit is information, not a failure",
+  describeMessages([["execution_cached", { nodes: [1] }]]).every((m) => m.kind !== "error"),
+  true,
+);
+check(
+  "an execution error is described rather than dumped",
+  describeMessages([
+    [
+      "execution_error",
+      {
+        node_type: "KSampler",
+        exception_type: "RuntimeError",
+        exception_message: "allocation on device 0 failed",
+        traceback: ["Traceback (most recent call last):", 'RuntimeError: allocation failed'],
+      },
+    ],
+  ]),
+  [
+    { kind: "error", text: "RuntimeError at KSampler: allocation on device 0 failed" },
+    { kind: "error", text: "RuntimeError: allocation failed" },
+  ],
+);
+check(
+  "nothing anywhere says [object Object]",
+  describeMessages([
+    ["execution_start", {}],
+    ["execution_cached", { nodes: [1] }],
+    ["execution_error", {}],
+    ["some_future_event", { a: 1 }],
+  ]).some((message) => message.text.includes("[object")),
+  false,
+);
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //

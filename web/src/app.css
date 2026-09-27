@@ -380,6 +380,11 @@ code,
   color: var(--unknown);
 }
 
+/* Information about a render that is not trouble: a cache hit, an unrecognised event. */
+.finding.note {
+  color: var(--muted);
+}
+
 /* --- Timeline ---------------------------------------------------------------------- */
 
 .timeline {

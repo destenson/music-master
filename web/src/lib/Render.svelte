@@ -246,7 +246,7 @@
           </p>
         {/if}
         {#each renderQueue.outcome.messages as message, i (i)}
-          <div class="finding error">{message}</div>
+          <div class="finding {message.kind === "error" ? "error" : "note"}">{message.text}</div>
         {/each}
       </div>
     {/if}
