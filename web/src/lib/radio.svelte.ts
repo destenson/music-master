@@ -624,21 +624,25 @@ async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
     .map(({ take }, index) => ({ ...take, index }));
 }
 
+/** How many of a station's own takes to queue at once, so a huge folder cannot flood the list. */
+const SEED_LIMIT = 50;
+
 /**
  * Queue the station's existing takes, so pressing play plays rather than waits.
  *
- * One slot is left for something new: the station starts on what it has and renders its next song
- * behind that, rather than replaying a whole repertoire before producing anything.
+ * They go in oldest first, and all of them: playback starts at the beginning of what the station
+ * already has, and nothing new is rendered until that repertoire runs down to the look-ahead.
+ * Seeding only the last few started playback at the end of the repertoire, passed over the earlier
+ * takes, and rendered replacements while they sat unplayed.
  */
 function seedSongs(existing: SavedRadioSong[]): number {
   if (!existing.length) return 0;
-  const want = Math.max(1, radioState.bufferTarget - 1);
-  const chosen = existing.slice(-want);
+  const chosen = existing.slice(0, SEED_LIMIT);
   const highest = existing.reduce(
     (top, take) => Math.max(top, Number.isFinite(take.index) ? take.index : 0),
     0,
   );
-  // New songs continue the numbering, so a fresh take cannot collide with a recovered one.
+  // New songs continue the numbering, so they sort after every recovered take.
   indices[radioState.stationId] = Math.max(indices[radioState.stationId] ?? 0, highest + 1);
   for (const take of chosen) enqueue(songFromSaved(take, "ready"));
   return chosen.length;

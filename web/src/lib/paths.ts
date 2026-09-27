@@ -1,30 +1,33 @@
 /**
- * Addresses for the page's own files, and the build they belong to.
+ * Addresses for the page's own files, and the build this page is running.
  *
- * A static host caches everything for minutes at a time and has no way to push a change to a tab it
- * has already served, so two things go wrong without help: a page can refuse to see a new build, and
- * it can load new code against the previous build's cached repository data. Stamping every
- * repository fetch with the build the page booted as turns the second into a cache miss, and gives
- * `update.svelte.ts` a stable name for the first.
+ * The build id is compiled into the bundle rather than fetched. That is the whole point: a page has
+ * to know which build *it* is, and asking the host which build is deployed tells a page served from
+ * the host's cache that it is already current — which is exactly the page that most needs to reload.
+ * `update.svelte.ts` compares this with the published `version.json`; every repository fetch is
+ * stamped with it, so a new build cannot be handed the previous build's cached data.
  *
  * Nothing here reads the repository, so it is importable from the smoke test under plain Node.
  */
 
-let build = "";
+// `typeof` rather than a bare read: under plain Node the build-time constant does not exist, and
+// this stays importable there rather than throwing on load.
+const build = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "";
 
-/** The build this page is running. Set once at boot, before anything reads the repository. */
-export function setBuild(id: string): void {
-  build = id;
-}
-
+/** The build this page is running, as compiled into it. */
 export function currentBuild(): string {
   return build;
 }
 
-/** A URL stamped with the running build, so a new build cannot be served an old cached file. */
-export function withBuild(url: string): string {
+/** Stamp a URL with a build id, so a new build is a cache miss rather than a stale hit. */
+export function stamp(url: string, build: string): string {
   if (!build) return url;
   return `${url}${url.includes("?") ? "&" : "?"}v=${encodeURIComponent(build)}`;
+}
+
+/** The same, for the build this page is running. */
+export function withBuild(url: string): string {
+  return stamp(url, build);
 }
 
 /**

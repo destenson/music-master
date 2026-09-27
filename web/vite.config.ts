@@ -87,9 +87,8 @@ function dropOrigin(proxy: Parameters<NonNullable<ProxyOptions["configure"]>>[0]
  * Serves the repository and the Pyodide runtime in dev, and copies both into the bundle for a
  * static build. The same list drives both, so what you develop against is what gets deployed.
  */
-function sharedAssets(): Plugin {
+function sharedAssets(build: string): Plugin {
   const repoFiles = collectRepoFiles();
-  const build = buildId();
   let outDir = path.join(WEB, "dist");
 
   return {
@@ -162,8 +161,13 @@ function sharedAssets(): Plugin {
   };
 }
 
+const BUILD = buildId();
+
 export default defineConfig({
-  plugins: [svelte(), sharedAssets()],
+  plugins: [svelte(), sharedAssets(BUILD)],
+  // Compiled into the bundle, so a page knows which build it is rather than asking the host — a
+  // cached page that asks is told the new id and never reloads.
+  define: { __BUILD_ID__: JSON.stringify(BUILD) },
   // Relative base so the build works from a subpath as well as a domain root.
   base: "./",
   build: {

@@ -23,7 +23,7 @@ import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { proxy } from "svelte/internal/client";
 import { generate } from "../src/lib/ollama.ts";
-import { reloadUrl, setBuild, withBuild } from "../src/lib/paths.ts";
+import { reloadUrl, stamp } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
 import { parseTakeName, takesFromHistory } from "../src/lib/takes.ts";
 
@@ -457,19 +457,17 @@ check(
 // code from running against the previous build's cached data.
 
 console.log("\nupdates:\n");
-check("a URL with no build id is left alone", withBuild("repo/manifest.json"), "repo/manifest.json");
-setBuild("abc123");
+check("a URL with no build id is left alone", stamp("repo/manifest.json", ""), "repo/manifest.json");
 check(
-  "a known build id stamps a repository URL",
-  withBuild("repo/manifest.json"),
+  "a build id stamps a repository URL",
+  stamp("repo/manifest.json", "abc123"),
   "repo/manifest.json?v=abc123",
 );
 check(
   "an existing query is extended, not replaced",
-  withBuild("repo/x.json?a=1"),
+  stamp("repo/x.json?a=1", "abc123"),
   "repo/x.json?a=1&v=abc123",
 );
-setBuild("");
 
 check(
   "a reload goes to a different URL, so the cached document cannot be served",

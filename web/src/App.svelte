@@ -30,7 +30,6 @@
   import { setRadioHost } from "./lib/radio.svelte";
   import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
   import {
-    discoverBuild,
     reloadNow,
     reloadedFor,
     updateState,
@@ -468,9 +467,9 @@
   onMount(async () => {
     try {
       saved = listSaved();
-      // Before anything reads the repository: the build id is what stamps those requests, so a new
-      // build cannot be served the previous build's cached data.
-      await discoverBuild();
+      // Before anything is loaded: a page the host served from its cache is running superseded code,
+      // and it should reload rather than spend the boot on a build it is about to replace.
+      watchForUpdates();
       status = "reading the vocabulary";
       data = await loadStaticData();
 
@@ -530,9 +529,6 @@
 
       core = await MusicMasterCore.boot((message) => (status = message));
       status = "ready";
-      // Only once the app works: watching for a new build before it boots would reload a broken
-      // page into the same broken page.
-      watchForUpdates();
     } catch (error) {
       failure = error instanceof Error ? error.message : String(error);
       status = "failed";

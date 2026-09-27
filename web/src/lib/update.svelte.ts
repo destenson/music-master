@@ -2,24 +2,24 @@
  * Update discovery for a static deployment.
  *
  * A page served from a static host has no idea a new build exists: the tab keeps running the
- * JavaScript it loaded until somebody reloads it, and the host caches even the fresh files for
- * minutes. This finds out that a new build is live, and does the reloading — which is the closest a
- * static bundle gets to the dev server's hot reload, since there is no server in the loop to push a
- * change into a running page.
+ * JavaScript it loaded until somebody reloads it, and the host serves even a fresh page from its
+ * cache for minutes. This finds out, and does the reloading — the closest a static bundle gets to
+ * the dev server's hot reload, since there is no server in the loop to push a change into a page.
  *
- * Three things make it work rather than race:
+ * What makes it work is that the page knows **its own** build id, because it was compiled into the
+ * bundle (`paths.currentBuild`). The tempting alternative — ask the host what build is deployed and
+ * call that "current" — cannot ever detect a stale page: a page the host served from its cache runs
+ * old code, asks the host, is told the new id, and concludes it is up to date. Comparing a compiled
+ * id against the published one is what lets a cached page notice, within a second of loading, that
+ * it is not the build being served.
  *
- * * the build publishes a `version.json` naming itself, so the page has something small and
- *   unambiguous to watch;
- * * every check is cache-busted and `no-store`, so a cached answer cannot hide a new build;
- * * repository fetches are stamped with the build this page booted as (`paths.withBuild`), so new
- *   code is never run against the previous build's cached data.
+ * Everything else supports that: `version.json` names the deployed build and every check is
+ * cache-busted and `no-store`, so a cached answer cannot hide a new build; and repository fetches
+ * are stamped with the compiled build, so new code is never run against the previous build's data.
  *
- * It is deliberately off in development, where Vite already replaces modules in place, and it never
- * reloads while a render or a station is running — the app decides that, because only the app knows
- * what a reload would throw away.
+ * It is deliberately off in development, where Vite already replaces modules in place.
  */
-import { asset, reloadUrl, setBuild } from "./paths";
+import { asset, currentBuild, reloadUrl } from "./paths";
 
 /** How often to ask. Short enough to feel immediate, long enough to be invisible. */
 const POLL_MS = 10_000;
@@ -33,8 +33,8 @@ const GUARD_KEY = "mm.update.reloadedFor";
 const GUARD_MS = 30_000;
 
 export const updateState = $state({
-  /** The build this page is running. */
-  current: "",
+  /** The build this page is running, compiled in — never learned from the host. */
+  current: currentBuild(),
   /** The newest build the host has offered. */
   latest: "",
   ready: false,
@@ -42,7 +42,6 @@ export const updateState = $state({
   notice: null as string | null,
 });
 
-let discovery: Promise<string> | null = null;
 let watched = false;
 
 /** One uncached read of the published build id. Empty means "could not tell", never "changed". */
@@ -60,22 +59,11 @@ async function fetchBuild(): Promise<string> {
 }
 
 /**
- * Learn and remember the build this page booted as. Called once, before anything reads the
- * repository, because every later repository fetch is stamped with what this returns.
+ * Start watching for a build other than this one.
+ *
+ * Called at boot, before anything is loaded: a page the host served from its cache is already
+ * superseded, and the sooner it says so the less it does before reloading.
  */
-export function discoverBuild(): Promise<string> {
-  if (!discovery) {
-    discovery = fetchBuild().then((id) => {
-      setBuild(id);
-      updateState.current = id;
-      updateState.latest = id;
-      return id;
-    });
-  }
-  return discovery;
-}
-
-/** Start watching for a newer build. Called once, after the app has booted. */
 export function watchForUpdates(): void {
   if (import.meta.env.DEV || watched) return;
   watched = true;
@@ -84,7 +72,7 @@ export function watchForUpdates(): void {
     const latest = await fetchBuild();
     if (!latest) return;
     updateState.latest = latest;
-    updateState.ready = Boolean(updateState.current) && latest !== updateState.current;
+    updateState.ready = latest !== updateState.current;
   };
 
   window.setInterval(() => void check(), POLL_MS);

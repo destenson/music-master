@@ -332,9 +332,8 @@
 
           {#if radioState.recovered}
             <div class="finding note">
-              started from {radioState.recovered} take{radioState.recovered === 1 ? "" : "s"} already
-              rendered for this station; the next song is rendering behind
-              {radioState.recovered === 1 ? "it" : "them"}
+              playing the {radioState.recovered} take{radioState.recovered === 1 ? "" : "s"} this
+              station already had, oldest first; it renders new songs once they run down
             </div>
           {/if}
 
