@@ -9,7 +9,7 @@ import { loadPyodide } from "pyodide";
 
 const REPO = path.resolve(import.meta.dirname, "..", "..");
 const PROBE = "spikes/pyodide_text_core/latency_probe.py";
-const MOUNTED_DIRS = ["vocabulary", "schemas"];
+const MOUNTED_DIRS = ["musicmaster", "vocabulary", "schemas"];
 
 function mountDir(py, relDir) {
   const abs = path.join(REPO, relDir);

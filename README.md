@@ -8,7 +8,8 @@ song, then returns it with a **compliance report** that says, per requirement, w
 checked, on what evidence, and whether it passed — and lists the requirements it could not
 satisfy rather than quietly ignoring them.
 
-Status: **design only.** No code yet.
+Status: **design only.** The vocabulary, lyric checker and time-budget tooling are real and now
+packaged as `musicmaster/`; the generator, the UI and the live compliance battery are not built.
 
 ## The idea in one paragraph
 
@@ -146,6 +147,31 @@ Adding a bin is a four-part change — options, a control, a render position, an
 because a bin is simultaneously a UI element, a prompt field and a compliance obligation.
 `maps_to` is the field that keeps the three in step, and it is orthogonal to `emits_tag`, so a
 bin like `tempo` can create a requirement without contributing a tag.
+
+## The core package
+
+Every check lives once, in `musicmaster/`, as a **text tier**: JSON in, JSON out, standard library
+only. That purity is not tidiness — it is what lets the same code run under the CLI and, in the
+browser, under a WebAssembly CPython, so a static SPA reuses the one implementation instead of a
+rewrite that drifts from it.
+
+```
+musicmaster/
+  render.py  lyrics.py  timeline.py  templates.py  vocabulary.py   # text tier, stdlib only
+```
+
+The scripts in `vocabulary/` are thin wrappers that delegate to it, so existing command lines and
+`songs/*/build_and_submit.py` keep working unchanged.
+
+```bash
+python3 -m unittest discover -s tests -v
+```
+
+`tests/test_text_tier.py` covers both halves: the standard-library guard, and unit tests for the
+values the tier computes — the tag budget, the bar-to-seconds arithmetic, the syllable budget, and
+each song satisfying its own template. Expectations are written inline and derived from the
+definitions wherever they can be, so the suite fails when the arithmetic or the mapping is wrong,
+not when a message is reworded or the vocabulary grows.
 
 ## Schemas
 

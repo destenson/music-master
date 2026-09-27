@@ -1,12 +1,16 @@
-// Prove that the text core runs unchanged under Pyodide, byte-identically to native CPython.
+// Prove that the text tier runs unchanged under Pyodide, byte-identically to native CPython.
 //
 // This is the load-bearing claim behind a static (server-less) SPA: the checks the UI must run
 // live -- tag rendering, the syllable/time budget, lyric findings -- are pure stdlib Python, so a
 // WASM CPython can be the *same* implementation the CLI uses rather than a TypeScript rewrite that
-// would drift. This harness runs each script's real entry point (`__main__`) both ways and diffs
-// stdout, stderr and exit status.
+// would drift. This harness runs each module's real entry point both ways and diffs stdout, stderr
+// and exit status.
 //
 //   cd spikes/pyodide_text_core && npm install && node parity.mjs
+//
+// Since the core moved into the `musicmaster` package, this drives the package entry points.
+// `python3 -m unittest discover -s tests` separately asserts that the same package reproduces the
+// pre-extraction CLI output, so native == Pyodide here means Pyodide == the recorded baseline.
 //
 // The heavy audio layer (librosa, numpy, scipy) is deliberately out of scope: it cannot run in the
 // browser at all, which is why it lives behind the optional local backend instead.
@@ -17,42 +21,37 @@ import { spawnSync } from "node:child_process";
 import { loadPyodide } from "pyodide";
 
 const REPO = path.resolve(import.meta.dirname, "..", "..");
-const MOUNTED_DIRS = ["vocabulary", "schemas"];
+const MOUNTED_DIRS = ["musicmaster", "vocabulary", "schemas"];
 
-// Each entry is one real CLI invocation, run from the repository root both ways.
+// One entry per package entry point, with the arguments after the module name.
 const COMMANDS = [
-  ["render_tags / fixture", ["vocabulary/render_tags.py", "vocabulary/examples/late-night-trap.json"]],
+  ["render / fixture", "musicmaster.render", ["vocabulary/examples/late-night-trap.json"]],
   [
-    "check_lyrics / fixture",
+    "lyrics / fixture",
+    "musicmaster.lyrics",
     [
-      "vocabulary/check_lyrics.py",
       "vocabulary/examples/lyrics-late-night-trap.md",
       "--selections=vocabulary/examples/late-night-trap.json",
     ],
   ],
-  ["check_lyrics / self-test", ["vocabulary/check_lyrics.py", "--self-test"]],
-  ["check_lyrics / song", ["vocabulary/check_lyrics.py", "songs/rap-metal-groove/lyrics.md"]],
-  ["structure_templates / list", ["vocabulary/structure_templates.py", "--list"]],
+  ["lyrics / self-test", "musicmaster.lyrics", ["--self-test"]],
+  ["lyrics / song", "musicmaster.lyrics", ["songs/rap-metal-groove/lyrics.md"]],
+  ["templates / list", "musicmaster.templates", ["--list"]],
   [
-    "structure_templates / brief",
-    [
-      "vocabulary/structure_templates.py",
-      "--template=pop_standard",
-      "--brief",
-      "--bpm=95",
-      "--duration=180",
-    ],
+    "templates / brief",
+    "musicmaster.templates",
+    ["--template=pop_standard", "--brief", "--bpm=95", "--duration=180"],
   ],
   [
-    "structure_templates / timeline",
-    [
-      "vocabulary/structure_templates.py",
-      "--template=pop_standard",
-      "--timeline",
-      "--bpm=95",
-      "--duration=180",
-    ],
+    "templates / timeline",
+    "musicmaster.templates",
+    ["--template=pop_standard", "--timeline", "--bpm=95", "--duration=180"],
   ],
+];
+
+const EXTRA_FILES = [
+  "songs/rap-metal-groove/lyrics.md",
+  "vocabulary/examples/late-night-trap.json",
 ];
 
 function mountDir(py, relDir) {
@@ -71,22 +70,24 @@ function mountDir(py, relDir) {
   return count;
 }
 
-function runNative(argv) {
-  const r = spawnSync("python3", argv, { cwd: REPO, encoding: "utf8" });
+function runNative(module, args) {
+  const r = spawnSync("python3", ["-m", module, ...args], { cwd: REPO, encoding: "utf8" });
   return { out: r.stdout ?? "", err: r.stderr ?? "", code: r.status ?? -1 };
 }
 
 const RUNNER = `
 import contextlib, io, os, runpy, sys
 
-def run_script(argv):
+def run_package(module, args):
     os.chdir("/repo")
-    sys.argv = list(argv)
+    if "/repo" not in sys.path:
+        sys.path.insert(0, "/repo")
+    sys.argv = [module, *args]
     out, err = io.StringIO(), io.StringIO()
     code = 0
     with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
         try:
-            runpy.run_path(argv[0], run_name="__main__")
+            runpy.run_module(module, run_name="__main__", alter_sys=False)
         except SystemExit as exc:
             value = exc.code
             code = 0 if value is None else (value if isinstance(value, int) else 1)
@@ -102,7 +103,7 @@ function report(name, native, wasm) {
   const ok = checks.every(([, same]) => same);
   const detail = checks
     .filter(([, same]) => !same)
-    .map(([field]) => `${field} (native=${native[field]?.length ?? native[field]} wasm=${wasm[field]?.length ?? wasm[field]})`)
+    .map(([field]) => `${field} differs`)
     .join(", ");
   return { name, ok, detail, native, wasm };
 }
@@ -111,24 +112,26 @@ const py = await loadPyodide();
 
 let mounted = 0;
 for (const dir of MOUNTED_DIRS) mounted += mountDir(py, dir);
-py.FS.mkdirTree("/repo/songs/rap-metal-groove");
-py.FS.writeFile(
-  "/repo/songs/rap-metal-groove/lyrics.md",
-  fs.readFileSync(path.join(REPO, "songs/rap-metal-groove/lyrics.md")),
-);
+for (const rel of EXTRA_FILES) {
+  const src = path.join(REPO, rel);
+  if (!fs.existsSync(src)) continue;
+  const dest = "/repo/" + rel;
+  py.FS.mkdirTree(path.posix.dirname(dest));
+  py.FS.writeFile(dest, fs.readFileSync(src));
+  mounted += 1;
+}
 py.runPython(RUNNER);
 
 const wasmPython = py.globals.get("sys").version.split(" ")[0];
 const results = [];
 
-for (const [name, argv] of COMMANDS) {
-  const native = runNative(argv);
-  const [out, err, code] = py.globals.get("run_script")(py.toPy(argv)).toJs();
+for (const [name, module, args] of COMMANDS) {
+  const native = runNative(module, args);
+  const [out, err, code] = py.globals.get("run_package")(module, py.toPy(args)).toJs();
   const wasm = { out, err, code: Number(code) };
   const r = report(name, native, wasm);
   results.push(r);
-  const mark = r.ok ? "IDENTICAL" : "DIFFERS";
-  console.log(`[${mark.padEnd(9)}] ${name}${r.detail ? "  --  " + r.detail : ""}`);
+  console.log(`[${r.ok ? "IDENTICAL" : "DIFFERS"}] ${name}${r.detail ? "  --  " + r.detail : ""}`);
   if (!r.ok) {
     const firstDiff = (a, b) => {
       const n = Math.min(a.length, b.length);
@@ -148,20 +151,19 @@ for (const [name, argv] of COMMANDS) {
 const passed = results.filter((r) => r.ok).length;
 console.log(
   `\n${passed}/${results.length} invocations byte-identical ` +
-    `(native CPython ${process.env.PYTHON_VERSION ?? "python3"} vs Pyodide ${wasmPython}, ${mounted} files mounted)`,
+    `(native CPython ${process.env.PYTHON_VERSION ?? "python3"} vs Pyodide ${wasmPython}, ` +
+    `${mounted} files mounted)`,
 );
 
 // The vocabulary validator is an admin/CI tool, not a live UI surface, and depends on jsonschema.
-// It is reported for information rather than as a parity gate.
-const nativeValidate = runNative(["vocabulary/validate_vocabulary.py"]);
-const [vout, verr, vcode] = py.globals
-  .get("run_script")(py.toPy(["vocabulary/validate_vocabulary.py"]))
-  .toJs();
+// It is reported for information rather than as a parity gate. Its entry point takes no arguments.
+const nativeValidate = runNative("musicmaster.vocabulary", []);
+const [vout, verr, vcode] = py.globals.get("run_package")("musicmaster.vocabulary", py.toPy([])).toJs();
 const validatorMatches =
   nativeValidate.out === vout && nativeValidate.err === verr && nativeValidate.code === Number(vcode);
 console.log(
-  `\ninfo: validate_vocabulary.py ${validatorMatches ? "matches" : "differs"} ` +
-    `(jsonschema is a native dependency; the core does not need it)`,
+  `\ninfo: musicmaster.vocabulary ${validatorMatches ? "matches" : "differs"} ` +
+    `(jsonschema is a native dependency; the text tier does not require it)`,
 );
 if (!validatorMatches) {
   const nativeLines = (nativeValidate.out + nativeValidate.err).split("\n");

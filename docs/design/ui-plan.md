@@ -136,11 +136,12 @@ with the same logic and no duplicated rules:
 ```
 musicmaster/
   # Text tier -- pure, stdlib only, JSON in / JSON out. Runs under CPython and under Pyodide.
-  vocabulary.py   # load, validate, options, polarity, label maps
-  timeline.py     # build_timeline, check_fit, rates          (from vocabulary/timeline.py)
-  lyrics.py       # parse, check, template conformance        (from check_lyrics.py)
-  render.py       # render tags, budget, negatives            (from render_tags.py)
-  prompt.py       # canonical prompt, target rendering, hashing
+  vocabulary.py   # load, validate, options, polarity, label maps   (from validate_vocabulary.py)
+  timeline.py     # build_timeline, check_fit, rates                (from timeline.py)
+  templates.py    # template lookup, brief, bar plan, scaling        (from structure_templates.py)
+  lyrics.py       # parse, check, template conformance               (from check_lyrics.py)
+  render.py       # render tags, budget, negatives                   (from render_tags.py)
+  prompt.py       # canonical prompt, target rendering, hashing      (M2/M3; no source script yet)
 
   # Boundary -- the manifest is pure (hashing, staleness); reading and writing the song directory is not.
   bundle.py       # song directory, manifest, manifest hashes
@@ -417,7 +418,7 @@ Network Access preflight both apply, and the text tier must never assume the ser
 | Milestone | Content | Done when |
 | --- | --- | --- |
 | **C** | **Captioner and evidence classes** — `describe.py`, the gauge, structured scoring, captions ([`captioner.md`](captioner.md)) | per-class gauge measured; genre, vocal and instrument classes either decided or explicitly not; `unverified` count falls by the classes that passed |
-| **M0** | Extract `musicmaster/` package + CLI into the text and execute tiers; current scripts become thin wrappers | the two existing songs build, check and report **byte-identically** through the package; one test asserts it, and one guard test asserts the text tier imports only the standard library |
+| **M0** | Extract `musicmaster/` package + CLI into the text and execute tiers; current scripts become thin wrappers | the two existing songs build, check and report **byte-identically** through the package; the suite asserts the values it computes, and a guard test asserts the text tier imports only the standard library |
 | **M1** | Read-only workspace + report viewer, shipped as a static build with nothing running | opening either existing song shows its artifacts and verdicts, with `unverified` correct and no backend required |
 | **M2** | Brief → spec → builder → structure/time | a new song can be authored to a valid prompt without touching a file |
 | **M3** | Lyric editor with grammar lens and inspector | the rap-metal lyric can be written in the UI, and every finding the CLI produces is reproduced |
@@ -471,8 +472,9 @@ the same checks, and the second one would drift.
 
 1. `musicmaster/` package skeleton, extracting the five text modules verbatim into the stdlib-only
    tier, with the current files becoming thin wrappers.
-2. A parity test with two halves: the package against the old scripts on both songs, and the same
-   package under Pyodide. [`spikes/pyodide_text_core`](../../spikes/pyodide_text_core/README.md)
-   already proves the second half is achievable; point it at the package instead of the scripts.
+2. Unit tests for the values the tier computes, with expectations derived from the definitions
+   rather than captured from output, plus the same package running under Pyodide.
+   [`spikes/pyodide_text_core`](../../spikes/pyodide_text_core/README.md) covers the runtime half;
+   the arithmetic and mapping assertions live in `tests/test_text_tier.py`.
 3. A guard test asserting the text tier imports nothing outside the standard library.
 4. Nothing else. The SPA starts once the core has one entry point and one proven runtime story.
