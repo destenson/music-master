@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/radio-stations.schema.json",
+  "title": "RadioStationLibrary",
+  "description": "Named radio stations as data. A station fixes its identity — genre, scene, era, tempo band, mood range — and declares pools for everything that makes a sound; musicmaster.radio draws a coherent subset from each pool per song, so consecutive songs differ in instrumentation, production, groove, delivery and key while staying in the genre. The planner computes tempo, structure and key, so a station does not fix them.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["radio_stations_version", "stations"],
+  "properties": {
+    "radio_stations_version": { "type": "string", "const": "1" },
+    "note": { "type": "string" },
+    "stations": {
+      "type": "array",
+      "minItems": 20,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "family", "tagline", "template_id", "bpm", "themes", "fixed", "pools"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "description": "The slug that names the station's output directory and its song ids."
+          },
+          "name": { "type": "string", "minLength": 1 },
+          "family": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The broad family the station belongs to, for grouping in the picker."
+          },
+          "tagline": {
+            "type": "string",
+            "minLength": 1,
+            "description": "One line of what the station sounds like, shown beside its name."
+          },
+          "template_id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The structure template every song from this station is written to."
+          },
+          "structure_option": {
+            "type": "string",
+            "description": "The `structure` option that names the template, when a template has more than one and the station wants a particular one."
+          },
+          "bpm": {
+            "description": "The tempo band: a fixed number, a list to cycle, or an inclusive min/max range the planner draws from.",
+            "oneOf": [
+              { "type": "number", "minimum": 40, "maximum": 220 },
+              {
+                "type": "array",
+                "minItems": 1,
+                "items": { "type": "number", "minimum": 40, "maximum": 220 }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["min", "max"],
+                "properties": {
+                  "min": { "type": "number", "minimum": 40, "maximum": 220 },
+                  "max": { "type": "number", "minimum": 40, "maximum": 220 }
+                }
+              }
+            ]
+          },
+          "themes": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Subjects a lyric can be written about. Rotated per song, so the station's songs are not about the same thing."
+          },
+          "keys": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Keys a song may be rendered in. The planner picks one per song.",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["key", "mode"],
+              "properties": {
+                "key": { "type": "string", "minLength": 1 },
+                "mode": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
+          "fixed": {
+            "type": "object",
+            "description": "The identity: bins every song carries unchanged. Bins the planner computes — tempo, structure, key_mode — must not appear here.",
+            "additionalProperties": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string" }
+            }
+          },
+          "pools": {
+            "type": "object",
+            "description": "The range: per bin, the options that are in character and how many of them one song carries. A pool may sit beside `fixed` options for the same bin.",
+            "additionalProperties": { "$ref": "#/$defs/pool" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from"],
+      "properties": {
+        "from": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string" },
+          "description": "The options in character for this station. Two at least, or the bin would not vary."
+        },
+        "count": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": { "type": "integer", "minimum": 1 },
+          "description": "Inclusive lower and upper number of options a song draws from this pool. Defaults to a per-bin number that respects the bin's cap."
+        }
+      }
+    }
+  }
+}

@@ -233,3 +233,43 @@ export interface TagPools {
   energy_tags: TagTerm[];
   instrumental_section_tags: TagTerm[];
 }
+
+/**
+ * A radio station: a fixed identity plus the pools a song draws its sound from.
+ *
+ * The pools are what make consecutive songs differ without leaving the genre — a station is a
+ * range, not an arrangement. The planner computes tempo, structure and key, so they are not in
+ * `fixed`.
+ */
+export interface RadioStation {
+  id: string;
+  name: string;
+  family: string;
+  tagline: string;
+  template_id: string;
+  structure_option?: string;
+  bpm: number | number[] | { min: number; max: number };
+  themes: string[];
+  keys?: { key: string; mode: string }[];
+  fixed: Record<string, string[]>;
+  pools: Record<string, { from: string[]; count?: [number, number] }>;
+}
+
+export interface RadioStationsFile {
+  radio_stations_version: string;
+  note?: string;
+  stations: RadioStation[];
+}
+
+/** One song of one station, as `musicmaster.radio.plan_song` returns it. */
+export interface RadioPlan {
+  station_id: string;
+  station_name: string;
+  song_id: string;
+  title: string;
+  template_id: string;
+  bpm: number;
+  selections: Selections;
+  theme: string;
+  instrumental: boolean;
+}

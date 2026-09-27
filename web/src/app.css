@@ -665,3 +665,64 @@ textarea.brief-input {
   margin-right: 6px;
   border-radius: 3px;
 }
+
+/* --- The radio ------------------------------------------------------------------------- */
+
+/* The radio stays mounted on every tab so its audio element survives a tab switch, and is hidden
+   with CSS rather than unmounted. `display: contents` when active lets its `.columns` participate
+   in the shell's flex layout as if the wrapper were not there. */
+.radio-host {
+  display: none;
+}
+
+.radio-host.active {
+  display: contents;
+}
+
+.radio .station-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.radio button.station {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.radio button.station:hover {
+  background: var(--panel-2);
+  border-color: var(--line);
+}
+
+.radio button.station.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.radio .station-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.radio audio {
+  width: 100%;
+  margin: 4px 0;
+}
+
+.queue-row {
+  padding: 3px 0;
+  border-top: 1px solid var(--line);
+}
+
+.queue-row:first-child {
+  border-top: 0;
+}

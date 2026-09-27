@@ -11,6 +11,8 @@ import glueSource from "./core_glue.py?raw";
 import type {
   Artifacts,
   LyricReport,
+  RadioPlan,
+  RadioStation,
   RenderResult,
   Selections,
   SectionTagsFile,
@@ -28,6 +30,8 @@ export interface StaticData {
   templates: StructureTemplate[];
   /** The lyric tag pools, so the editor's lens and the checker read the same vocabulary. */
   pools: TagPools;
+  /** The radio stations, so the picker and the planner read the same document. */
+  stations: RadioStation[];
 }
 
 /**
@@ -62,9 +66,13 @@ export async function loadStaticData(): Promise<StaticData> {
     asset("repo/vocabulary/structure-templates.json"),
   );
   const tagFile = await fetchJson<SectionTagsFile>(asset("repo/vocabulary/section-tags.json"));
+  const stationFile = await fetchJson<{ stations: RadioStation[] }>(
+    asset("repo/vocabulary/radio-stations.json"),
+  );
   return {
     vocabulary,
     templates: templatesFile.templates,
+    stations: stationFile.stations,
     pools: {
       sections: tagFile.sections,
       modifiers: tagFile.modifiers,
@@ -162,6 +170,10 @@ export class MusicMasterCore {
     lyrics: string;
     brief: string;
     artist_references: string[];
+    /** Where this take's companion files belong, for a take that is not a `songs/<id>/` song. */
+    artifacts_dir?: string;
+    /** The audio's path under ComfyUI's output directory. Defaults to `audio/<song_id>`. */
+    filename_prefix?: string;
   }): Artifacts {
     return this.call<Artifacts>("artifacts", request);
   }
@@ -187,5 +199,20 @@ export class MusicMasterCore {
       "preview",
       request,
     );
+  }
+
+  /**
+   * One song of one radio station: the selections, tempo, key, form and subject.
+   *
+   * The same `musicmaster.radio.plan_song` the CLI and the tests use, so the page cannot invent a
+   * station the document does not describe.
+   */
+  radioPlan(request: {
+    station_id: string;
+    index: number;
+    seed?: number;
+    instrumental?: boolean;
+  }): RadioPlan {
+    return this.call<RadioPlan>("radio_plan", request);
   }
 }

@@ -90,9 +90,16 @@ def build_prompt(
     plan: dict,
     timesignature: str = "4",
     language: str = "en",
+    artifacts_dir: str | None = None,
 ) -> dict:
-    """The canonical, model-agnostic request."""
+    """The canonical, model-agnostic request.
+
+    ``artifacts_dir`` is where this take's companion files belong. A song built by hand lives in
+    ``songs/<song_id>/``; a radio take lives under its station, so the reference follows the
+    caller's layout rather than assuming a song directory.
+    """
     key = selections.get("key_mode") or {}
+    base = artifacts_dir or f"songs/{song_id}"
     metadata = {
         "bpm": bpm,
         "key": key.get("key"),
@@ -120,7 +127,7 @@ def build_prompt(
         },
         "metadata": metadata,
         "form": {
-            "composition_ref": f"songs/{song_id}/composition.json",
+            "composition_ref": f"{base}/composition.json",
             "composition_sha256": composition_sha256,
             "sections": [
                 {"name": row["role"], "bars": row["bars"], "label": row["label"]}
@@ -128,7 +135,7 @@ def build_prompt(
             ],
         },
         "lyrics": {
-            "ref": f"songs/{song_id}/lyrics.md",
+            "ref": f"{base}/lyrics.md",
             "sha256": sha256_bytes(lyrics.encode()),
             "section_tags": True,
         },
@@ -142,7 +149,7 @@ def build_prompt(
         "target": {
             "generator_id": "ace_step_1_5_xl_turbo",
             "runner": "comfyui",
-            "graph_ref": f"songs/{song_id}/workflow.json",
+            "graph_ref": f"{base}/workflow.json",
             "sampler": {
                 "steps": 8,
                 "cfg": 1.0,
@@ -189,13 +196,24 @@ def build_prompt(
         ],
         "provenance": {
             "spec_sha256": sha256_bytes(brief.encode()),
-            "builder": f"songs/{song_id}/build_and_submit.py",
+            "builder": f"{base}/build_and_submit.py",
         },
     }
 
 
-def build_workflow(prompt: dict, lyrics: str, duration_s: float, graph: dict | None = None) -> dict:
-    """Render the canonical prompt into an ACE-Step 1.5 graph in ComfyUI API format."""
+def build_workflow(
+    prompt: dict,
+    lyrics: str,
+    duration_s: float,
+    graph: dict | None = None,
+    filename_prefix: str | None = None,
+) -> dict:
+    """Render the canonical prompt into an ACE-Step 1.5 graph in ComfyUI API format.
+
+    ``filename_prefix`` decides where the audio lands under ComfyUI's output directory. It defaults
+    to ``audio/<song_id>``; a radio take passes a path under its station so a station's songs stay
+    together and a listener can find them by station.
+    """
     weights = graph or GRAPH
     md, style, target = prompt["metadata"], prompt["style"], prompt["target"]
     keyscale = f"{md['key']} {md['mode']}" if md.get("key") else "D minor"
@@ -226,7 +244,8 @@ def build_workflow(prompt: dict, lyrics: str, duration_s: float, graph: dict | N
         "9": {"class_type": "VAEDecodeAudio", "inputs": {"samples": ["8", 0], "vae": ["3", 0]}},
         "10": {"class_type": "SaveAudioMP3",
                "inputs": {"audio": ["9", 0],
-                          "filename_prefix": f"audio/{prompt['song_id']}", "quality": "V0"}},
+                          "filename_prefix": filename_prefix or f"audio/{prompt['song_id']}",
+                          "quality": "V0"}},
     }
 
 
@@ -371,9 +390,14 @@ def build(doc: dict) -> dict:
         plan=plan,
         timesignature=doc.get("timesignature", "4"),
         language=doc.get("language", "en"),
+        artifacts_dir=doc.get("artifacts_dir"),
     )
     workflow = build_workflow(
-        prompt, doc["lyrics"], prompt["metadata"]["duration_s"], graph=doc.get("graph")
+        prompt,
+        doc["lyrics"],
+        prompt["metadata"]["duration_s"],
+        graph=doc.get("graph"),
+        filename_prefix=doc.get("filename_prefix"),
     )
 
     return {

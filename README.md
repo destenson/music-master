@@ -14,8 +14,8 @@ and a preview auditions the whole song at a couple of sampler steps before commi
 
 Status: the generator works end to end. The vocabulary, the caption renderer, the lyric checker, the
 time budget and the prompt builder are real and packaged as `musicmaster/`, and the browser builds a
-song, renders it and previews it. The compliance battery described under "Checking the brief" is
-designed, not built.
+song, renders it, previews it and streams it from a radio station. The compliance battery described
+under "Checking the brief" is designed, not built.
 
 ## What it produces
 
@@ -52,6 +52,7 @@ verification does not imply audio compliance, so the checking design reports the
 | --- | --- |
 | [`docs/design/compliance-architecture.md`](docs/design/compliance-architecture.md) | The design: the artifact bundle, the prompt artifact, stages, requirement taxonomy, the compliance battery, gating policy, repair loop, risks, validation plan |
 | [`docs/design/tag-vocabulary.md`](docs/design/tag-vocabulary.md) | The tag bins: what a bin declares, the UI controls built from them, how selections render into the comma-separated prompt, and how the vocabulary keeps the UI, the prompt and the compliance battery in step |
+| [`docs/design/radio-stations.md`](docs/design/radio-stations.md) | The radio: what a station states, how a song is drawn from its pools, the four-stage pipeline and the look-ahead buffer, the output layout, and what the radio cannot do |
 | [`docs/design/lyric-templates.md`](docs/design/lyric-templates.md) | Song structures and rhyme schemes as a contract: the writing brief handed to the lyric generator, the bar plan handed to the composer, and the conformance check on the result |
 | [`docs/design/ui-plan.md`](docs/design/ui-plan.md) | The front-end plan: readiness, design principles, information architecture, the core/UI seam, the four surfaces that matter, phasing from core extraction to live verification |
 | [`docs/design/captioner.md`](docs/design/captioner.md) | The captioner: what audio description entails, the two outputs it must produce, model choices, the gauge that decides what it may decide, and what it must not be used for |
@@ -142,6 +143,34 @@ because a bin is simultaneously a UI element, a prompt field and a compliance ob
 `maps_to` is the field that keeps the three in step, and it is orthogonal to `emits_tag`, so a
 bin like `tempo` can create a requirement without contributing a tag.
 
+## Radio stations
+
+Picking tags one at a time is the wrong shape for "just play me something". **39 radio stations**
+ship as data — [`vocabulary/radio-stations.json`](vocabulary/radio-stations.json) — across hip-hop,
+rock and metal, pop, electronic, soul and funk, folk and country, Latin and Afro, and jazz and
+cinematic.
+
+A station is a **range, not a preset**. It fixes only its identity — genre, scenes, era, tempo band —
+and declares a **pool** for every bin that makes a sound: the instruments, production, groove,
+delivery and moods that are in character, and how many of them one song carries. Each song draws its
+own coherent subset, so consecutive songs differ in their kit, their synths, their mix and their key
+and still sound like the station. The draw is a pure function of the station, the song's position and
+the seed, and it is conflict-aware: an option that excludes something already chosen is never taken.
+
+```bash
+python3 vocabulary/radio_stations.py            # every station is playable: bins, options, counts, tempos, budget
+python3 vocabulary/radio_stations.py --list     # the stations and how many shapes each can draw
+python3 vocabulary/radio_stations.py --plan=neon-drive --index=3 --seed=42
+```
+
+The UI's **Radio** tab streams a station: it keeps three songs ready or rendering ahead, starts
+playing as soon as the first is done, and skips to the next ready one. Each song is a full 8-step
+render into `ComfyUI/output/radio/<station>/`, so a station's songs are organised by station and easy
+to find. A lyric is written per song from the station's subject by the same generator the Lyrics tab
+uses; with no model reachable, or with the panel's **instrumental** box ticked, the take is planned
+and captioned as an instrumental instead. The current song can be downloaded, and the songs played on
+a station are listed there while the browser remembers them.
+
 ## The core package
 
 Every check lives once, in `musicmaster/`, as a **text tier**: JSON in, JSON out, standard library
@@ -151,7 +180,7 @@ rewrite that drifts from it.
 
 ```
 musicmaster/
-  render.py  lyrics.py  timeline.py  templates.py  vocabulary.py   # text tier, stdlib only
+  render.py  lyrics.py  timeline.py  templates.py  vocabulary.py  radio.py   # text tier, stdlib only
 ```
 
 The scripts in `vocabulary/` are thin wrappers that delegate to it, so existing command lines and
@@ -194,7 +223,8 @@ control, and nothing in `web/` changes.
 
 What it does today: opens `rap-metal-groove`, generates the whole bin form from the vocabulary,
 renders the caption live with its tag budget, dropped tags, negatives and coherence notes, draws the
-timeline with its syllable budget, and gives the lyric a generator and an editor.
+timeline with its syllable budget, and gives the lyric a generator and an editor. A fourth tab,
+**Radio**, streams one of 39 stations continuously — see [Radio stations](#radio-stations).
 
 **The generator has a deterministic half and a model half.** The deterministic half is the scaffold
 and the writing brief, both from the text tier: no network, and correct by construction — a fresh
@@ -291,6 +321,8 @@ early as possible.
   and any output traced to its inputs.
 - [`schemas/tag-vocabulary.schema.json`](schemas/tag-vocabulary.schema.json) — the shape of the
   bin vocabulary: bins, controls, priorities, render positions, options and cautions.
+- [`schemas/radio-stations.schema.json`](schemas/radio-stations.schema.json) — the shape of the
+  station document: a fixed identity, per-bin pools with draw counts, tempo bands, themes and keys.
 - [`schemas/section-tags.schema.json`](schemas/section-tags.schema.json) — the lyric metatag
   vocabulary and its grammar, including the caption/lyric consistency rules.
 - [`schemas/structure-templates.schema.json`](schemas/structure-templates.schema.json) — the shape

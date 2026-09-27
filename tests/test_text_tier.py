@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parent.parent
 PACKAGE = REPO / "musicmaster"
 sys.path.insert(0, str(REPO))
 
-from musicmaster import TEXT_TIER, lyrics, prompt, render, templates, timeline  # noqa: E402
+from musicmaster import TEXT_TIER, lyrics, prompt, radio, render, templates, timeline  # noqa: E402
 
 ALLOWED_LOCAL = {"musicmaster"}
 
@@ -380,6 +380,84 @@ class PromptTest(unittest.TestCase):
         self.assertIn(f"{self.doc['bpm']:g} BPM", notes["metadata.bpm"])
 
 
+# --- Radio stations ----------------------------------------------------------------------
+
+class RadioTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.vocab = render.load_vocabulary()
+        cls.doc = radio.load_stations()
+        cls.templates = timeline.load(timeline.TEMPLATES_PATH)
+        cls.station = cls.doc["stations"][0]["id"]
+
+    def test_every_station_is_playable(self) -> None:
+        problems = radio.validate(self.vocab, self.templates, self.doc)
+        self.assertEqual(problems, [], "\n".join(problems))
+
+    def test_the_document_is_the_specified_size(self) -> None:
+        self.assertGreaterEqual(len(self.doc["stations"]), 20)
+        self.assertLessEqual(len(self.doc["stations"]), 40)
+
+    def test_the_schema_and_the_semantic_checks_agree(self) -> None:
+        # The schema and the checks below look at different things; a station document that passes
+        # one and not the other means one of them has stopped being maintained.
+        self.assertEqual(radio._schema_errors(self.doc), [])
+
+    def test_a_plan_is_reproducible(self) -> None:
+        first = radio.plan_song(self.doc, self.station, 4, seed=99, vocab=self.vocab)
+        second = radio.plan_song(self.doc, self.station, 4, seed=99, vocab=self.vocab)
+        self.assertEqual(first, second)
+
+    def test_each_song_varies_within_the_stations_identity(self) -> None:
+        # The point of a station: consecutive songs differ in what they draw from the pools, while
+        # everything the station fixes is on every one of them.
+        station = radio.station_by_id(self.doc, self.station)
+        plans = [
+            radio.plan_song(self.doc, self.station, index, seed=1000 + index, vocab=self.vocab)
+            for index in range(8)
+        ]
+        captions = {render.render(self.vocab, plan["selections"])["string"] for plan in plans}
+        self.assertGreater(len(captions), 1)
+        for plan in plans:
+            for bin_id, options in station["fixed"].items():
+                with self.subTest(bin=bin_id):
+                    self.assertEqual(
+                        (plan["selections"].get(bin_id) or {}).get("options"), list(options)
+                    )
+
+    def test_an_instrumental_plan_describes_no_vocal(self) -> None:
+        plan = radio.plan_song(
+            self.doc, self.station, 0, seed=7, vocab=self.vocab, instrumental=True
+        )
+        self.assertEqual(plan["selections"]["lead_vocal"]["options"], ["instrumental"])
+        for bin_id in ("vocal_delivery", "backing_vocal", "vocal_fx", "lyric_theme"):
+            self.assertNotIn(bin_id, plan["selections"])
+
+    def test_the_form_tag_names_the_stations_template(self) -> None:
+        station = radio.station_by_id(self.doc, self.station)
+        plan = radio.plan_song(self.doc, self.station, 0, seed=7, vocab=self.vocab)
+        structure = plan["selections"]["structure"]["options"][0]
+        option = next(
+            entry
+            for bin_ in self.vocab["bins"]
+            if bin_["id"] == "structure"
+            for entry in bin_["options"]
+            if entry["id"] == structure
+        )
+        self.assertEqual(option["template_ref"], station["template_id"])
+
+    def test_no_plan_exceeds_the_tag_budget(self) -> None:
+        for station in self.doc["stations"]:
+            for index in range(4):
+                with self.subTest(station=station["id"], index=index):
+                    plan = radio.plan_song(
+                        self.doc, station["id"], index, seed=index, vocab=self.vocab
+                    )
+                    rendered = render.render(self.vocab, plan["selections"])
+                    self.assertLessEqual(len(rendered["tags"]), self.vocab["tag_budget"])
+                    self.assertEqual(rendered["omitted"], [])
+
+
 # --- The entry points, and the wrappers --------------------------------------------------
 
 class EntryPointTest(unittest.TestCase):
@@ -391,6 +469,7 @@ class EntryPointTest(unittest.TestCase):
             ("render_tags", render, "render"),
             ("timeline", timeline, "build_timeline"),
             ("check_lyrics", lyrics, "analyse"),
+            ("radio_stations", radio, "plan_song"),
         ]:
             with self.subTest(wrapper=wrapper_name):
                 wrapper = importlib.import_module(wrapper_name)
@@ -426,6 +505,8 @@ class EntryPointTest(unittest.TestCase):
             ("vocabulary/render_tags.py", ["vocabulary/examples/late-night-trap.json"]),
             ("vocabulary/structure_templates.py", ["--list"]),
             ("vocabulary/validate_vocabulary.py", []),
+            ("vocabulary/radio_stations.py", ["--list"]),
+            ("vocabulary/radio_stations.py", ["--plan=neon-drive", "--index=2", "--seed=7"]),
             ("vocabulary/check_lyrics.py", ["songs/rap-metal-groove/lyrics.md",
                                             "--template=rap_metal_groove", "--bpm=92"]),
             ("vocabulary/check_lyrics.py", ["songs/nu-metal-rap-rock/lyrics.md",

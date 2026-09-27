@@ -5,6 +5,7 @@
   import Caption from "./lib/Caption.svelte";
   import Inspector from "./lib/Inspector.svelte";
   import Lyrics from "./lib/Lyrics.svelte";
+  import RadioPanel from "./lib/Radio.svelte";
   import Render from "./lib/Render.svelte";
   import Preview from "./lib/Preview.svelte";
   import Song from "./lib/Song.svelte";
@@ -26,6 +27,7 @@
   import { parseFindings, type Finding } from "./lib/lens";
   import { buildPrompt } from "./lib/prompt";
   import { setPreviewBuilder } from "./lib/preview.svelte";
+  import { setRadioHost } from "./lib/radio.svelte";
   import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
   import * as S from "./lib/selection";
   import type { Artifacts, LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
@@ -47,7 +49,7 @@
     brief?: string;
   }
 
-  type View = "builder" | "lyrics" | "render";
+  type View = "builder" | "lyrics" | "render" | "radio";
 
   /** Everything a saved draft carries. The view is deliberately not in it: loading a draft should
    * not move you to another tab. */
@@ -220,6 +222,29 @@
   // builder that reads the page's current state is registered here rather than rebuilt in each.
   $effect(() => {
     setPreviewBuilder((steps, variants) => buildPreview(selections, steps, variants));
+  });
+
+  /**
+   * The radio engine needs the text tier, and the app owns it. Registering the four calls it needs
+   * keeps the engine out of the page's state: it asks for a plan, a caption, a brief and a graph,
+   * and never reaches into the form.
+   */
+  $effect(() => {
+    const instance = core;
+    if (!instance) {
+      setRadioHost(null);
+      return;
+    }
+    setRadioHost({
+      plan: (stationId, index, seed, instrumental) =>
+        instance.radioPlan({ station_id: stationId, index, seed, instrumental }),
+      render: (forSelections) => instance.render(forSelections),
+      brief: (templateId, atBpm, forSelections) =>
+        instance.brief({ template_id: templateId, bpm: atBpm, duration_s: null, selections: forSelections })
+          .brief,
+      artifacts: (request) => instance.artifacts({ ...request, artist_references: [] }),
+    });
+    return () => setRadioHost(null);
   });
 
   /**
@@ -558,6 +583,9 @@
       <button role="tab" aria-selected={view === "render"} onclick={() => (view = "render")}>
         Render
       </button>
+      <button role="tab" aria-selected={view === "radio"} onclick={() => (view = "radio")}>
+        Radio
+      </button>
     </div>
     <span class="small muted">{status}</span>
   </div>
@@ -606,7 +634,7 @@
         </div>
       </div>
     </div>
-  {:else}
+  {:else if view === "render"}
     <div class="columns">
       <div class="column">
         <div class="stack">
@@ -625,6 +653,17 @@
       <div class="column">
         <Render {artifact} bind:seed {artifactsFor} />
       </div>
+    </div>
+  {/if}
+
+  <!--
+    The radio is mounted on every tab and hidden with CSS rather than unmounted, because its
+    `<audio>` element is the stream: a radio that stopped when you looked at the Builder would not
+    be a radio.
+  -->
+  {#if data}
+    <div class="radio-host" class:active={view === "radio"}>
+      <RadioPanel stations={data.stations} ready={!!core} />
     </div>
   {/if}
 </div>

@@ -50,7 +50,7 @@ if (!fs.existsSync(path.join(DIST, "repo", "manifest.json"))) {
 const NATIVE = `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(REPO)})
-from musicmaster import prompt, render, timeline
+from musicmaster import prompt, radio, render, timeline
 vocab = render.load_vocabulary()
 selections = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "selections.json"))}))["selections"]
 song = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "song.json"))}))
@@ -74,6 +74,7 @@ built = prompt.build({
     "section_tags": st,
     "templates_doc": doc,
 })
+radio_plan = radio.plan_song(radio.load_stations(), "neon-drive", 3, seed=12345, vocab=vocab)
 print(json.dumps({
     "render": {**render.render(vocab, selections),
                "problems": sorted(render.coherence_check(vocab, selections))},
@@ -83,6 +84,8 @@ print(json.dumps({
     "artifacts": {"prompt_sha256": built["prompt_sha256"],
                   "prompt_text": prompt.serialise(built["prompt"]),
                   "workflow_text": prompt.serialise(built["workflow"])},
+    "radio": {"plan": radio_plan,
+              "caption": render.render(vocab, radio_plan["selections"])["string"]},
 }))
 `;
 
@@ -221,6 +224,55 @@ check(
   ),
   ["native", "native"],
 );
+
+// --- The radio: the browser's station plan must be the CLI's ----------------------------------
+//
+// The page plays what the station document says, so the two must not be able to disagree about a
+// station any more than about a caption. The same station, position and seed are planned in both
+// and compared whole, selections included; then the graph is built for that plan and checked to
+// land under the station rather than in a song directory.
+
+const tagBudget = JSON.parse(
+  fs.readFileSync(path.join(DIST, "repo", "vocabulary", "tag-bins.json"), "utf8"),
+).tag_budget;
+const radioPlan = call("radio_plan", { station_id: "neon-drive", index: 3, seed: 12345 });
+const radioCaption = call("render_selections", radioPlan.selections);
+const nextPlan = call("radio_plan", { station_id: "neon-drive", index: 4, seed: 12346 });
+
+console.log("\nradio:\n");
+check("the browser plans the station the CLI plans", radioPlan, native.radio.plan);
+check("the browser renders the station's caption", radioCaption.string, native.radio.caption);
+check("a radio caption is inside the tag budget", radioCaption.tags.length <= tagBudget, true);
+check(
+  "the next song of the station is a different song",
+  call("render_selections", nextPlan.selections).string !== radioCaption.string,
+  true,
+);
+
+const radioArtifact = call("artifacts", {
+  song_id: radioPlan.song_id,
+  template_id: radioPlan.template_id,
+  bpm: radioPlan.bpm,
+  seed: 12345,
+  selections: radioPlan.selections,
+  lyrics: "",
+  brief: "",
+  artist_references: [],
+  artifacts_dir: `radio/neon-drive/${radioPlan.song_id}`,
+  filename_prefix: `radio/neon-drive/${radioPlan.song_id}`,
+});
+const radioGraph = JSON.parse(radioArtifact.workflow_text);
+check(
+  "a radio take lands in its station's directory",
+  radioGraph["10"].inputs.filename_prefix,
+  `radio/neon-drive/${radioPlan.song_id}`,
+);
+check(
+  "a radio take names its own artifacts directory",
+  radioArtifact.prompt.lyrics.ref,
+  `radio/neon-drive/${radioPlan.song_id}/lyrics.md`,
+);
+check("a radio take still pins a composition", typeof radioArtifact.prompt.form.composition_sha256, "string");
 
 // --- The generator: the brief must be the core's own, and the scaffold must be valid on arrival ---
 

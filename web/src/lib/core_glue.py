@@ -18,7 +18,7 @@ import sys
 if "/repo" not in sys.path:
     sys.path.insert(0, "/repo")
 
-from musicmaster import lyrics, prompt, render, templates, timeline  # noqa: E402
+from musicmaster import lyrics, prompt, radio, render, templates, timeline  # noqa: E402
 
 _vocab = render.load_vocabulary()
 _section_tags = timeline.load(timeline.SECTION_TAGS_PATH)
@@ -26,6 +26,7 @@ _templates_doc = timeline.load(timeline.TEMPLATES_PATH)
 _rates = timeline.load_delivery_rates()
 _tag_labels = timeline.tag_label_map(_section_tags)
 _section_meta = timeline.section_meta(_section_tags)
+_stations = radio.load_stations()
 
 
 def _template(template_id):
@@ -150,7 +151,8 @@ def artifacts(payload):
 
     The same `musicmaster.prompt` the CLI writes, given what the page already holds: a static page
     has no song directory to read, so the lyrics, the brief and the selections come from the editor
-    instead of from disk.
+    instead of from disk. `artifacts_dir` and `filename_prefix` let a radio take declare where it
+    lives -- under its station -- rather than under a song directory it does not have.
     """
     request = json.loads(payload)
     built = prompt.build(
@@ -168,6 +170,8 @@ def artifacts(payload):
             "section_tags": _section_tags,
             "templates_doc": _templates_doc,
             "rates": _rates,
+            "artifacts_dir": request.get("artifacts_dir"),
+            "filename_prefix": request.get("filename_prefix"),
         }
     )
     return json.dumps(
@@ -235,6 +239,24 @@ def preview(payload):
         steps=int(request.get("steps") or prompt.PREVIEW_STEPS),
     )
     return json.dumps({"workflow": workflow, "captions": captions, "names": names})
+
+
+def radio_plan(payload):
+    """One song of one station: its selections, tempo, key, form and subject.
+
+    The same `musicmaster.radio.plan_song` the CLI and the tests use, so what the page plays is what
+    the station document says. Pure and deterministic given the station, the position and the seed.
+    """
+    request = json.loads(payload)
+    plan = radio.plan_song(
+        _stations,
+        request["station_id"],
+        int(request["index"]),
+        seed=request.get("seed"),
+        vocab=_vocab,
+        instrumental=bool(request.get("instrumental")),
+    )
+    return json.dumps(plan)
 
 
 def check_lyric(payload):

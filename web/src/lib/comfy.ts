@@ -232,9 +232,27 @@ export async function submitWorkflow(target: ComfyTarget, workflow: unknown): Pr
   return { jobId: parsed.prompt_id, pollUrl: `${base}/history/${parsed.prompt_id}` };
 }
 
+export interface OutputFile {
+  filename: string;
+  subfolder: string;
+  type: string;
+}
+
 export interface RenderOutput {
   name: string;
   url?: string;
+  /** The parts the URL is built from, so a saved take can be re-addressed after a reload. */
+  file?: OutputFile;
+}
+
+/** The playable URL of a file in the service's output or temp tree. */
+export function viewUrl(base: string, file: OutputFile): string {
+  const query = new URLSearchParams({
+    filename: file.filename,
+    subfolder: file.subfolder,
+    type: file.type,
+  });
+  return `${endpoint(base)}/view?${query}`;
 }
 
 export interface RenderOutcome {
@@ -341,14 +359,15 @@ export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promis
           const file = item as { subfolder?: string; filename: string; type?: string };
           // A playable URL, so a preview can be listened to without writing anything: previews
           // come back from the temp directory, renders from output.
-          const query = new URLSearchParams({
+          const parts: OutputFile = {
             filename: file.filename,
             subfolder: file.subfolder ?? "",
             type: file.type ?? "output",
-          });
+          };
           outputs.push({
-            name: file.subfolder ? `${file.subfolder}/${file.filename}` : file.filename,
-            url: `${endpoint(target.base)}/view?${query}`,
+            name: parts.subfolder ? `${parts.subfolder}/${parts.filename}` : parts.filename,
+            url: viewUrl(target.base, parts),
+            file: parts,
           });
         }
       }
