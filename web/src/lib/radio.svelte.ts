@@ -22,6 +22,7 @@
  * ComfyUI's output directory and the files themselves are what the user will go back to.
  */
 import {
+  fetchHistory,
   fetchOutcome,
   freshSeed,
   submitWorkflow,
@@ -31,6 +32,7 @@ import {
 import { generate, ollamaBase } from "./ollama";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
+import { parseTakeName, takeKey, takesFromHistory } from "./takes";
 import type { Artifacts, RadioPlan, RenderResult, Selections } from "./types";
 
 export type RadioStatus =
@@ -162,6 +164,8 @@ export const radioState = $state({
   queue: [] as RadioSong[],
   /** Played songs for the current station, newest first. */
   history: [] as SavedRadioSong[],
+  /** How many already-rendered takes the last start began from, so the panel can say so. */
+  recovered: 0,
   lastError: null as string | null,
   /** A non-fatal message, such as the lyric model being unreachable and the take going instrumental. */
   notice: null as string | null,
@@ -244,6 +248,37 @@ function createSong(stationId: string): RadioSong {
     artifacts: null,
     error: null,
     at: 0,
+    abort: new AbortController(),
+  };
+}
+
+/**
+ * A song the page already has, as a queue entry. It has no plan and needs none: the file exists, so
+ * playing it is the whole job, and the fields the panel shows come from the record that was kept.
+ */
+function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
+  return {
+    id: take.id,
+    index: Number.isFinite(take.index) ? take.index : nextIndex(take.stationId),
+    stationId: take.stationId,
+    title: take.title,
+    seed: take.seed,
+    status,
+    plan: null,
+    selections: {},
+    bpm: 0,
+    caption: take.caption,
+    theme: take.theme,
+    lyrics: "",
+    instrumental: take.instrumental,
+    lyricSource: "instrumental",
+    jobId: null,
+    waited: 0,
+    file: take.file,
+    url: take.file ? viewUrl(renderQueue.target.base, take.file) : null,
+    artifacts: null,
+    error: null,
+    at: take.at,
     abort: new AbortController(),
   };
 }
@@ -448,9 +483,75 @@ function hardStop(): void {
   for (const song of radioState.queue) song.abort.abort();
   radioState.queue = [];
   radioState.currentId = null;
+  radioState.recovered = 0;
 }
 
-export function startRadio(): void {
+/**
+ * The takes this station already has, from the page's own record and the renderer's memory.
+ *
+ * The saved list is the durable one; the renderer's history is what catches takes the page never
+ * recorded — one this browser had not played yet, or one rendered from somewhere else. They are
+ * merged by file, so a take both know about is not queued twice.
+ */
+async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
+  const byFile = new Map<string, SavedRadioSong>();
+  const remember = (take: SavedRadioSong): void => {
+    const key = take.file ? takeKey(take.file) : take.id;
+    if (!byFile.has(key)) byFile.set(key, take);
+  };
+
+  for (const saved of radioState.history) remember(saved);
+
+  try {
+    const history = await fetchHistory(renderQueue.target);
+    for (const take of takesFromHistory(history, `radio/${stationId}`)) {
+      // A file under this station that does not carry the take naming is not one of ours to place.
+      const parsed = parseTakeName(stationId, take.filename);
+      if (!parsed) continue;
+      const file = { filename: take.filename, subfolder: take.subfolder, type: take.type };
+      remember({
+        id: `found:${takeKey(file)}`,
+        index: parsed.index,
+        stationId,
+        title: `${stationId} #${parsed.index + 1}`,
+        seed: take.seed ?? 0,
+        caption: take.caption,
+        theme: "",
+        instrumental: parsed.instrumental,
+        file,
+        at: 0,
+      });
+    }
+  } catch {
+    /* the renderer's history is a bonus; what the page saved is the durable record */
+  }
+
+  return [...byFile.values()].sort(
+    (a, b) => a.index - b.index || (a.file?.filename ?? "").localeCompare(b.file?.filename ?? ""),
+  );
+}
+
+/**
+ * Queue the station's existing takes, so pressing play plays rather than waits.
+ *
+ * One slot is left for something new: the station starts on what it has and renders its next song
+ * behind that, rather than replaying a whole repertoire before producing anything.
+ */
+function seedSongs(existing: SavedRadioSong[]): number {
+  if (!existing.length) return 0;
+  const want = Math.max(1, radioState.bufferTarget - 1);
+  const chosen = existing.slice(-want);
+  const highest = existing.reduce(
+    (top, take) => Math.max(top, Number.isFinite(take.index) ? take.index : 0),
+    0,
+  );
+  // New songs continue the numbering, so a fresh take cannot collide with a recovered one.
+  indices[radioState.stationId] = Math.max(indices[radioState.stationId] ?? 0, highest + 1);
+  for (const take of chosen) radioState.queue.push(songFromSaved(take, "ready"));
+  return chosen.length;
+}
+
+export async function startRadio(): Promise<void> {
   if (!host || !radioState.stationId || radioState.on) return;
   radioState.on = true;
   radioState.stopped = false;
@@ -458,10 +559,19 @@ export function startRadio(): void {
   radioState.notice = null;
   // Pressing play is also "try the model again", so a temporary outage does not stick for the tab.
   radioState.lyricModelDown = false;
+  radioState.recovered = 0;
   failures = 0;
   session += 1;
-  ensure();
+  const token = session;
+
+  // What the station already has comes first: a local read plus one bounded request to the
+  // renderer, over before a listener would notice, and it is what stops play from meaning "wait".
+  const existing = await discoverExisting(radioState.stationId);
+  if (token !== session) return;
+  radioState.recovered = seedSongs(existing);
+
   promoteNext();
+  ensure();
 }
 
 export function stopRadio(): void {
@@ -470,7 +580,7 @@ export function stopRadio(): void {
 
 export function toggleRadio(): void {
   if (radioState.on) stopRadio();
-  else startRadio();
+  else void startRadio();
 }
 
 /** Skip to the next ready song. The current one goes to the history and keeps its file. */
@@ -478,7 +588,17 @@ export function advance(): void {
   const current = currentSong();
   if (current) {
     current.status = "played";
-    radioState.history = [toSaved(current), ...radioState.history].slice(0, HISTORY_PER_STATION);
+    // A recovered take is already in the history; moving it to the front rather than adding it
+    // again keeps the list a record of what was played, not of how many times play was pressed.
+    const entry = toSaved(current);
+    radioState.history = [
+      entry,
+      ...radioState.history.filter(
+        (saved) =>
+          saved.id !== entry.id &&
+          !(saved.file && entry.file && saved.file.filename === entry.file.filename),
+      ),
+    ].slice(0, HISTORY_PER_STATION);
     rememberHistory();
   }
   radioState.queue = radioState.queue.filter(
@@ -546,19 +666,7 @@ export function replay(saved: SavedRadioSong): void {
     radioState.lastError = "that take has no file recorded, so it cannot be re-addressed";
     return;
   }
-  const song: RadioSong = {
-    ...createSong(saved.stationId),
-    index: saved.index,
-    title: saved.title,
-    seed: saved.seed,
-    caption: saved.caption,
-    theme: saved.theme,
-    instrumental: saved.instrumental,
-    file: saved.file,
-    url: viewUrl(renderQueue.target.base, saved.file),
-    status: "playing",
-    at: saved.at,
-  };
+  const song = songFromSaved(saved, "playing");
   const current = currentSong();
   if (current && current.status === "playing") current.status = "ready";
   radioState.queue = [...radioState.queue, song];

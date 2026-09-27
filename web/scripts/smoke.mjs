@@ -24,6 +24,7 @@ import { EditorView } from "@codemirror/view";
 import { generate } from "../src/lib/ollama.ts";
 import { reloadUrl, setBuild, withBuild } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
+import { parseTakeName, takesFromHistory } from "../src/lib/takes.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
 const REPO = path.resolve(WEB, "..");
@@ -486,6 +487,123 @@ const version = fs.existsSync(versionPath)
   : null;
 check("the build publishes a version file", typeof version?.build, "string");
 check("the version file names a non-empty build", (version?.build ?? "").length > 0, true);
+
+// --- Recovering a station's existing takes ------------------------------------------------------
+//
+// The file name is what places a take without its plan, so a station can play what it has already
+// rendered instead of rendering a replacement. The station id is anchored, because one id can be a
+// prefix of another and a loose match would file one station's songs under the other.
+
+console.log("\ntake names:\n");
+check("a sung take parses", parseTakeName("neon-drive", "neon-drive-000_00001.mp3"), {
+  index: 0,
+  instrumental: false,
+});
+check(
+  "an instrumental take parses",
+  parseTakeName("neon-drive", "neon-drive-005-instrumental_00001.mp3"),
+  { index: 5, instrumental: true },
+);
+check(
+  "a hyphenated station id parses",
+  parseTakeName("reggaeton-block-party", "reggaeton-block-party-012_00003.mp3"),
+  { index: 12, instrumental: false },
+);
+check(
+  "another station's take is not this station's",
+  parseTakeName("neon-drive", "trap-after-dark-001_00001.mp3"),
+  null,
+);
+check(
+  "a station id that is a prefix does not match",
+  parseTakeName("neon-drive", "neon-drive-b-sides-001_00001.mp3"),
+  null,
+);
+check("a file that is not a take is refused", parseTakeName("neon-drive", "prompt.json"), null);
+
+// The renderer's history is the other place a station's takes can be found, and its shape has
+// changed between versions. Both shapes are pinned here, along with the rules that keep a temp file
+// and another station's folder out of the result.
+const historyFixture = {
+  tuple: {
+    prompt: [
+      1,
+      "id",
+      { 4: { inputs: { tags: "Trap, Dark, Late Night" } }, 8: { inputs: { seed: 42 } } },
+      {},
+      [],
+    ],
+    outputs: {
+      10: {
+        audio: [
+          { filename: "neon-drive-000_00001.mp3", subfolder: "radio/neon-drive", type: "output" },
+        ],
+      },
+    },
+  },
+  bare: {
+    prompt: { 4: { inputs: { tags: "Shoegaze, Dreamy" } }, 8: { inputs: { seed: 7 } } },
+    outputs: {
+      10: {
+        audio: [
+          {
+            filename: "neon-drive-001-instrumental_00001.mp3",
+            subfolder: "radio/neon-drive",
+            type: "output",
+          },
+        ],
+      },
+    },
+  },
+  elsewhere: {
+    prompt: [],
+    outputs: {
+      10: { audio: [{ filename: "other-000_00001.mp3", subfolder: "radio/other", type: "output" }] },
+    },
+  },
+  preview: {
+    prompt: [],
+    outputs: {
+      9: { audio: [{ filename: "temp_00001.mp3", subfolder: "radio/neon-drive", type: "temp" }] },
+    },
+  },
+  prefix: {
+    prompt: [],
+    outputs: {
+      10: {
+        audio: [
+          {
+            filename: "neon-drive-b-sides-001_00001.mp3",
+            subfolder: "radio/neon-drive-b-sides",
+            type: "output",
+          },
+        ],
+      },
+    },
+  },
+};
+const recovered = takesFromHistory(historyFixture, "radio/neon-drive");
+check("a take is recovered from the queue-tuple history", recovered[0], {
+  filename: "neon-drive-000_00001.mp3",
+  subfolder: "radio/neon-drive",
+  type: "output",
+  caption: "Trap, Dark, Late Night",
+  seed: 42,
+});
+check("a take is recovered from the bare-graph history", recovered[1], {
+  filename: "neon-drive-001-instrumental_00001.mp3",
+  subfolder: "radio/neon-drive",
+  type: "output",
+  caption: "Shoegaze, Dreamy",
+  seed: 7,
+});
+check("only this station's takes are recovered", recovered.length, 2);
+check(
+  "a preview is not a take",
+  recovered.some((take) => take.filename === "temp_00001.mp3"),
+  false,
+);
+check("an empty history is not an error", takesFromHistory(null, "radio/neon-drive"), []);
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //

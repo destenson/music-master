@@ -117,7 +117,7 @@
 
   function toggle(): void {
     if (radioState.on) stopRadio();
-    else startRadio();
+    else void startRadio();
   }
 
   function playCurrent(): void {
@@ -211,16 +211,17 @@
             <div>
               <div class="row" style="justify-content:space-between">
                 <strong>{current.title}</strong>
-                <span class="chip" class:meta={current.lyricSource === "instrumental"}>
-                  {current.lyricSource === "instrumental" ? "instrumental" : "sung"}
+                <span class="chip" class:meta={current.instrumental}>
+                  {current.instrumental ? "instrumental" : "sung"}
                 </span>
               </div>
               <div class="small muted">
-                {station?.name ?? current.stationId} · {current.bpm} BPM · seed
-                <span class="mono">{current.seed}</span>
+                {station?.name ?? current.stationId}
+                {#if current.bpm}· {current.bpm} BPM{/if}
+                {#if current.seed}· seed <span class="mono">{current.seed}</span>{/if}
                 {#if current.theme}· about “{current.theme}”{/if}
               </div>
-              {#if current.instrumental && !radioState.instrumental}
+              {#if current.instrumental && current.plan && !radioState.instrumental}
                 <div class="finding note">no lyric model was reachable, so this take is instrumental</div>
               {/if}
               <details style="margin-top:6px">
@@ -233,21 +234,43 @@
                   <pre class="brief">{current.lyrics}</pre>
                 </details>
               {/if}
-              <div class="small muted mono" style="margin-top:4px">
-                output/radio/{current.stationId}/{current.plan?.song_id ?? ""}
-              </div>
+              {#if current.file}
+                <div class="small muted mono" style="margin-top:4px">
+                  output/{current.file.subfolder}/{current.file.filename}
+                </div>
+              {:else if current.plan}
+                <div class="small muted mono" style="margin-top:4px">
+                  output/radio/{current.stationId}/{current.plan.song_id}
+                </div>
+              {/if}
             </div>
+          {:else if radioState.stopped}
+            <p class="small muted" style="margin:0">
+              stopped after repeated failures; fix the target and press play
+            </p>
+          {:else if radioState.stationId && radioState.on}
+            <p class="small muted" style="margin:0">
+              buffering — nothing has been rendered for this station yet, so the first song is still
+              rendering
+            </p>
           {:else if radioState.stationId}
             <p class="small muted" style="margin:0">
-              {radioState.stopped
-                ? "stopped after repeated failures; fix the target and press play"
-                : "buffering — the next song is still rendering, and this one starts when it is done"}
+              Press play to start the station. It begins on any songs already rendered for it, so
+              there is usually nothing to wait for, and renders ahead from there.
             </p>
           {:else}
             <p class="small muted" style="margin:0">
               Choose a station on the left. Songs are rendered a few ahead, so there is always a
               next one.
             </p>
+          {/if}
+
+          {#if radioState.recovered}
+            <div class="finding note">
+              started from {radioState.recovered} take{radioState.recovered === 1 ? "" : "s"} already
+              rendered for this station; the next song is rendering behind
+              {radioState.recovered === 1 ? "it" : "them"}
+            </div>
           {/if}
 
           {#if radioState.notice}

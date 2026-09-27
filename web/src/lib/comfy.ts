@@ -384,6 +384,23 @@ export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promis
   };
 }
 
+/**
+ * The renderer's own history, as it reports it.
+ *
+ * ComfyUI keeps this in memory, so it holds what the renderer still remembers — including takes this
+ * browser did not render, or has forgotten. It is a bonus rather than the record: a restarted
+ * renderer remembers nothing, which is why `takes.ts` merges it with the page's own saved takes
+ * rather than replacing them. A v2 target has no such route.
+ */
+export async function fetchHistory(target: ComfyTarget, limit = 200): Promise<unknown> {
+  if (target.protocol === "v2") return {};
+  const response = await fetch(`${endpoint(target.base)}/history?max_items=${limit}`, {
+    headers: headers(target),
+  });
+  if (!response.ok) throw await failure(response, "Could not read the renderer's history");
+  return await response.json();
+}
+
 /** One id per page load: ComfyUI groups a render's messages under it. */
 const CLIENT_ID = `music-master-${Math.random().toString(36).slice(2, 10)}`;
 

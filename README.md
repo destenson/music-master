@@ -172,6 +172,11 @@ panel's **instrumental** box ticked, the take is planned and captioned as an ins
 The current song can be downloaded, and the songs played on a station are listed there while the
 browser remembers them.
 
+**Pressing play plays.** A station that has songs already starts on them and renders new ones behind,
+so a station you have used before never makes you wait for a replacement first. It finds them in two
+places — the takes this browser saved, and the ones the renderer still remembers, including songs it
+rendered but that were never played — and merges them by file, so nothing is queued twice.
+
 ## The core package
 
 Every check lives once, in `musicmaster/`, as a **text tier**: JSON in, JSON out, standard library

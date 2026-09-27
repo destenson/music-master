@@ -68,6 +68,28 @@ and the station's own brief as the contract. A model is optional: with none chos
 song is re-planned as an **instrumental** and the caption stops describing a singer who is not
 there. The panel's **instrumental** checkbox skips the model entirely.
 
+## Starting on what the station already has
+
+Pressing play should mean playing, not waiting two minutes for a render. So a station's existing
+takes are found **before** anything new is queued, from two places:
+
+- the page's own saved history, which is the durable record and survives a reload or an update; and
+- the renderer's `/history`, which catches takes the page never recorded — one that was rendered but
+  never played, or one rendered from somewhere else — and is a bonus rather than the record, since a
+  restarted renderer remembers nothing.
+
+The two are merged by file, so a take both know about is queued once, and a file whose name is not
+this station's take naming is ignored. One slot is deliberately left for something new: the station
+starts on what it has and renders its next song behind that, so it neither replays a whole repertoire
+nor stops producing. The take's position and kind come from its **file name**, which is why the name
+carries them ([`takes.ts`](../../web/src/lib/takes.ts)); the caption and seed are read back from the
+graph the renderer kept.
+
+ComfyUI's history has recorded that graph in two shapes a version apart — the bare API graph, and the
+queue tuple `[number, prompt_id, graph, extra_data, outputs]` — so both are read rather than betting
+on one. That parsing is pure and unit-tested in the smoke run rather than only exercised against a
+live server.
+
 ## Output layout
 
 A radio take is not a repository song, so it does not pretend to live in `songs/<id>/`. The graph
