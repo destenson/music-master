@@ -267,6 +267,13 @@
               full.
             </p>
           {:else}
+            <p style="margin:0">
+              If it is running on your own machine, note that ComfyUI refuses a POST to a loopback
+              address whose <code>Origin</code> does not match its <code>Host</code> — its guard
+              against a random site queueing renders through <code>127.0.0.1</code>. The dev server
+              proxies <code>:8288</code> and <code>:8188</code> so that does not arise; a page served
+              from elsewhere has to reach ComfyUI at a non-loopback address, with the header below.
+            </p>
             <pre class="brief">python main.py --enable-cors-header {pageOrigin}</pre>
           {/if}
           <p class="muted" style="margin:6px 0 0">

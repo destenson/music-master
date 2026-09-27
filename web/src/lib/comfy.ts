@@ -179,6 +179,21 @@ async function failure(response: Response, what: string): Promise<Error> {
   } catch {
     /* not JSON; the raw text is the most useful thing we have */
   }
+
+  if (!detail.trim()) {
+    // A bare status is not an explanation, and these two have one worth giving.
+    if (response.status === 403) {
+      detail =
+        "ComfyUI answered 403 with no body. It refuses a POST to a loopback address whose Origin " +
+        "host or port differs from its Host — a guard against a random site queueing renders " +
+        "through 127.0.0.1. The dev server proxies :8288 and :8188, so this does not arise there. " +
+        "A page served from anywhere else cannot post to a loopback ComfyUI at all: reach it at a " +
+        "non-loopback address instead, with --enable-cors-header set for this page.";
+    } else {
+      detail = `no response body (${response.statusText || "no status text"})`;
+    }
+  }
+
   return new Error(`${what} (HTTP ${response.status}):\n${detail}`);
 }
 

@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 
 const WEB = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(WEB, "..");
@@ -65,6 +65,11 @@ function collectRepoFiles(): string[] {
 function sendFile(res: import("node:http").ServerResponse, abs: string, rel: string): void {
   res.setHeader("Content-Type", MIME[path.extname(rel)] ?? "application/octet-stream");
   fs.createReadStream(abs).pipe(res);
+}
+
+/** Strip the browser's `Origin` on the way to ComfyUI; see the proxy comment below. */
+function dropOrigin(proxy: Parameters<NonNullable<ProxyOptions["configure"]>>[0]): void {
+  proxy.on("proxyReq", (request) => request.removeHeader("origin"));
 }
 
 /**
@@ -155,15 +160,23 @@ export default defineConfig({
       // The same for the renderer, so a local render needs no CORS on the ComfyUI side. Two ports
       // are proxied because two are named as presets. The keys must not be prefixes of one another:
       // Vite matches them with startsWith, so `/comfy` would swallow `/comfy-8188`.
+      //
+      // ComfyUI refuses a loopback POST whose Origin host:port differs from its Host, to stop a
+      // random site queueing renders through 127.0.0.1. `changeOrigin` rewrites Host but not Origin,
+      // so the browser's own Origin would be refused; the dev server is this machine and proxies
+      // same-origin, so drop it and let the request look like the CLI's. ComfyUI still enforces CORS
+      // for anything that reaches it directly.
       "/comfy-8288": {
         target: "http://127.0.0.1:8288",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/comfy-8288/, ""),
+        configure: dropOrigin,
       },
       "/comfy-8188": {
         target: "http://127.0.0.1:8188",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/comfy-8188/, ""),
+        configure: dropOrigin,
       },
     },
   },

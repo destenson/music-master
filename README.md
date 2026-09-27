@@ -225,9 +225,12 @@ and returns a durable, pollable job. The presets are this project's service on `
 default on `:8188`, a self-hosted [`comfy-api-proxy`](https://github.com/Comfy-Org/comfy-api-proxy)
 on `:8189`, [Comfy Cloud](https://cloud.comfy.org) on v2, or any address you supply. The graph is API
 format, which is the one v2 accepts — it rejects the `nodes`/`links` UI export. The dev server proxies
-`:8288` and `:8188` so a local render needs nothing; anything else is called directly and must allow
-the page. Comfy Cloud needs a paid subscription, and an API key typed there is held in the tab's
-session storage rather than saved, because a page cannot keep a secret.
+`:8288` and `:8188`, so a local render needs nothing — and it has to, because ComfyUI refuses a POST
+to a loopback address whose `Origin` does not match its `Host`, its guard against a random site
+queueing renders through `127.0.0.1`. A page served from elsewhere therefore **cannot** post to a
+loopback ComfyUI however it is configured: it has to reach ComfyUI at a non-loopback address, with
+`--enable-cors-header` set for the page. Comfy Cloud needs a paid subscription, and an API key typed
+there is held in the tab's session storage rather than saved, because a page cannot keep a secret.
 
 A **new take** is the same prompt with a different seed; a **new song** is a blank draft you name,
 with empty selections and no words, that you export and commit — the same loop as everything else,
