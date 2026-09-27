@@ -196,9 +196,13 @@
     targetTimer = setTimeout(() => void checkTarget(), 600);
   });
 
-  /** The quick render in the top bar: the same queue the Render tab drives. */
-  function quickRender(): void {
-    void startRender({ seed, onSeed: (chosen) => (seed = chosen), artifactsFor });
+  /**
+   * Both top-bar actions, and the only two. `fresh` decides the seed, so neither of them consults
+   * the Render panel's checkbox — a button that changed meaning according to a control in a panel
+   * you might not have open is what made this confusing.
+   */
+  function quickRender(fresh: boolean): void {
+    void startRender({ seed, fresh, onSeed: (chosen) => (seed = chosen), artifactsFor });
   }
 
   // Keep the working state across a reload. `stable` walks every property, which is what makes a
@@ -480,19 +484,18 @@
 
     <button
       class="primary"
-      onclick={quickRender}
+      onclick={() => quickRender(true)}
       disabled={renderQueue.busy || !artifact}
-      title={renderQueue.keepSeed
-        ? `Re-render with seed ${seed}, holding the arrangement so only your edits vary.`
-        : "Render this graph from any tab. Each render generates a seed, so each take differs."}
+      title="Render from any tab with a generated seed, so this take's arrangement is new."
     >
-      {#if renderQueue.busy}
-        {`rendering ${renderQueue.waited}s`}
-      {:else if renderQueue.keepSeed}
-        {`re-render ${seed}`}
-      {:else}
-        render
-      {/if}
+      {renderQueue.busy ? `rendering ${renderQueue.waited}s` : "render"}
+    </button>
+    <button
+      onclick={() => quickRender(false)}
+      disabled={renderQueue.busy || !artifact}
+      title={`Re-render with seed ${seed}. The same inputs reproduce the same take, which holds the arrangement still while something else changes.`}
+    >
+      re-render {seed}
     </button>
     {#if renderQueue.error}
       <span class="chip warn" title={renderQueue.error}>render failed</span>

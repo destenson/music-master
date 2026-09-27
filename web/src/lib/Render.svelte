@@ -47,8 +47,8 @@
     rememberTarget();
   }
 
-  function render(): void {
-    void startRender({ seed, onSeed: (chosen) => (seed = chosen), artifactsFor });
+  function render(fresh: boolean): void {
+    void startRender({ seed, fresh, onSeed: (chosen) => (seed = chosen), artifactsFor });
   }
 </script>
 
@@ -185,7 +185,7 @@
     </div>
 
     <div class="row">
-      <button onclick={render} disabled={renderQueue.busy || !artifact}>
+      <button onclick={() => render(!renderQueue.keepSeed)} disabled={renderQueue.busy || !artifact}>
         {renderQueue.keepSeed ? `re-render seed ${seed}` : "render a new take"}
       </button>
       {#if renderQueue.busy}

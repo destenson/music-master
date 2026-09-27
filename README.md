@@ -234,12 +234,15 @@ there is held in the tab's session storage rather than saved, because a page can
 
 A render picks a **fresh seed** by default, so each one is a new take. The same seed with the same
 inputs *is* the same take — of the eighteen takes on disk, the only two whose graphs matched came out
-byte-identical, and every other pair differed because something in the inputs had. So holding the seed
-is a deliberate act, and the checkbox next to the button is what does it: it keeps the arrangement put
-while the caption varies, which is the only way to hear what a caption change actually did rather than
-hearing it mixed with whatever a different seed would have produced anyway. A **new song** is a blank
-draft you name, that you export and commit — the same loop as everything else, since a page cannot
-write a song directory.
+byte-identical, and every other pair differed because something in the inputs had. The top bar
+therefore carries **both actions, always**: `render` generates a seed, and `re-render <seed>` sends the
+one on screen. Neither consults a mode, because a button whose meaning depends on a checkbox in a
+panel you might not have open is worse than no button. The Render panel keeps the checkbox for its own
+button, where the seed field is next to it and nothing is hidden. Holding the seed is what keeps the
+arrangement put while the caption varies, which is the only way to hear what a caption change actually
+did rather than hearing it mixed with whatever a different seed would have produced anyway. A **new
+song** is a blank draft you name, that you export and commit — the same loop as everything else, since
+a page cannot write a song directory.
 
 **State is browser-local by design.** The working state — selections, lyric, template, tempo, seed, brief — is autosaved to `localStorage` so a reload does not throw an edit away, and any number of **named drafts** can be saved, loaded and deleted from the top bar, so several directions can exist at once. A `differs from repo` marker with one-click revert appears whenever the working state no longer matches the files in `songs/<id>/`. The marker is there because the distinction is real: the song directory is the record, and a page cannot write to it.
 

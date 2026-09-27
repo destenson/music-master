@@ -32,12 +32,12 @@ export const renderQueue = $state({
   usedSeed: null as number | null,
   cancelRequested: false,
   /**
-   * Off by default: every render is a new take, because the same seed with the same inputs reproduces
-   * the same take rather than making another one.
+   * The Render panel's preference for its own button, and nothing else's: the top bar carries both
+   * actions as two explicit buttons, so neither of them consults this.
    *
-   * Turned on, the seed is held so the underlying arrangement stays put while everything else varies
-   * — which is the only way to hear what a caption change actually did, rather than hearing it mixed
-   * with whatever a different seed would have produced anyway.
+   * On: hold the seed, so the arrangement stays put while everything else varies — the only way to
+   * hear what a caption change actually did. Off: every render is a new take. The same seed with the
+   * same inputs reproduces the same take, so holding it is a deliberate act rather than a default.
    */
   keepSeed: false,
 });
@@ -62,20 +62,28 @@ export async function checkTarget(): Promise<void> {
 }
 
 export interface StartOptions {
-  /** The seed to send when one is pinned rather than generated. */
+  /** The seed to re-send when reproducing a take. */
   seed: number;
+  /**
+   * True for a new take, false to re-send `seed`.
+   *
+   * A parameter rather than a stored mode, so the two buttons in the top bar are independent of the
+   * panel's checkbox. A global button whose meaning depended on a checkbox in a panel you might not
+   * have open is what made this confusing in the first place.
+   */
+  fresh: boolean;
   /** Given the seed actually used, so the caller can show it and the take stays reproducible. */
   onSeed: (seed: number) => void;
   artifactsFor: (seed: number) => Artifacts | null;
 }
 
-export async function startRender({ seed, onSeed, artifactsFor }: StartOptions): Promise<void> {
+export async function startRender({ seed, fresh, onSeed, artifactsFor }: StartOptions): Promise<void> {
   if (renderQueue.busy) return;
 
-  const chosen = renderQueue.keepSeed ? seed : freshSeed();
+  const chosen = fresh ? freshSeed() : seed;
   const built = artifactsFor(chosen);
   if (!built) return;
-  if (!renderQueue.keepSeed) onSeed(chosen);
+  if (fresh) onSeed(chosen);
 
   renderQueue.usedSeed = chosen;
   renderQueue.busy = true;
