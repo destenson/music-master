@@ -17,6 +17,7 @@
     downloadSong,
     nowPlaying,
     radioState,
+    refreshAvailable,
     replay,
     selectStation,
     setBufferTarget,
@@ -121,6 +122,12 @@
     void refreshModels();
     const timer = window.setInterval(() => (now = Date.now()), 1000);
     return () => window.clearInterval(timer);
+  });
+
+  // Look up what the station already has whenever one is chosen — on mount too, for the station a
+  // reload came back to — so its takes are listed before anything is playing.
+  $effect(() => {
+    if (radioState.stationId) void refreshAvailable();
   });
 
   // Follow the engine's current song, and only that song. The player is cleared when there is
@@ -412,23 +419,46 @@
       <div class="section">
         <div class="section-body">
           <div class="section-title">Up next</div>
-          {#if next.length}
-            {#each next as song (song.id)}
-              {@const age = elapsed(song)}
+          {#if radioState.on}
+            {#if next.length}
+              {#each next as song (song.id)}
+                {@const age = elapsed(song)}
+                <div class="row queue-row">
+                  <span class="small muted mono">{song.index}</span>
+                  <span class="small">{song.title}</span>
+                  {#if song.theme}<span class="small muted">· {song.theme}</span>{/if}
+                  <span class="spacer" style="flex:1"></span>
+                  {#if age}<span class="small muted">{age}</span>{/if}
+                  {#if song.status === "ready" || song.status === "playing"}
+                    <span class="chip" class:meta={song.lyricSource === "instrumental"}>
+                      {song.lyricSource === "instrumental" ? "instrumental" : "sung"}
+                    </span>
+                  {/if}
+                  <span class="chip" class:warn={song.status === "failed"}>{STATUS[song.status]}</span>
+                </div>
+              {/each}
+            {:else}
+              <p class="small muted" style="margin:0">nothing buffered yet</p>
+            {/if}
+          {:else if radioState.available.length}
+            {#each radioState.available as take (take.id)}
               <div class="row queue-row">
-                <span class="small muted mono">{song.index}</span>
-                <span class="small">{song.title}</span>
-                {#if song.theme}<span class="small muted">· {song.theme}</span>{/if}
+                <span class="small">{take.title}</span>
+                {#if take.theme}<span class="small muted">· {take.theme}</span>{/if}
                 <span class="spacer" style="flex:1"></span>
-                {#if age}<span class="small muted">{age}</span>{/if}
-                {#if song.status === "ready" || song.status === "playing"}
-                  <span class="chip" class:meta={song.lyricSource === "instrumental"}>
-                    {song.lyricSource === "instrumental" ? "instrumental" : "sung"}
-                  </span>
-                {/if}
-                <span class="chip" class:warn={song.status === "failed"}>{STATUS[song.status]}</span>
+                <span class="chip" class:meta={take.instrumental}>
+                  {take.instrumental ? "instrumental" : "sung"}
+                </span>
+                <span class="chip">rendered</span>
               </div>
             {/each}
+            <p class="small muted" style="margin:4px 0 0">
+              already rendered for this station — press play to start on them, oldest first
+            </p>
+          {:else if radioState.availableBusy}
+            <p class="small muted" style="margin:0">
+              looking for songs this station already has…
+            </p>
           {:else}
             <p class="small muted" style="margin:0">nothing buffered yet</p>
           {/if}

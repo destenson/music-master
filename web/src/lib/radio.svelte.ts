@@ -217,6 +217,12 @@ export const radioState = $state({
   history: [] as SavedRadioSong[],
   /** How many already-rendered takes the last start began from, so the panel can say so. */
   recovered: 0,
+  /**
+   * The takes the current station already has, found when the station is chosen so the panel can
+   * show them before anything is playing. Playback seeds from this list rather than looking again.
+   */
+  available: [] as SavedRadioSong[],
+  availableBusy: false,
   lastError: null as string | null,
   /** A non-fatal message, such as the lyric model being unreachable and the take going instrumental. */
   notice: null as string | null,
@@ -555,7 +561,29 @@ export function selectStation(stationId: string): void {
   radioState.stationId = stationId;
   radioState.history = loadHistory(stationId);
   radioState.lastError = null;
+  radioState.available = [];
   persistSettings();
+  void refreshAvailable();
+}
+
+/**
+ * Find the takes this station already has, without starting anything.
+ *
+ * The panel shows them as what is up next before play is pressed, which is what makes "pressing
+ * play plays" something to see rather than a promise, and a start seeds from the same list instead
+ * of asking the renderer a second time.
+ */
+export async function refreshAvailable(): Promise<void> {
+  const stationId = radioState.stationId;
+  if (!stationId) return;
+  radioState.availableBusy = true;
+  try {
+    const found = await discoverExisting(stationId);
+    if (stationId !== radioState.stationId) return;
+    radioState.available = found;
+  } finally {
+    if (stationId === radioState.stationId) radioState.availableBusy = false;
+  }
 }
 
 function hardStop(): void {
@@ -661,9 +689,11 @@ export async function startRadio(): Promise<void> {
   session += 1;
   const token = session;
 
-  // What the station already has comes first: a local read plus one bounded request to the
-  // renderer, over before a listener would notice, and it is what stops play from meaning "wait".
-  const existing = await discoverExisting(radioState.stationId);
+  // What the station already has comes first. It was found when the station was chosen, so pressing
+  // play usually does not wait for a request at all; if it was not, this finds it now.
+  const existing = radioState.available.length
+    ? radioState.available
+    : await discoverExisting(radioState.stationId);
   if (token !== session) return;
   radioState.recovered = seedSongs(existing);
 
