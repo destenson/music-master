@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/section-tags.schema.json",
+  "title": "SectionTagVocabulary",
+  "description": "The metatag vocabulary and grammar for the lyric artifact. Section tags are the strongest structural control the generator offers and also the easiest to misuse: the model may sing a tag it does not recognise, and stacking modifiers both dilutes the instruction and risks that outcome. So the grammar is data, not convention, and every bracket in a lyric is validated against this file before the prompt is rendered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["section_tags_version", "grammar", "sections", "modifiers", "vocal_tags", "energy_tags", "instrumental_section_tags", "consistency"],
+  "properties": {
+    "section_tags_version": { "type": "string", "const": "1" },
+    "note": { "type": "string" },
+    "grammar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["section_tag", "max_modifiers", "rules"],
+      "properties": {
+        "section_tag": { "type": "string", "description": "The accepted shape of a section tag, e.g. '[<section>] or [<section> - <modifier>]'." },
+        "max_modifiers": { "type": "integer", "minimum": 0, "maximum": 1, "description": "One. The model's own guide warns that stacked tags get sung or ignored." },
+        "rules": { "type": "array", "items": { "type": "string" }, "description": "Prose rules the linter enforces where it can and the reviewer enforces where it cannot." },
+        "not_recognised": { "type": "string" }
+      }
+    },
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Tag" },
+      "description": "Structural tags. `instrumental` marks sections that carry no vocal, which the consistency check uses to catch a vocal tag inside an instrumental section."
+    },
+    "modifiers": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Tag" },
+      "description": "Performance modifiers appended after a hyphen, at most one per section."
+    },
+    "vocal_tags": { "type": "array", "items": { "$ref": "#/$defs/Tag" } },
+    "energy_tags": { "type": "array", "items": { "$ref": "#/$defs/Tag" } },
+    "instrumental_section_tags": { "type": "array", "items": { "$ref": "#/$defs/Tag" } },
+    "consistency": {
+      "type": "array",
+      "description": "Cross-artifact rules: a caption bin and the lyric tag pool it must agree with. These are the model's own consistency checklist, made checkable.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "caption_bins", "section_pool", "rule"],
+        "properties": {
+          "id": { "type": "string" },
+          "caption_bins": { "type": "array", "items": { "type": "string" } },
+          "section_pool": { "type": "string", "enum": ["vocal_tags", "energy_tags", "instrumental_section_tags"] },
+          "rule": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "Tag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "label": {
+          "type": "string",
+          "pattern": "^[^,\\[\\]]+$",
+          "description": "The text written inside the brackets, verbatim. No commas or brackets, since those are structural in a lyric."
+        },
+        "axis": { "type": ["string", "null"], "description": "Grouping for the UI: delivery, energy, emotion, arrangement." },
+        "instrumental": { "type": "boolean", "description": "For sections: carries no vocal." },
+        "numbered": { "type": "boolean", "description": "For sections: may take an index, e.g. [Verse 1]." },
+        "description": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

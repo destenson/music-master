@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/tag-vocabulary.schema.json",
+  "title": "TagVocabulary",
+  "description": "The bins of taggable properties and the options each bin may take. This file is the interface between three consumers: the UI builds its dropdowns and checkboxes from it, the prompt renderer turns selections into the comma-separated tag string, and the compliance battery reads maps_to to know what each bin obliges it to check. Options carry compound, natural-reading labels ('Heavy 808 Bass', 'Dark Bedroom Production') because that is how music tag prompts are actually written; bins keep them organised by dimension. Selections are stored by option id, never by label, so a label can be improved without invalidating saved work.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["vocabulary_version", "render_order", "tag_budget", "bins"],
+  "properties": {
+    "vocabulary_version": { "type": "string", "const": "1" },
+    "tag_budget": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Maximum number of tags emitted into the rendered string. Long tag lists dilute a prompt, so the renderer truncates by priority rather than emitting everything. Whatever is dropped is recorded in the prompt's omitted list, never silently discarded."
+    },
+    "render_order": {
+      "type": "array",
+      "description": "Canonical order in which bins contribute tags to the rendered string. Deliberately independent of UI order: the UI groups bins for a human, this orders tags for the model. Deterministic order is what makes two prompts meaning the same thing hash the same.",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "bins": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Bin" }
+    }
+  },
+  "$defs": {
+    "Bin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label", "group", "control", "priority", "maps_to"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "label": { "type": "string", "description": "The human-facing name of this bin in the UI." },
+        "group": {
+          "type": "string",
+          "description": "UI grouping, purely for layout. e.g. 'Style', 'Rhythm', 'Instruments', 'Vocals', 'Sound', 'Words', 'Constraints'."
+        },
+        "control": {
+          "type": "string",
+          "enum": [
+            "single_select",
+            "multi_select",
+            "numeric",
+            "numeric_with_descriptor",
+            "key_mode",
+            "ranked_multi",
+            "combo_free"
+          ],
+          "description": "Which UI element to render. single_select = dropdown/radio (exactly one). multi_select = checkbox list (bounded). numeric = slider plus number input. numeric_with_descriptor = slider that can also emit a word tag. key_mode = paired dropdowns. ranked_multi = ordered list, order is meaningful. combo_free = dropdown that also accepts typed text."
+        },
+        "min_selections": { "type": "integer", "minimum": 0, "default": 0 },
+        "max_selections": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Upper bound for multi_select. Exists to protect the tag budget, not for its own sake."
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "description": "1 = defining, keep first when the budget truncates. 2 = strongly characteristic. 3 = nice to have, dropped first."
+        },
+        "maps_to": {
+          "type": "string",
+          "description": "The requirement this bin creates, in the same vocabulary as RequirementSpec.verify. Adding a bin means adding a checker; this field is how the two stay in step."
+        },
+        "help": { "type": ["string", "null"], "description": "Tooltip text for the UI." },
+        "emits_tag": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether selections in this bin contribute to the positive tag string. False for constraint bins such as explicitness and content exclusions, whose selections become negative conditioning and compliance checks rather than tags. A bin with emits_tag false needs no entry in render_order."
+        },
+        "unit": { "type": ["string", "null"], "description": "For numeric controls, e.g. 'BPM' or 's'." },
+        "range": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" },
+            "step": { "type": "number" }
+          }
+        },
+        "emit": {
+          "type": ["string", "null"],
+          "description": "Template for how a numeric bin renders into a tag, e.g. '{value} BPM'. Required only when value_emits_tag is true.",
+          "examples": ["{value} BPM"]
+        },
+        "value_emits_tag": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether a numeric bin's value becomes a tag. False for tempo, where the model's own guidance is that BPM belongs in the metadata parameter and not in the caption; in that case only the bin's descriptor words reach the tag string."
+        },
+        "descriptor_options": {
+          "type": ["array", "null"],
+          "description": "For numeric_with_descriptor: the word tags the slider can additionally emit.",
+          "items": { "$ref": "#/$defs/Option" }
+        },
+        "key_options": { "type": ["array", "null"], "items": { "type": "string" }, "description": "For key_mode: the selectable tonics." },
+        "mode_options": { "type": ["array", "null"], "items": { "type": "string" }, "description": "For key_mode: the selectable modes." },
+        "options": {
+          "type": ["array", "null"],
+          "description": "For the select controls. An option's label is emitted verbatim as a tag.",
+          "items": { "$ref": "#/$defs/Option" }
+        }
+      }
+    },
+    "Option": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "label"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_]*$", "description": "Stable key stored in the prompt and saved presets. Never derived from the label at runtime." },
+        "label": { "type": "string", "pattern": "^[^,]+$", "description": "The exact tag text emitted when this option is selected. Must not contain a comma, because commas separate tags in the rendered string, and must not have leading or trailing whitespace." },
+        "aliases": {
+          "type": "array",
+          "description": "Alternative spellings matched against a hand-typed or imported tag string, so an existing prompt can be parsed back into selections.",
+          "items": { "type": "string" }
+        },
+        "excludes": {
+          "type": "array",
+          "description": "Option ids that cannot be selected together with this one. Checked by the coherence linter before the prompt is rendered.",
+          "items": { "type": "string" }
+        },
+        "requires_any": {
+          "type": "array",
+          "description": "Option ids of which at least one must also be selected. A soft constraint: reported by the linter as a warning, not a hard failure.",
+          "items": { "type": "string" }
+        },
+        "default": { "type": "boolean", "default": false, "description": "Pre-selected in the UI." },
+        "caution": {
+          "type": ["string", "null"],
+          "description": "A known reliability limit of this option on the target model, surfaced in the UI and carried into the pre-prompt check. Used where the model's own documentation says an option is unstable rather than merely unusual."
+        }
+      }
+    }
+  }
+}

@@ -72,23 +72,48 @@
     "Style": {
       "type": "object",
       "additionalProperties": false,
-      "description": "The descriptive half of the request. Tags use a controlled vocabulary so that two prompts meaning the same thing render the same string and hash the same; free_text carries what the vocabulary cannot express. Both are sent to the generator.",
-      "required": ["tags", "free_text"],
+      "description": "The descriptive half of the request, produced from a controlled vocabulary of tag bins rather than typed. Selections are stored by option id; the rendered tags and the rendered string are stored alongside so the exact bytes sent to the generator are always recoverable, even if the vocabulary is later reworded. Both go to the generator.",
+      "required": ["selections", "rendered_tags", "rendered_string"],
       "properties": {
-        "tags": {
+        "vocabulary_ref": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "description": "Which vocabulary revision produced these tags. Pinning it is what makes an old prompt still render identically after the vocabulary is extended.",
+          "properties": {
+            "path": { "type": "string" },
+            "version": { "type": "string" },
+            "sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "selections": {
+          "type": "object",
+          "description": "The bin state, keyed by bin id. This is what a UI binds to and what a saved preset restores.",
+          "additionalProperties": { "$ref": "#/$defs/Selection" }
+        },
+        "rendered_tags": {
           "type": "array",
-          "description": "Normalised vocabulary terms, e.g. 'indie folk', 'fingerpicked guitar', 'brushed drums', 'close-mic female alto'. The adapter joins these into the target's tag string in a fixed order.",
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9 +#/'-]*$" },
+          "description": "The tags actually emitted, in canonical render order, after the budget has been applied. This is the tag list the model sees.",
+          "items": { "type": "string" },
           "uniqueItems": true
+        },
+        "rendered_string": {
+          "type": "string",
+          "description": "rendered_tags joined with ', '. Recorded verbatim because it is the exact input to the generator, and because it is the field the human actually reads and reviews."
+        },
+        "omitted_tags": {
+          "type": "array",
+          "description": "Tags dropped to respect the tag budget. Recorded so a truncation is visible in the artifact instead of being silently lost.",
+          "items": { "type": "string" }
         },
         "free_text": {
           "type": "string",
-          "description": "The residual descriptive clause in natural language, for what the vocabulary cannot hold. Renders after the tags."
+          "default": "",
+          "description": "The residual descriptive clause in natural language, for what the vocabulary cannot hold. Appended after the rendered tags."
         },
         "dimensions": {
           "type": "object",
           "additionalProperties": false,
-          "description": "The same intent, split by axis. Kept because the compliance battery scores these axes separately; a single blob cannot be checked per requirement.",
+          "description": "A denormalised view of the selections by axis, generated from the bins. Kept because the compliance battery scores these axes separately and a single tag blob cannot be checked per requirement.",
           "properties": {
             "genre": { "type": "array", "items": { "type": "string" } },
             "era": { "type": ["string", "null"] },
@@ -107,6 +132,23 @@
             }
           }
         }
+      }
+    },
+    "Selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "One bin's state. The uniform shape lets the UI, the renderer and the linter all read every bin the same way; which fields are meaningful is declared by the bin's `control` in the vocabulary.",
+      "properties": {
+        "options": {
+          "type": "array",
+          "description": "Selected option ids. Used by every select control, and by numeric_with_descriptor for its word tag.",
+          "items": { "type": "string" },
+          "uniqueItems": true
+        },
+        "value": { "type": ["number", "null"], "description": "For numeric controls." },
+        "text": { "type": ["string", "null"], "description": "For combo_free and any bin that accepts typed input." },
+        "key": { "type": ["string", "null"], "description": "For key_mode." },
+        "mode": { "type": ["string", "null"], "description": "For key_mode." }
       }
     },
     "Metadata": {

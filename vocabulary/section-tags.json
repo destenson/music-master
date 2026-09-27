@@ -1,0 +1,112 @@
+{
+  "section_tags_version": "1",
+  "note": "The metatag vocabulary for the lyric artifact. ACE-Step's tutorial calls structure tags 'the most powerful tool in Lyrics' and warns against stacking them, so this file defines both the tags and the grammar that constrains their use. Tags live in the lyrics, not in the caption: the caption is the overall portrait, the lyrics are the temporal script.",
+  "grammar": {
+    "section_tag": "[<section>] or [<section> - <modifier>]",
+    "max_modifiers": 1,
+    "rules": [
+      "At most one modifier per section tag. Stacking is explicitly discouraged by the model's own guide: it risks the model singing the tag, and it dilutes the instruction.",
+      "Separate sections with a blank line, so the boundary is unambiguous.",
+      "Uppercase within a lyric line means louder, higher-intensity delivery; use it sparingly and never for a whole verse.",
+      "Parentheses around a phrase mean background vocal or harmony, not a stage direction.",
+      "Keep complex style description in the caption and only the performance instruction in the tag.",
+      "A modifier must not contradict the caption: if the caption says 'intimate chamber music', a [Chorus - explosive] tag is a conflict, not a contrast."
+    ],
+    "not_recognised": "Treat an unrecognised tag as a defect: the model may sing it. The prompt-level check validates every bracket against this file before rendering."
+  },
+  "sections": [
+    { "id": "sec_intro", "label": "Intro", "instrumental": false, "description": "Opening; establishes atmosphere." },
+    { "id": "sec_verse", "label": "Verse", "instrumental": false, "numbered": true, "description": "Narrative progression." },
+    { "id": "sec_pre_chorus", "label": "Pre-Chorus", "instrumental": false, "description": "Builds energy into the chorus." },
+    { "id": "sec_chorus", "label": "Chorus", "instrumental": false, "description": "Emotional climax; the hook." },
+    { "id": "sec_post_chorus", "label": "Post-Chorus", "instrumental": false, "description": "Hook extension after the chorus." },
+    { "id": "sec_bridge", "label": "Bridge", "instrumental": false, "description": "Transition or lift." },
+    { "id": "sec_breakdown", "label": "Breakdown", "instrumental": false, "description": "Reduced instrumentation; space." },
+    { "id": "sec_build", "label": "Build", "instrumental": false, "description": "Energy rising." },
+    { "id": "sec_drop", "label": "Drop", "instrumental": false, "description": "Electronic energy release." },
+    { "id": "sec_outro", "label": "Outro", "instrumental": false, "description": "Conclusion." },
+    { "id": "sec_instrumental", "label": "Instrumental", "instrumental": true, "description": "No vocals." },
+    { "id": "sec_solo", "label": "Solo", "instrumental": true, "description": "Featured solo; name the instrument in the modifier." },
+    { "id": "sec_interlude", "label": "Interlude", "instrumental": true, "description": "Short instrumental passage." },
+    { "id": "sec_fade_out", "label": "Fade Out", "instrumental": false, "description": "Fading ending." },
+    { "id": "sec_silence", "label": "Silence", "instrumental": true, "description": "Deliberate silence." }
+  ],
+  "modifiers": [
+    { "id": "mod_anthemic", "label": "anthemic", "axis": "energy" },
+    { "id": "mod_whispered", "label": "whispered", "axis": "delivery" },
+    { "id": "mod_powerful", "label": "powerful", "axis": "energy" },
+    { "id": "mod_belting", "label": "belting", "axis": "delivery" },
+    { "id": "mod_raspy", "label": "raspy", "axis": "delivery" },
+    { "id": "mod_falsetto", "label": "falsetto", "axis": "delivery" },
+    { "id": "mod_spoken", "label": "spoken", "axis": "delivery" },
+    { "id": "mod_laid_back", "label": "laid-back", "axis": "delivery" },
+    { "id": "mod_intimate", "label": "intimate", "axis": "delivery" },
+    { "id": "mod_building", "label": "building energy", "axis": "energy" },
+    { "id": "mod_explosive", "label": "explosive", "axis": "energy" },
+    { "id": "mod_high_energy", "label": "high energy", "axis": "energy" },
+    { "id": "mod_low_energy", "label": "low energy", "axis": "energy" },
+    { "id": "mod_melancholic", "label": "melancholic", "axis": "emotion" },
+    { "id": "mod_euphoric", "label": "euphoric", "axis": "emotion" },
+    { "id": "mod_dreamy", "label": "dreamy", "axis": "emotion" },
+    { "id": "mod_aggressive", "label": "aggressive", "axis": "emotion" },
+    { "id": "mod_stripped", "label": "stripped back", "axis": "arrangement" },
+    { "id": "mod_minimal", "label": "minimal", "axis": "arrangement" },
+    { "id": "mod_soaring", "label": "soaring", "axis": "delivery" },
+    { "id": "mod_fade", "label": "fade out", "axis": "arrangement" }
+  ],
+  "vocal_tags": [
+    { "id": "vt_raspy", "label": "raspy vocal", "axis": "delivery" },
+    { "id": "vt_whispered", "label": "whispered", "axis": "delivery" },
+    { "id": "vt_falsetto", "label": "falsetto", "axis": "delivery" },
+    { "id": "vt_belting", "label": "powerful belting", "axis": "delivery" },
+    { "id": "vt_spoken_word", "label": "spoken word", "axis": "delivery" },
+    { "id": "vt_harmonies", "label": "harmonies", "axis": "arrangement" },
+    { "id": "vt_call_response", "label": "call and response", "axis": "arrangement" },
+    { "id": "vt_ad_lib", "label": "ad-lib", "axis": "arrangement" }
+  ],
+  "energy_tags": [
+    { "id": "et_high", "label": "high energy", "axis": "energy" },
+    { "id": "et_low", "label": "low energy", "axis": "energy" },
+    { "id": "et_building", "label": "building energy", "axis": "energy" },
+    { "id": "et_explosive", "label": "explosive", "axis": "energy" },
+    { "id": "et_melancholic", "label": "melancholic", "axis": "emotion" },
+    { "id": "et_euphoric", "label": "euphoric", "axis": "emotion" },
+    { "id": "et_dreamy", "label": "dreamy", "axis": "emotion" },
+    { "id": "et_aggressive", "label": "aggressive", "axis": "emotion" }
+  ],
+  "instrumental_section_tags": [
+    { "id": "ist_instrumental", "label": "Instrumental" },
+    { "id": "ist_guitar_solo", "label": "Guitar Solo" },
+    { "id": "ist_piano_interlude", "label": "Piano Interlude" },
+    { "id": "ist_synth_solo", "label": "Synth Solo" },
+    { "id": "ist_sax_solo", "label": "Sax Solo" },
+    { "id": "ist_strings_interlude", "label": "Strings Interlude" },
+    { "id": "ist_drum_break", "label": "Drum Break" }
+  ],
+  "consistency": [
+    {
+      "id": "instruments_match_instrumental_tags",
+      "caption_bins": ["drums", "bass", "harmony", "synth", "extra_instrument"],
+      "section_pool": "instrumental_section_tags",
+      "rule": "An instrument named as a solo or interlude in the lyrics should be present in the caption's instrumentation, and vice versa. The model does not resolve conflicts; it degrades."
+    },
+    {
+      "id": "emotion_matches_energy_tags",
+      "caption_bins": ["mood", "energy"],
+      "section_pool": "energy_tags",
+      "rule": "Energy and emotion tags in the lyrics must not contradict the caption's mood or energy selections."
+    },
+    {
+      "id": "vocal_matches_vocal_tags",
+      "caption_bins": ["lead_vocal", "vocal_delivery", "backing_vocal"],
+      "section_pool": "vocal_tags",
+      "rule": "Vocal control tags in the lyrics must be consistent with the caption's vocal, delivery and backing selections."
+    },
+    {
+      "id": "no_vocals_no_vocal_tags",
+      "caption_bins": ["lead_vocal"],
+      "section_pool": "vocal_tags",
+      "rule": "When the lead vocal bin is Instrumental or No Vocals, no vocal control tag may appear in the lyrics."
+    }
+  ]
+}

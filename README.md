@@ -56,8 +56,46 @@ both.
 | Document | What it covers |
 | --- | --- |
 | [`docs/design/compliance-architecture.md`](docs/design/compliance-architecture.md) | The design: the artifact bundle, the prompt artifact, stages, requirement taxonomy, the compliance battery, gating policy, repair loop, risks, validation plan |
+| [`docs/design/tag-vocabulary.md`](docs/design/tag-vocabulary.md) | The tag bins: what a bin declares, the UI controls built from them, how selections render into the comma-separated prompt, and how the vocabulary keeps the UI, the prompt and the compliance battery in step |
 | [`docs/research/jev-and-decision-models.md`](docs/research/jev-and-decision-models.md) | What Jev is, what it measures, what the sibling projects already learned, and the open alternatives (including self-hosted) |
 | [`docs/research/music-generation-landscape.md`](docs/research/music-generation-landscape.md) | Open lyrics-to-song and text-to-music models, controllability, and the MIR tools that make audio judgeable as text |
+| [`docs/research/prompting-rules.md`](docs/research/prompting-rules.md) | What the generator's own tutorial says about prompting: the caption/metadata split, structure tags, caption↔lyric consistency, control boundaries, and the three sources of randomness |
+| [`docs/research/suno-prompting-principles.md`](docs/research/suno-prompting-principles.md) | The "universal" prompting ideas the ACE-Step guide points at |
+
+## The tag vocabulary
+
+The tag string is **rendered from selections**, not typed. 29 bins of properties — genre,
+scene, tempo, drums, bass, harmonies, synths, vocals, delivery, production, timbre, mood,
+exclusions and more — with **711 options** between them, each labelled with the exact tag text it
+emits. The lyrics have their own vocabulary too: **59 section tags** across 5 pools, with a
+grammar and the caption/lyric consistency rules.
+
+```bash
+python3 vocabulary/validate_vocabulary.py     # bins, ids, labels, references, limits, tags
+python3 vocabulary/render_tags.py vocabulary/examples/late-night-trap.json
+python3 vocabulary/check_lyrics.py vocabulary/examples/lyrics-late-night-trap.md \
+    --selections=vocabulary/examples/late-night-trap.json
+python3 vocabulary/check_lyrics.py --self-test
+```
+
+Rendering the motivating example yields 13 tags, and the renderer reproduces the fixture
+exactly. It is 13 rather than 14 because the example's `95 BPM` was **moved out of the caption
+into `metadata.bpm`** — the generator's own guide says tempo, key and time signature belong in
+the metadata parameters and should not be written into the caption, so those bins are
+metadata-only.
+
+The lyrics fixtures are the real paired example — the caption and lyrics that ship together with
+the packaged ComfyUI template. Running the checker on them found: no blank line between sections
+(four warnings, against explicit guidance), verse lines at 11–13 syllables against a recommended
+6–10 band, no modifiers or performance tags anywhere, three genuine rhymes missed by the
+spelling-based detector, and heavy technical jargon that the model is likely to slur. That last
+pair is why the design treats a pronunciation lexicon and an independent ASR as real
+dependencies rather than nice-to-haves.
+
+Adding a bin is a four-part change — options, a control, a render position, and a checker —
+because a bin is simultaneously a UI element, a prompt field and a compliance obligation.
+`maps_to` is the field that keeps the three in step, and it is orthogonal to `emits_tag`, so a
+bin like `tempo` can create a requirement without contributing a tag.
 
 ## Schemas
 
@@ -67,14 +105,18 @@ both.
 - [`schemas/song-bundle.schema.json`](schemas/song-bundle.schema.json) — the manifest: content
   hashes, per-stage seeds, dependency edges and environment, so any artifact can be re-derived
   and any output traced to its inputs.
+- [`schemas/tag-vocabulary.schema.json`](schemas/tag-vocabulary.schema.json) — the shape of the
+  bin vocabulary: bins, controls, priorities, render positions, options and cautions.
+- [`schemas/section-tags.schema.json`](schemas/section-tags.schema.json) — the lyric metatag
+  vocabulary and its grammar, including the caption/lyric consistency rules.
 - [`schemas/requirement-spec.schema.json`](schemas/requirement-spec.schema.json) — the typed
   interpretation of a brief, where every requirement names its checker and its provenance.
 - [`schemas/compliance-report.schema.json`](schemas/compliance-report.schema.json) — the
   per-requirement verdict with evidence; `unverified` is distinct from `met`.
 
-The prompt, manifest, spec and report schemas are written. `composition.json` and `lyrics.md`
-are described in the design but do not yet have schemas of their own — by intent, since the
-prompt is the input to the generator and is being specified first.
+The prompt, manifest, vocabulary, spec and report schemas are written. `composition.json` and
+`lyrics.md` are described in the design but do not yet have schemas of their own — by intent,
+since the prompt is the input to the generator and is being specified first.
 
 ## Spikes
 

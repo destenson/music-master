@@ -75,14 +75,18 @@ rather than written by hand.
 
 | Field | Contents | Renders to (ACE-Step 1.5) |
 | --- | --- | --- |
-| `style` | normalised tag vocabulary — genre, era, production, instrumentation, vocal, mood — plus a free-text clause for what the vocabulary cannot hold | `tags` |
+| `style` | bin selections from the tag vocabulary — genre, scene, tempo, instrumentation, vocals, production, mood and more — plus the tags they render to and any free text; see [`tag-vocabulary.md`](tag-vocabulary.md) | `tags` |
 | `metadata` | `bpm`, `key`, `mode`, `timesignature`, `duration_s`, `language` | `bpm`, `keyscale`, `timesignature`, `duration`, `language` |
 | `form` | the section plan, by reference into `composition.json` | section tags in the lyric text |
 | `lyrics` | a reference (path + content hash) to `lyrics.md` | `lyrics` |
 | `negative` | per-field exclusions mirroring the positive fields | `*_negative` fields |
 | `references` | optional reference audio or melody handles | `ReferenceAudio` node / latents |
-| `target` | generator id, weights hash, runner, graph reference, sampler settings, seed, batch size | seed + sampler inputs |
+| `target` | generator id, weights hash, runner, graph reference, task type, sampler settings, inference method, LM sampling settings, seed, batch size | seed + sampler inputs |
 | `notes` | human-readable rationale per choice, for review | — (not sent) |
+
+`metadata` is the **only** place these values belong: the model's own guide says not to write
+tempo, BPM or key into the caption, so the vocabulary makes those bins metadata-only. A value in
+both places is a conflict waiting to happen, and the pre-prompt check looks for it.
 
 Four properties make it worth this much structure:
 
@@ -131,6 +135,11 @@ artifact you keep is the waveform.
   exact graph (for ComfyUI, the node graph itself) and library versions. "Same model" is a
   claim that has to be provable.
 - **Every artifact is regenerable in isolation** from its recorded inputs.
+- **A seed is necessary but not sufficient.** The model has three documented sources of
+  randomness: diffusion initial noise, controlled by `seed`; language-model sampling, when
+  `lm_temperature > 0`; and extra noise when `infer_method = "sde"`. The reproducible lane
+  therefore fixes all three — `ode`, CoT planning disabled, and the LM sampling settings recorded
+  in the target block beside the seed.
 - **Bit-exactness is best-effort, and stated as such.** A fixed seed on the same hardware,
   driver, libraries and graph is expected to reproduce; across those changes it may not. The
   contract is therefore *re-derivable and diffable*, not *bit-identical* — and the measurement
@@ -375,8 +384,26 @@ hard constraints. Then:
 **Code gates, per candidate** — all exactly computable:
 
 - syllable count per line against the per-line target, via a syllable counter with an
-  optional pronunciation lexicon; report max/mean deviation rather than a boolean
-- rhyme scheme against the required scheme, via phoneme endings (CMUdict/Pronouncing)
+  optional pronunciation lexicon; report max/mean deviation rather than a boolean. The target
+  band is the model's own recommendation — 6–10 syllables per line — and lines in the same
+  position across sections should agree within ±1–2 syllables, because the model aligns
+  syllables to beats and a 6-syllable line next to a 14-syllable one produces strange rhythm
+- delivery markup: uppercase inside a line means louder delivery, and parenthesised text means
+  background vocal or harmony. Both are semantic signals, not formatting, so the counter must
+  strip them and the gate must not treat a parenthesised line as a lyric line
+- metatag grammar, via `vocabulary/check_lyrics.py`: known sections only, at most one modifier,
+  and the caption/lyric consistency rules
+- prosody: prefer line endings on open vowels and liquids. The model matches phonemes to melody
+  and will drop or slur consonant clusters
+- cliché: a soft lexical gate over stock phrases, overused nouns and overused rhyme pairs
+  (`vocabulary/lyric-cliches.json`), reported as warnings because freshness is a judgement and
+  the hard verdict belongs to the oracle's cliché score
+- rhyme scheme against the required scheme, via phoneme endings (CMUdict/Pronouncing). Until that
+  lexicon is a dependency the check is spelling-based and **must not gate anything hard**: on the
+  real fixture it missed three genuine rhymes (queue/through, height/right, chain/insane) while
+  still finding the scheme in two sections
+- blank-line separation between sections, which the model's guide asks for so boundaries are
+  unambiguous
 - required and banned words/phrases (including morphological variants)
 - language identification
 - section tag structure and line counts
@@ -437,6 +464,11 @@ having asked for the wrong thing.
 | Ceiling: `duration_s` within the target's max, batch within its max | code | asking for something out of range, before it fails |
 | Policy: excluded artist references absent from positive tags and present in `negative`; banned words absent from tags and lyrics; explicitness terms absent | code | a policy violation introduced upstream of the audio |
 | Hash integrity: `lyrics.sha256` matches `lyrics.md`; `form.composition_sha256` matches `composition.json` | code | a prompt referring to a lyric that has since changed |
+| Metadata hygiene: no BPM, key or time signature appears among the caption tags | code | a value duplicated between caption and metadata, which the model's own guide says to avoid and which can conflict |
+| Lyric metatag grammar: every bracket is a known section, at most one modifier, no index on a section that takes none, no vocal tag inside an instrumental section | code | a tag the model may sing as a lyric, or instructions it will ignore |
+| Caption/lyric consistency, mechanical half: the exactly-decidable rules from the section-tag file | code | contradictory instructions, which the guide says the model degrades on rather than resolves |
+| Caution flags: any selected option whose vocabulary entry carries a `caution` string | code | an option the model documents as unreliable (`5/4`, `7/8`), surfaced before it wastes a render |
+| Do the caption and the lyrics tell the same story — instruments, emotion, vocal description? | Jev, one noul per consistency rule | the semantic half of the same check, which code cannot decide |
 | Does the style description actually convey the requested genre, era and mood? | Jev, one score per axis | tags that are individually plausible but jointly wrong |
 | Do the tag set, the free text and the metadata contradict one another? | Jev noul | "unhurried" tags with a 160 BPM field; a minor key described as "bright" |
 | Does the prompt ask for anything the brief forbade? | Jev noul | a positive tag that reintroduces an excluded element |
@@ -597,6 +629,31 @@ renders them into a caption string, and duration additionally sets the LM's toke
 why tempo, key and meter are `conditioned + verified` and never `conditioned` alone: the
 parameter is a lever, and the measurement is the verdict.
 
+#### Task types, and why the planner is off
+
+ACE-Step exposes more than text-to-music, and "lane" under-specified it. The real control surface
+is a **task type**, and it changes what can be asked for at all:
+
+| Task | What it does | The requirement it serves |
+| --- | --- | --- |
+| `text2music` | generate from caption + lyrics + metadata | the default |
+| `cover` | keep the source's melodic structure — melody, rhythm, chords, orchestration — and change style and detail | "make my demo sound like this" while preserving the song |
+| `repaint` | regenerate a 3–90 s region from its context | fix one bad section without re-rendering the rest |
+| `lego` | add a track to existing audio | "add a bassline to this" |
+| `extract` | separate a track from a mix | stems, and the vocal-only measurement path |
+| `complete` | add accompaniment to a single track | melody or vocal in, arrangement out |
+
+Task type belongs in the prompt's `target` block and in the generator's declared capabilities,
+because a brief that needs `cover` cannot be served by a `text2music`-only generator. That is a
+pre-prompt rejection, not a failed render — the same logic as the range and ceiling checks.
+
+Relatedly, the LM planner is **disabled on the reproducible lane**. It is optional by design: the
+guide says that when you already have a clear planning goal you should skip it, and "you become
+the planner yourself". Music Master is that planner. Leaving it on would rewrite the caption after
+it had been hashed and add a second source of sampling randomness. It stays available as an
+explicit explore mode, where its output is captured as a *candidate* prompt for review rather
+than applied inside the render.
+
 #### Self-evaluation is not verification
 
 ACE-Step 1.5 also advertises audio understanding (extract BPM, key, time signature and a
@@ -654,7 +711,7 @@ generator can do. The right-hand column is what ACE-Step 1.5 actually supports (
 | Hook / payoff | semantic | Jev | verified | noul |
 | Cliché / freshness | semantic | Jev | verified | score |
 | Narrative coherence | semantic | Jev | verified | score |
-| Sung == written lyric | mechanical | needs independent ASR; ACE-Step's own LRC timestamps are self-report | **unverified** | code |
+| Sung == written lyric | mechanical | needs independent ASR; ACE-Step's own LRC timestamps and DiT Lyrics Alignment Score are self-report, usable only as screening | **unverified** | code |
 | Intelligibility | semantic | needs ASR or a captioner | **unverified** | score |
 | Loudness, clipping, true peak | mechanical | pyloudnorm + peak scan | measured | code |
 | Explicitness | policy | lexical list + Jev on the lyric text | verified | noul |
