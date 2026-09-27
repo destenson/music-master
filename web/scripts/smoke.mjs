@@ -238,6 +238,12 @@ const tagBudget = JSON.parse(
 const radioPlan = call("radio_plan", { station_id: "neon-drive", index: 3, seed: 12345 });
 const radioCaption = call("render_selections", radioPlan.selections);
 const nextPlan = call("radio_plan", { station_id: "neon-drive", index: 4, seed: 12346 });
+const instrumentalPlan = call("radio_plan", {
+  station_id: "neon-drive",
+  index: 3,
+  seed: 12345,
+  instrumental: true,
+});
 
 console.log("\nradio:\n");
 check("the browser plans the station the CLI plans", radioPlan, native.radio.plan);
@@ -247,6 +253,16 @@ check(
   "the next song of the station is a different song",
   call("render_selections", nextPlan.selections).string !== radioCaption.string,
   true,
+);
+check(
+  "an instrumental take is marked in its file name",
+  instrumentalPlan.filename_prefix,
+  `radio/neon-drive/${instrumentalPlan.song_id}-instrumental`,
+);
+check(
+  "the take kind does not move the record's directory",
+  instrumentalPlan.artifacts_dir,
+  radioPlan.artifacts_dir,
 );
 
 const radioArtifact = call("artifacts", {
@@ -258,8 +274,8 @@ const radioArtifact = call("artifacts", {
   lyrics: "",
   brief: "",
   artist_references: [],
-  artifacts_dir: `radio/neon-drive/${radioPlan.song_id}`,
-  filename_prefix: `radio/neon-drive/${radioPlan.song_id}`,
+  artifacts_dir: radioPlan.artifacts_dir,
+  filename_prefix: radioPlan.filename_prefix,
 });
 const radioGraph = JSON.parse(radioArtifact.workflow_text);
 check(

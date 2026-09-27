@@ -345,10 +345,10 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       selections: plan.selections,
       lyrics: song.lyrics,
       brief: host.brief(plan.template_id, plan.bpm, plan.selections),
-      // A radio take lives under its station, so the station's songs stay together on disk and a
-      // listener can find them by station rather than by a song id they never chose.
-      artifacts_dir: `radio/${song.stationId}/${plan.song_id}`,
-      filename_prefix: `radio/${song.stationId}/${plan.song_id}`,
+      // The text tier decides where a radio take lives: under its station, with an instrumental
+      // take marked in the file name so the output directory classifies itself.
+      artifacts_dir: plan.artifacts_dir,
+      filename_prefix: plan.filename_prefix,
     });
     if (!artifacts) throw new Error("the graph could not be built");
     song.artifacts = artifacts;

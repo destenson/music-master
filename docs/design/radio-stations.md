@@ -77,8 +77,14 @@ writes to `output/radio/<station>/<song_id>`, and the prompt's `composition_ref`
 
 ```
 ComfyUI/output/radio/<station>/
-  <station>-000_00001_.mp3   # a SaveAudioMP3 take; ComfyUI numbers it so takes never collide
+  <station>-000_00001_.mp3               # a sung take
+  <station>-001-instrumental_00001_.mp3  # an instrumental take, self-classifying
 ```
+
+The take's **file name** carries its kind, because the output directory is browsed and a directory
+of identically named files classifies nothing. The record's directory (`radio/<station>/<song_id>/`,
+which the prompt's refs point into) stays keyed by the song: an empty lyric is part of that song's
+record, not a different song. ComfyUI's own counter keeps takes of the same song from colliding.
 
 ## Checking it
 

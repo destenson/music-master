@@ -164,6 +164,21 @@ def _tempo(station: dict, rng: _Rng) -> float:
     return float(spec)
 
 
+def take_path(station_id: str, song_id: str, instrumental: bool = False) -> dict:
+    """Where a radio take's audio and its companion files belong.
+
+    A station's takes live under the station, and an instrumental take says so in its **file name**,
+    so the two kinds can be told apart in the output directory without opening either. The artifacts
+    directory stays keyed by the song rather than by the take: it is where that song's record would
+    live, and an empty lyric is part of the record, not a different song.
+    """
+    stem = f"{song_id}-instrumental" if instrumental else song_id
+    return {
+        "artifacts_dir": f"radio/{station_id}/{song_id}",
+        "filename_prefix": f"radio/{station_id}/{stem}",
+    }
+
+
 def plan_song(
     doc: dict,
     station_id: str,
@@ -221,16 +236,18 @@ def plan_song(
         selections["hook"] = {"options": ["hook_instrumental"]}
 
     themes = station.get("themes") or []
+    song_id = f"{station_id}-{index:03d}"
     return {
         "station_id": station_id,
         "station_name": station["name"],
-        "song_id": f"{station_id}-{index:03d}",
+        "song_id": song_id,
         "title": f"{station['name']} #{index + 1}",
         "template_id": station["template_id"],
         "bpm": selections["tempo"]["value"],
         "selections": selections,
         "theme": themes[(index + (seed or 0)) % len(themes)] if themes else "",
         "instrumental": bool(instrumental),
+        **take_path(station_id, song_id, bool(instrumental)),
     }
 
 

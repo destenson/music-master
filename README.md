@@ -166,10 +166,11 @@ python3 vocabulary/radio_stations.py --plan=neon-drive --index=3 --seed=42
 The UI's **Radio** tab streams a station: it keeps three songs ready or rendering ahead, starts
 playing as soon as the first is done, and skips to the next ready one. Each song is a full 8-step
 render into `ComfyUI/output/radio/<station>/`, so a station's songs are organised by station and easy
-to find. A lyric is written per song from the station's subject by the same generator the Lyrics tab
-uses; with no model reachable, or with the panel's **instrumental** box ticked, the take is planned
-and captioned as an instrumental instead. The current song can be downloaded, and the songs played on
-a station are listed there while the browser remembers them.
+to find, and an instrumental take says so in its file name. A lyric is written per song from the
+station's subject by the same generator the Lyrics tab uses; with no model reachable, or with the
+panel's **instrumental** box ticked, the take is planned and captioned as an instrumental instead.
+The current song can be downloaded, and the songs played on a station are listed there while the
+browser remembers them.
 
 ## The core package
 

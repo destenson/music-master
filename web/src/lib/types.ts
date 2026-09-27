@@ -272,4 +272,8 @@ export interface RadioPlan {
   selections: Selections;
   theme: string;
   instrumental: boolean;
+  /** Where the take's companion files belong. Keyed by the song, not by the kind of take. */
+  artifacts_dir: string;
+  /** The audio's path under ComfyUI's output directory; an instrumental take says so in the name. */
+  filename_prefix: string;
 }
