@@ -13,7 +13,8 @@
 import type { OutputFile } from "./comfy";
 
 export interface TakeName {
-  index: number;
+  /** The take number the renderer gave the file, which is also the order it was rendered in. */
+  order: number;
   instrumental: boolean;
 }
 
@@ -29,17 +30,21 @@ function escape(value: string): string {
 }
 
 /**
- * The position and kind in a take's file name, or null when it is not this station's take.
+ * The kind and number in a take's file name, or null when it is not this station's take.
  *
  * The station id is anchored at the start rather than searched for, because one station's id can be
  * a prefix of another's — `neon-drive` and `neon-drive-b-sides` — and a loose match would file one
  * station's songs under the other.
+ *
+ * The number is the renderer's own counter. It counts per prefix, and an instrumental take is a
+ * different prefix, so a sung and an instrumental take can share a number; the kind in the name is
+ * what tells them apart.
  */
 export function parseTakeName(stationId: string, filename: string): TakeName | null {
-  const pattern = new RegExp(`^${escape(stationId)}-(\\d+)(-instrumental)?_\\d+\\.[A-Za-z0-9]+$`);
+  const pattern = new RegExp(`^${escape(stationId)}(-instrumental)?_(\\d+)\\.[A-Za-z0-9]+$`);
   const match = pattern.exec(filename);
   if (!match) return null;
-  return { index: Number(match[1]), instrumental: Boolean(match[2]) };
+  return { order: Number(match[2]), instrumental: Boolean(match[1]) };
 }
 
 /** The key a take is unique by in the renderer's output tree. */

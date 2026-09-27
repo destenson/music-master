@@ -32,7 +32,7 @@ import {
 import { generate, ollamaBase } from "./ollama";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
-import { parseTakeName, takeKey, takesFromHistory } from "./takes";
+import { parseTakeName, takeKey, takesFromHistory, type TakeName } from "./takes";
 import type { Artifacts, RadioPlan, RenderResult, Selections } from "./types";
 
 export type RadioStatus =
@@ -67,6 +67,8 @@ export interface RadioSong {
   artifacts: Artifacts | null;
   error: string | null;
   at: number;
+  /** When the song entered the pipeline, so the panel can show how long a stage has been running. */
+  startedAt: number;
   abort: AbortController;
 }
 
@@ -124,6 +126,54 @@ const HISTORY_KEY = "mm.radio.history";
 const MODEL_KEY = "mm.ollama.model";
 const HISTORY_PER_STATION = 24;
 const MAX_CONSECUTIVE_FAILURES = 3;
+/**
+ * How long a lyric may take before the take gives up and goes instrumental.
+ *
+ * A model is optional, so it must never be able to stall the station: without a cap, one request
+ * that never answers holds its buffer slot forever and nothing behind it ever plays.
+ */
+const LYRIC_TIMEOUT_MS = 150_000;
+
+/** A promise that gives up after `ms`. The work is aborted by `onTimeout`, which knows what to cancel. */
+function withTimeout<T>(
+  work: Promise<T>,
+  ms: number,
+  message: string,
+  onTimeout: () => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      onTimeout();
+      reject(new Error(message));
+    }, ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+/**
+ * Lyric calls run one at a time.
+ *
+ * The buffer fills several songs at once, and a cloud model asked for several lyrics in parallel
+ * answers them slowly, inconsistently, or not at all. The render is the long pole anyway, so there
+ * is nothing to win by asking for them together — and one request at a time is what keeps the
+ * lyric stage from being the thing that stalls a station.
+ */
+let lyricQueue: Promise<unknown> = Promise.resolve();
+
+function serializeLyrics<T>(work: () => Promise<T>): Promise<T> {
+  const next = lyricQueue.then(work, work);
+  lyricQueue = next.catch(() => undefined);
+  return next;
+}
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -248,6 +298,7 @@ function createSong(stationId: string): RadioSong {
     artifacts: null,
     error: null,
     at: 0,
+    startedAt: Date.now(),
     abort: new AbortController(),
   };
 }
@@ -279,6 +330,7 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
     artifacts: null,
     error: null,
     at: take.at,
+    startedAt: 0,
     abort: new AbortController(),
   };
 }
@@ -332,16 +384,21 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       song.lyricSource = "instrumental";
     } else {
       song.status = "writing";
+      // Its own controller, so a timeout can abandon this one request without looking like a stop.
+      const lyric = new AbortController();
+      const stopIt = (): void => lyric.abort();
+      song.abort.signal.addEventListener("abort", stopIt, { once: true });
       try {
         const brief = host.brief(plan.template_id, plan.bpm, plan.selections);
         const prompt = buildPrompt({ brief, caption: song.caption, theme: plan.theme });
-        const text = await generate({
-          model: radioState.model,
-          base: ollamaBase(),
-          prompt,
-          // `signal` on the request, so stopping the radio abandons a slow model call.
-          signal: song.abort.signal,
-        });
+        const text = await withTimeout(
+          serializeLyrics(() =>
+            generate({ model: radioState.model, base: ollamaBase(), prompt, signal: lyric.signal }),
+          ),
+          LYRIC_TIMEOUT_MS,
+          "the lyric model did not answer in time",
+          stopIt,
+        );
         if (token !== session) return;
         song.lyrics = cleanLyric(text);
         if (!song.lyrics) throw new Error("the model wrote nothing");
@@ -368,6 +425,8 @@ async function produce(song: RadioSong, token: number): Promise<void> {
         radioState.notice = `no lyric model reachable (${
           cause instanceof Error ? cause.message : String(cause)
         }); playing instrumentally`;
+      } finally {
+        song.abort.signal.removeEventListener("abort", stopIt);
       }
     }
 
@@ -491,16 +550,20 @@ function hardStop(): void {
  *
  * The saved list is the durable one; the renderer's history is what catches takes the page never
  * recorded — one this browser had not played yet, or one rendered from somewhere else. They are
- * merged by file, so a take both know about is not queued twice.
+ * merged by file, so a take both know about is queued once, and ordered by the renderer's own
+ * numbering rather than by either list's idea of it.
  */
 async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
-  const byFile = new Map<string, SavedRadioSong>();
-  const remember = (take: SavedRadioSong): void => {
-    const key = take.file ? takeKey(take.file) : take.id;
-    if (!byFile.has(key)) byFile.set(key, take);
+  const found = new Map<string, { take: SavedRadioSong; name: TakeName }>();
+  const remember = (key: string, take: SavedRadioSong, name: TakeName): void => {
+    if (!found.has(key)) found.set(key, { take, name });
   };
 
-  for (const saved of radioState.history) remember(saved);
+  for (const saved of radioState.history) {
+    const parsed = saved.file ? parseTakeName(stationId, saved.file.filename) : null;
+    if (!saved.file || !parsed) continue;
+    remember(takeKey(saved.file), saved, parsed);
+  }
 
   try {
     const history = await fetchHistory(renderQueue.target);
@@ -509,26 +572,32 @@ async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
       const parsed = parseTakeName(stationId, take.filename);
       if (!parsed) continue;
       const file = { filename: take.filename, subfolder: take.subfolder, type: take.type };
-      remember({
+      remember(takeKey(file), {
         id: `found:${takeKey(file)}`,
-        index: parsed.index,
+        index: 0,
         stationId,
-        title: `${stationId} #${parsed.index + 1}`,
+        title: `${stationId} #${parsed.order}`,
         seed: take.seed ?? 0,
         caption: take.caption,
         theme: "",
         instrumental: parsed.instrumental,
         file,
         at: 0,
-      });
+      }, parsed);
     }
   } catch {
     /* the renderer's history is a bonus; what the page saved is the durable record */
   }
 
-  return [...byFile.values()].sort(
-    (a, b) => a.index - b.index || (a.file?.filename ?? "").localeCompare(b.file?.filename ?? ""),
-  );
+  return [...found.values()]
+    .sort(
+      (a, b) =>
+        a.name.order - b.name.order ||
+        (a.take.file?.filename ?? "").localeCompare(b.take.file?.filename ?? ""),
+    )
+    // The queue orders by this number, so a recovered take is numbered by the render order its file
+    // name already carries rather than by a second counter of our own.
+    .map(({ take }, index) => ({ ...take, index }));
 }
 
 /**

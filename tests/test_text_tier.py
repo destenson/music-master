@@ -433,18 +433,21 @@ class RadioTest(unittest.TestCase):
         for bin_id in ("vocal_delivery", "backing_vocal", "vocal_fx", "lyric_theme"):
             self.assertNotIn(bin_id, plan["selections"])
 
-    def test_an_instrumental_take_says_so_in_its_file_name(self) -> None:
-        # The output directory has to classify itself: an instrumental take is marked in the file
-        # name, and the record's directory stays keyed by the song rather than by the take.
+    def test_a_take_name_leaves_the_number_to_the_renderer(self) -> None:
+        # ComfyUI appends its own take number to whatever prefix it is given, counting past what is
+        # already in the folder, so the prefix stops at the station and the marker that says
+        # instrumental. The record's directory keeps the song's position, which the audio's name
+        # no longer carries.
         sung = radio.plan_song(self.doc, self.station, 1, seed=5, vocab=self.vocab)
         plain = radio.plan_song(
             self.doc, self.station, 1, seed=5, vocab=self.vocab, instrumental=True
         )
-        self.assertEqual(sung["filename_prefix"], f"radio/{self.station}/{sung['song_id']}")
+        self.assertEqual(sung["filename_prefix"], f"radio/{self.station}/{self.station}")
         self.assertNotIn("instrumental", sung["filename_prefix"])
         self.assertEqual(
-            plain["filename_prefix"], f"radio/{self.station}/{plain['song_id']}-instrumental"
+            plain["filename_prefix"], f"radio/{self.station}/{self.station}-instrumental"
         )
+        self.assertEqual(sung["artifacts_dir"], f"radio/{self.station}/{sung['song_id']}")
         self.assertEqual(plain["artifacts_dir"], sung["artifacts_dir"])
 
     def test_the_form_tag_names_the_stations_template(self) -> None:

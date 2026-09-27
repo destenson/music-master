@@ -25,6 +25,7 @@
     startRadio,
     stopRadio,
     upNext,
+    type RadioSong,
     type RadioStatus,
   } from "./radio.svelte";
   import type { RadioStation } from "./types";
@@ -45,6 +46,16 @@
   const current = $derived(nowPlaying());
   const next = $derived(upNext());
   const station = $derived(stations.find((entry) => entry.id === radioState.stationId) ?? null);
+
+  /** A one-second tick, so a stage that is slow reads as slow rather than as stuck. */
+  let now = $state(Date.now());
+  const RUNNING = new Set<RadioStatus>(["planning", "writing", "queued", "rendering"]);
+
+  function elapsed(song: RadioSong): string {
+    if (!song.startedAt || !RUNNING.has(song.status)) return "";
+    const seconds = Math.round((now - song.startedAt) / 1000);
+    return seconds >= 1 ? `${seconds}s` : "";
+  }
 
   const families = $derived.by(() => {
     const query = filter.trim().toLowerCase();
@@ -90,24 +101,37 @@
 
   onMount(() => {
     void refreshModels();
+    const timer = window.setInterval(() => (now = Date.now()), 1000);
+    return () => window.clearInterval(timer);
   });
 
-  // Follow the engine's current song: load it, and play it while the radio is on. `play()` is
-  // rejected until the page has been clicked, so the rejection is surfaced as a play button rather
-  // than as silence.
+  // Follow the engine's current song, and only that song. The player is cleared when there is
+  // nothing current, because a leftover source would let starting a station with an empty queue play
+  // a take that is not in it — which reads as "playing" while the panel says it is still buffering.
   $effect(() => {
     const song = current;
     const url = song?.url ?? null;
     if (!audio) return;
-    if (url && url !== loadedUrl) {
+
+    if (!url) {
+      if (loadedUrl !== null) {
+        loadedUrl = null;
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+      }
+      wasOn = radioState.on;
+      return;
+    }
+
+    const fresh = url !== loadedUrl;
+    if (fresh) {
       loadedUrl = url;
       audio.src = url;
       audio.load();
-      if (radioState.on) playCurrent();
-    } else if (radioState.on && !wasOn) {
-      playCurrent();
     }
-    if (!radioState.on && wasOn) audio.pause();
+    // Play a new song, or a song already loaded when the radio is switched on.
+    if (radioState.on && (fresh || !wasOn)) playCurrent();
     wasOn = radioState.on;
   });
 
@@ -350,10 +374,12 @@
           <div class="section-title">Up next</div>
           {#if next.length}
             {#each next as song (song.id)}
+              {@const age = elapsed(song)}
               <div class="row queue-row">
                 <span class="small muted mono">{song.index}</span>
                 <span class="small">{song.title}</span>
                 <span class="spacer" style="flex:1"></span>
+                {#if age}<span class="small muted">{age}</span>{/if}
                 <span class="chip" class:warn={song.status === "failed"}>{STATUS[song.status]}</span>
               </div>
             {/each}

@@ -167,12 +167,16 @@ def _tempo(station: dict, rng: _Rng) -> float:
 def take_path(station_id: str, song_id: str, instrumental: bool = False) -> dict:
     """Where a radio take's audio and its companion files belong.
 
-    A station's takes live under the station, and an instrumental take says so in its **file name**,
-    so the two kinds can be told apart in the output directory without opening either. The artifacts
-    directory stays keyed by the song rather than by the take: it is where that song's record would
-    live, and an empty lyric is part of the record, not a different song.
+    The audio prefix names the station and, for an instrumental take, says so — and stops there.
+    ComfyUI appends its own take number to whatever prefix it is given (`<prefix>_00001.mp3`, counting
+    past what is already in the folder), so writing a number of ours beside it would put two counters
+    on one file.
+
+    The artifacts directory is keyed by the song instead. It is where that song's record would live,
+    the renderer never writes it, and a song's kind does not change its identity — so the song's
+    position belongs here even though it does not belong in the audio's name.
     """
-    stem = f"{song_id}-instrumental" if instrumental else song_id
+    stem = f"{station_id}-instrumental" if instrumental else station_id
     return {
         "artifacts_dir": f"radio/{station_id}/{song_id}",
         "filename_prefix": f"radio/{station_id}/{stem}",

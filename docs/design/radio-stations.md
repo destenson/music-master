@@ -66,7 +66,11 @@ cannot list ComfyUI's output directory; the files themselves are the durable rec
 The lyrics come from the same generator the Lyrics tab uses, with the station's subject as the theme
 and the station's own brief as the contract. A model is optional: with none chosen or reachable, the
 song is re-planned as an **instrumental** and the caption stops describing a singer who is not
-there. The panel's **instrumental** checkbox skips the model entirely.
+there. The panel's **instrumental** checkbox skips the model entirely. Because it is optional, the
+lyric call is bounded rather than open-ended: it is capped at 150 s and runs one at a time — the
+buffer fills several songs at once, and a cloud model answers a parallel burst slowly — and a call
+that times out or fails yields an instrumental take rather than costing the song its place in the
+queue. The panel shows how long each in-progress song has been in its stage.
 
 ## Starting on what the station already has
 
@@ -81,9 +85,9 @@ takes are found **before** anything new is queued, from two places:
 The two are merged by file, so a take both know about is queued once, and a file whose name is not
 this station's take naming is ignored. One slot is deliberately left for something new: the station
 starts on what it has and renders its next song behind that, so it neither replays a whole repertoire
-nor stops producing. The take's position and kind come from its **file name**, which is why the name
-carries them ([`takes.ts`](../../web/src/lib/takes.ts)); the caption and seed are read back from the
-graph the renderer kept.
+nor stops producing. A take's kind comes from a marker in its **file name** and its number from the
+renderer's counter in the same name ([`takes.ts`](../../web/src/lib/takes.ts)), which is what orders
+a station's takes; the caption and seed are read back from the graph the renderer kept.
 
 ComfyUI's history has recorded that graph in two shapes a version apart — the bare API graph, and the
 queue tuple `[number, prompt_id, graph, extra_data, outputs]` — so both are read rather than betting
@@ -93,20 +97,21 @@ live server.
 ## Output layout
 
 A radio take is not a repository song, so it does not pretend to live in `songs/<id>/`. The graph
-writes to `output/radio/<station>/<song_id>`, and the prompt's `composition_ref`, `lyrics.ref`,
-`graph_ref` and `provenance.builder` point into `radio/<station>/<song_id>/` with it — one change to
-`prompt.build`, and the default for a song built by hand is unchanged byte for byte.
+writes under the station, and the prompt's `composition_ref`, `lyrics.ref`, `graph_ref` and
+`provenance.builder` point into `radio/<station>/<song_id>/` — the song's record, which the renderer
+never writes. That split is one change to `prompt.build`, and the default for a song built by hand is
+unchanged byte for byte.
 
 ```
 ComfyUI/output/radio/<station>/
-  <station>-000_00001_.mp3               # a sung take
-  <station>-001-instrumental_00001_.mp3  # an instrumental take, self-classifying
+  <station>_00001.mp3               # a sung take
+  <station>-instrumental_00001.mp3  # an instrumental take, self-classifying
 ```
 
-The take's **file name** carries its kind, because the output directory is browsed and a directory
-of identically named files classifies nothing. The record's directory (`radio/<station>/<song_id>/`,
-which the prompt's refs point into) stays keyed by the song: an empty lyric is part of that song's
-record, not a different song. ComfyUI's own counter keeps takes of the same song from colliding.
+The **file name** carries the station and, for an instrumental take, says so — and carries no number
+of ours, because ComfyUI appends its own (`<prefix>_00001.mp3`, counting past what is already in the
+folder) and a second counter beside it would number one file twice. The record's directory stays
+keyed by the song, because an empty lyric is part of that song's record rather than a different song.
 
 ## Checking it
 

@@ -259,7 +259,7 @@ check(
 check(
   "an instrumental take is marked in its file name",
   instrumentalPlan.filename_prefix,
-  `radio/neon-drive/${instrumentalPlan.song_id}-instrumental`,
+  "radio/neon-drive/neon-drive-instrumental",
 );
 check(
   "the take kind does not move the record's directory",
@@ -283,7 +283,7 @@ const radioGraph = JSON.parse(radioArtifact.workflow_text);
 check(
   "a radio take lands in its station's directory",
   radioGraph["10"].inputs.filename_prefix,
-  `radio/neon-drive/${radioPlan.song_id}`,
+  "radio/neon-drive/neon-drive",
 );
 check(
   "a radio take names its own artifacts directory",
@@ -495,31 +495,36 @@ check("the version file names a non-empty build", (version?.build ?? "").length 
 // prefix of another and a loose match would file one station's songs under the other.
 
 console.log("\ntake names:\n");
-check("a sung take parses", parseTakeName("neon-drive", "neon-drive-000_00001.mp3"), {
-  index: 0,
+check("a take carries the renderer's number", parseTakeName("neon-drive", "neon-drive_00003.mp3"), {
+  order: 3,
   instrumental: false,
 });
 check(
-  "an instrumental take parses",
-  parseTakeName("neon-drive", "neon-drive-005-instrumental_00001.mp3"),
-  { index: 5, instrumental: true },
+  "an instrumental take says so",
+  parseTakeName("neon-drive", "neon-drive-instrumental_00002.mp3"),
+  { order: 2, instrumental: true },
 );
 check(
   "a hyphenated station id parses",
-  parseTakeName("reggaeton-block-party", "reggaeton-block-party-012_00003.mp3"),
-  { index: 12, instrumental: false },
+  parseTakeName("reggaeton-block-party", "reggaeton-block-party_00011.mp3"),
+  { order: 11, instrumental: false },
 );
 check(
   "another station's take is not this station's",
-  parseTakeName("neon-drive", "trap-after-dark-001_00001.mp3"),
+  parseTakeName("neon-drive", "trap-after-dark_00001.mp3"),
   null,
 );
 check(
   "a station id that is a prefix does not match",
-  parseTakeName("neon-drive", "neon-drive-b-sides-001_00001.mp3"),
+  parseTakeName("neon-drive", "neon-drive-b-sides_00001.mp3"),
   null,
 );
 check("a file that is not a take is refused", parseTakeName("neon-drive", "prompt.json"), null);
+check(
+  "a name that carried a number of ours is not a take",
+  parseTakeName("neon-drive", "neon-drive-005-instrumental_00001.mp3"),
+  null,
+);
 
 // The renderer's history is the other place a station's takes can be found, and its shape has
 // changed between versions. Both shapes are pinned here, along with the rules that keep a temp file
@@ -604,6 +609,51 @@ check(
   false,
 );
 check("an empty history is not an error", takesFromHistory(null, "radio/neon-drive"), []);
+
+// --- Reading a model stream ---------------------------------------------------------------------
+//
+// ollama streams NDJSON and says when it is finished. The read must end on that marker rather than on
+// the socket closing: a proxy that holds the connection open otherwise leaves the caller waiting for
+// text that already arrived, which is how a radio song sits at "writing lyrics" forever with nothing
+// behind it ever playing.
+
+console.log("\nmodel stream:\n");
+const realFetch = globalThis.fetch;
+const encoder = new TextEncoder();
+const chunksOf = (chunks, close) =>
+  new Response(
+    new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        if (close) controller.close();
+        // Otherwise deliberately left open: the model said it was done.
+      },
+    }),
+  );
+
+globalThis.fetch = async () =>
+  chunksOf(['{"response":"[Verse 1]\\n","done":false}\n', '{"response":"a line","done":true}\n'], false);
+const raced = await Promise.race([
+  generate({ model: "m", base: "http://example.invalid", prompt: "p" }),
+  new Promise((resolve) => setTimeout(() => resolve("__timeout__"), 3000)),
+]);
+check("a stream that says done is not waited on to close", raced, "[Verse 1]\na line");
+
+globalThis.fetch = async () => chunksOf(['{"response":"last","done":true}'], true);
+check(
+  "a final line without a newline is still read",
+  await generate({ model: "m", base: "http://example.invalid", prompt: "p" }),
+  "last",
+);
+
+globalThis.fetch = async () =>
+  chunksOf(['{"response":"partial","done":false}\n', '{"response":" tail"'], true);
+check(
+  "a truncated final line is dropped rather than fatal",
+  await generate({ model: "m", base: "http://example.invalid", prompt: "p" }),
+  "partial",
+);
+globalThis.fetch = realFetch;
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //

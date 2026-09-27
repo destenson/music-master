@@ -70,7 +70,14 @@ export interface GenerateRequest {
   onText?: (text: string) => void;
 }
 
-/** Stream a completion, returning the whole text. Throws on an ollama-reported error. */
+/**
+ * Stream a completion, returning the whole text. Throws on an ollama-reported error.
+ *
+ * The stream itself says when it is finished, and that is what ends the read. Waiting for the
+ * connection to close instead would hang forever behind anything that keeps it open — a proxy, a
+ * load balancer, an idle keep-alive — and the caller would never learn that the text it asked for
+ * had already arrived.
+ */
 export async function generate({
   model,
   prompt,
@@ -93,6 +100,18 @@ export async function generate({
   let buffer = "";
   let text = "";
 
+  /** Read one NDJSON line; true when it was the model's last. */
+  const consume = (line: string): boolean => {
+    if (!line.trim()) return false;
+    const chunk = JSON.parse(line) as { response?: string; error?: string; done?: boolean };
+    if (chunk.error) throw new Error(chunk.error);
+    if (chunk.response) {
+      text += chunk.response;
+      onText?.(text);
+    }
+    return Boolean(chunk.done);
+  };
+
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -100,14 +119,17 @@ export async function generate({
     const lines = buffer.split("\n");
     buffer = lines.pop() ?? "";
     for (const line of lines) {
-      if (!line.trim()) continue;
-      const chunk = JSON.parse(line) as { response?: string; error?: string };
-      if (chunk.error) throw new Error(chunk.error);
-      if (chunk.response) {
-        text += chunk.response;
-        onText?.(text);
-      }
+      if (!consume(line)) continue;
+      await reader.cancel().catch(() => undefined);
+      return text;
     }
+  }
+
+  // A last line without a trailing newline is still a line. A partial one is not, and is dropped.
+  try {
+    consume(buffer);
+  } catch {
+    /* an incomplete trailing fragment is not an error worth failing a generation over */
   }
   return text;
 }
