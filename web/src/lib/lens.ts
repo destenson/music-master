@@ -220,6 +220,28 @@ export function structureMarks(pools: TagPools): Extension {
 
 // --- Assembling the lens ----------------------------------------------------------------------
 
+/**
+ * The editor is dark, and CodeMirror has to be told that.
+ *
+ * Its base theme carries `"&light .cm-content": { caretColor: "black" }` and the matching white for
+ * dark. Styling the editor dark in CSS alone leaves CodeMirror believing the theme is light, so it
+ * paints a black caret on a near-black background — an invisible insertion point. `dark: true` flips
+ * that branch; the cursor and selection are set explicitly so they read as the accent rather than as
+ * default white.
+ */
+export function editorTheme(): Extension {
+  return EditorView.theme(
+    {
+      ".cm-cursor, .cm-dropCursor": { borderLeft: "2px solid var(--accent)" },
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": {
+        backgroundColor: "color-mix(in srgb, var(--accent) 28%, transparent)",
+      },
+      ".cm-activeLine": { backgroundColor: "color-mix(in srgb, var(--accent) 7%, transparent)" },
+    },
+    { dark: true },
+  );
+}
+
 export function createLens(options: {
   pools: TagPools;
   check: (text: string) => Finding[];

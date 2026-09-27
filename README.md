@@ -232,15 +232,16 @@ loopback ComfyUI however it is configured: it has to reach ComfyUI at a non-loop
 `--enable-cors-header` set for the page. Comfy Cloud needs a paid subscription, and an API key typed
 there is held in the tab's session storage rather than saved, because a page cannot keep a secret.
 
-A **new take** is the same prompt with a different seed; a **new song** is a blank draft you name,
-with empty selections and no words, that you export and commit — the same loop as everything else,
-since a page cannot write a song directory.
+A render picks a **fresh seed** by default, so each one is a new take. The same seed with the same
+inputs *is* the same take — of the eighteen takes on disk, the only two whose graphs matched came out
+byte-identical, and every other pair differed because something in the inputs had. So holding the seed
+is a deliberate act, and the checkbox next to the button is what does it: it keeps the arrangement put
+while the caption varies, which is the only way to hear what a caption change actually did rather than
+hearing it mixed with whatever a different seed would have produced anyway. A **new song** is a blank
+draft you name, that you export and commit — the same loop as everything else, since a page cannot
+write a song directory.
 
-**State is browser-local by design.** Selections, the lyric, the template, the tempo and the view are
-kept in `localStorage` so a reload does not throw an edit away, and a **local draft** marker with
-one-click revert appears whenever the working state differs from what the repository holds. The
-marker is there because the distinction is real: the song directory is the record, and a page cannot
-write to it.
+**State is browser-local by design.** The working state — selections, lyric, template, tempo, seed, brief — is autosaved to `localStorage` so a reload does not throw an edit away, and any number of **named drafts** can be saved, loaded and deleted from the top bar, so several directions can exist at once. A `differs from repo` marker with one-click revert appears whenever the working state no longer matches the files in `songs/<id>/`. The marker is there because the distinction is real: the song directory is the record, and a page cannot write to it.
 
 **The model server is a setting, not an assumption.** It defaults to this machine's daemon. A page
 served from somewhere else — GitHub Pages, say — reaches it over CORS, which ollama refuses by
@@ -311,6 +312,21 @@ since the prompt is the input to the generator and is being specified first.
   cd spikes/pyodide_text_core && npm install
   node parity.mjs      # correctness, byte-for-byte
   node latency.mjs     # is the per-caret check inside a frame budget?
+  ```
+
+- [`spikes/take_similarity.py`](spikes/take_similarity.py) — reads the graph ComfyUI embeds in each
+  rendered MP3, so the requested tempo, seed and caption come from the artifact itself rather than
+  from a note about it, and measures the audio against them. It exists to test an ear's claim that
+  the takes of one song are variations of a single underlying track. Three findings: the requested
+  tempo **does** take effect (112 asked, 107.7–112.3 measured; 92 asked, 92.3 measured); the beat
+  tracker's octave ambiguity is not rare, at 3 of 17 takes measuring exactly double; and onset-envelope
+  agreement runs about 0.15–0.20 within a tempo against 0.04 across tempos, so the takes are
+  distinguishable — but 14 of the 17 shared one seed, and a seed is what fixes a take's underlying
+  structure, so the caption was varying the surface of a common arrangement.
+
+  ```bash
+  NUMBA_CACHE_DIR=spikes/.numba \
+    /home/dennis/src/comfyanonymous--ComfyUI/.venv/bin/python spikes/take_similarity.py
   ```
 
 ## Target model

@@ -38,6 +38,8 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 4px;
   padding: 3px 6px;
+  /* The insertion point in a text field is information; make it impossible to lose. */
+  caret-color: var(--accent);
 }
 
 button {
@@ -46,6 +48,19 @@ button {
 
 button:hover {
   border-color: var(--accent);
+}
+
+/* The quick render in the top bar is the one action worth finding without looking. */
+button.primary {
+  background: color-mix(in srgb, var(--accent) 20%, var(--panel-2));
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  font-weight: 600;
+  padding: 3px 12px;
+}
+
+button.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 input[type="checkbox"] {
@@ -86,11 +101,31 @@ code,
 .topbar {
   display: flex;
   align-items: baseline;
-  gap: 16px;
-  padding: 10px 16px;
+  gap: 12px;
+  /* The draft controls and the repo indicator both live up here, so let it wrap rather than crush. */
+  flex-wrap: wrap;
+  padding: 8px 16px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
   flex: none;
+}
+
+.drafts {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.drafts select {
+  max-width: 11rem;
+}
+
+.drafts input.draft-name {
+  width: 7.5rem;
+}
+
+.drafts button {
+  padding: 3px 8px;
 }
 
 .topbar h1 {

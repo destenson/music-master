@@ -16,8 +16,11 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { loadPyodide } from "pyodide";
 import { parseFindings, slotFor } from "../src/lib/lens.ts";
-import { presetFor } from "../src/lib/comfy.ts";
-import { stable } from "../src/lib/draft.ts";
+import { presetFor, freshSeed } from "../src/lib/comfy.ts";
+import { freeName, stable } from "../src/lib/draft.ts";
+import { editorTheme } from "../src/lib/lens.ts";
+import { EditorState } from "@codemirror/state";
+import { EditorView } from "@codemirror/view";
 import { generate } from "../src/lib/ollama.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
 
@@ -163,6 +166,20 @@ check(
   song.seed + 1,
 );
 check("a new seed changes the prompt hash", reseeded.prompt_sha256 !== artifact.prompt_sha256, true);
+// Why a render picks a fresh seed: the same graph reproduces the same take. Of the eighteen takes on
+// disk, the only two sharing a graph came out byte-identical, and every other pair differed because
+// something in the inputs had. A pinned seed re-renders one take rather than making a new one.
+check(
+  "a different seed makes a different graph, so each take has its own address",
+  reseeded.workflow_text !== artifact.workflow_text,
+  true,
+);
+const generated = freshSeed();
+check(
+  "a generated seed is usable as a ComfyUI seed",
+  Number.isInteger(generated) && generated > 0 && generated <= 0x7fffffff,
+  true,
+);
 
 const blank = call("artifacts", {
   song_id: "untitled-song",
@@ -287,6 +304,27 @@ check("arrays keep their order", stable({ a: [1, 2, 3] }), '{"a":[1,2,3]}');
 check("values survive the round trip", JSON.parse(stable({ a: { b: [1, "x", null] } })), {
   a: { b: [1, "x", null] },
 });
+
+// --- The editor's theme, and draft names ------------------------------------------------------
+//
+// The caret was invisible because CodeMirror believed the theme was light: its base theme sets
+// `caret-color: black` for `&light` and white for `&dark`, so a dark editor it thinks is light gets
+// a black caret. Asserting the facet is asserting the fix.
+
+console.log("\neditor and drafts:\n");
+check(
+  "CodeMirror is told the theme is dark",
+  EditorState.create({ extensions: [editorTheme()] }).facet(EditorView.darkTheme),
+  true,
+);
+check("an unused draft name is left alone", freeName("chorus idea", []), "chorus idea");
+check("a taken name gets a suffix", freeName("chorus idea", ["chorus idea"]), "chorus idea 2");
+check(
+  "a name taken twice keeps counting",
+  freeName("chorus idea", ["chorus idea", "chorus idea 2"]),
+  "chorus idea 3",
+);
+check("an empty name still gets one", freeName("   ", []), "draft");
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //

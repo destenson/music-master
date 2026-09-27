@@ -1,13 +1,11 @@
 <script lang="ts">
   import Collapsible from "./Collapsible.svelte";
-  import { freshSeed } from "./comfy";
   import type { StructureTemplate } from "./types";
 
   let {
     songId = $bindable(),
     templateId = $bindable(),
     bpm = $bindable(),
-    seed = $bindable(),
     artists = $bindable(),
     brief = $bindable(),
     templates,
@@ -16,7 +14,6 @@
     songId: string;
     templateId: string;
     bpm: number;
-    seed: number;
     artists: string;
     brief: string;
     templates: StructureTemplate[];
@@ -26,7 +23,7 @@
 
 <Collapsible
   title="Song"
-  summary={`${songId} · ${bpm} BPM · seed ${seed}`}
+  summary={`${songId} · ${bpm} BPM`}
   storageKey="mm.panel.song"
   defaultOpen
 >
@@ -48,17 +45,6 @@
       <input type="number" style="width:4.5rem" min="40" max="220" bind:value={bpm} />
       BPM
     </label>
-  </div>
-
-  <div class="row">
-    <label class="row small">
-      seed
-      <input type="number" style="width:7rem" bind:value={seed} />
-    </label>
-    <button onclick={() => (seed = freshSeed())}>new take — new seed</button>
-    <span class="muted small">
-      the seed is in the graph, so a new one is a different render of the same prompt
-    </span>
   </div>
 
   <label class="row small">

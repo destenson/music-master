@@ -3,9 +3,9 @@
   import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
   import { bracketMatching, indentOnInput } from "@codemirror/language";
   import { EditorState } from "@codemirror/state";
-  import { EditorView, keymap } from "@codemirror/view";
+  import { EditorView, drawSelection, keymap } from "@codemirror/view";
   import { forceLinting } from "@codemirror/lint";
-  import { createLens, type Finding } from "./lens";
+  import { createLens, editorTheme, type Finding } from "./lens";
   import type { TagPools } from "./types";
 
   let {
@@ -31,6 +31,10 @@
         extensions: [
           history(),
           keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          // Draws the cursor and selection rather than leaving them to the browser, so both follow
+          // the theme below instead of the platform's own colours.
+          drawSelection(),
+          editorTheme(),
           bracketMatching(),
           indentOnInput(),
           // Reads the prop at call time rather than capturing it: the parent's caption and template

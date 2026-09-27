@@ -10,9 +10,21 @@
   import Timeline from "./lib/Timeline.svelte";
   import { freshSeed } from "./lib/comfy";
   import { asset, loadStaticData, MusicMasterCore, type StaticData } from "./lib/core";
-  import { clear as clearDraft, read as readDraft, stable, write as writeDraft } from "./lib/draft";
+  import {
+    clear as clearDraft,
+    deleteNamed,
+    freeName,
+    listSaved,
+    loadNamed,
+    read as readDraft,
+    saveNamed,
+    stable,
+    write as writeDraft,
+    type DraftSummary,
+  } from "./lib/draft";
   import { parseFindings, type Finding } from "./lib/lens";
   import { buildPrompt } from "./lib/prompt";
+  import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
   import * as S from "./lib/selection";
   import type { Artifacts, LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
 
@@ -34,6 +46,20 @@
   }
 
   type View = "builder" | "lyrics" | "render";
+
+  /** Everything a saved draft carries. The view is deliberately not in it: loading a draft should
+   * not move you to another tab. */
+  interface Snapshot {
+    selections: string;
+    lyric: string;
+    template: string;
+    bpm: number;
+    duration: number | null;
+    songId: string;
+    seed: number;
+    artists: string;
+    brief: string;
+  }
 
   let status = $state("starting up");
   let failure = $state<string | null>(null);
@@ -127,15 +153,18 @@
     }
   });
 
-  /** The render path: the canonical prompt, the composition it pins, and the ComfyUI graph. */
-  let artifact = $derived.by((): Artifacts | null => {
+  /** The render path: the canonical prompt, the composition it pins, and the ComfyUI graph.
+   *
+   * Built for a given seed rather than only for the current one, so a render can use a fresh seed
+   * that the graph on screen does not carry yet. */
+  function artifactsFor(seedValue: number): Artifacts | null {
     if (!core || !templateId) return null;
     try {
       return core.artifacts({
         song_id: songId,
         template_id: templateId,
         bpm,
-        seed,
+        seed: seedValue,
         selections,
         lyrics: lyricText,
         brief: briefText,
@@ -148,7 +177,29 @@
       console.error("artifacts failed", error);
       return null;
     }
+  }
+
+  let artifact = $derived.by(() => artifactsFor(seed));
+
+  /**
+   * The render target is app-level state, so its persistence and its reachability check live here
+   * rather than in a panel that only exists while its tab is open.
+   */
+  let targetTimer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    // Read so the effect tracks them, then discarded: the dependency is the point, not the value.
+    void renderQueue.target.base;
+    void renderQueue.target.protocol;
+    void renderQueue.target.key;
+    rememberTarget();
+    clearTimeout(targetTimer);
+    targetTimer = setTimeout(() => void checkTarget(), 600);
   });
+
+  /** The quick render in the top bar: the same queue the Render tab drives. */
+  function quickRender(): void {
+    void startRender({ seed, onSeed: (chosen) => (seed = chosen), artifactsFor });
+  }
 
   // Keep the working state across a reload. `stable` walks every property, which is what makes a
   // change deep inside a selection a dependency of this effect rather than an invisible one.
@@ -185,6 +236,81 @@
     clearDraft(DRAFT_KEY);
   }
 
+  // --- Named drafts ---------------------------------------------------------------------------
+  //
+  // The autosave above keeps one working state so a reload does not lose an edit. These are the
+  // deliberate ones: a name you choose, kept until you delete it, so several directions can exist at
+  // once and be switched between.
+
+  let saved = $state<DraftSummary[]>([]);
+  let draftName = $state("");
+  let nameInput = $state("");
+  let baseline = $state("");
+
+  function currentSnapshot(): Snapshot {
+    return {
+      selections: stable(selections),
+      lyric: lyricText,
+      template: templateId,
+      bpm,
+      duration,
+      songId,
+      seed,
+      artists,
+      brief: briefText,
+    };
+  }
+
+  function applySnapshot(snapshot: Snapshot): void {
+    selections = JSON.parse(snapshot.selections) as Selections;
+    lyricText = snapshot.lyric;
+    templateId = snapshot.template;
+    bpm = snapshot.bpm;
+    duration = snapshot.duration;
+    songId = snapshot.songId;
+    seed = snapshot.seed;
+    artists = snapshot.artists;
+    briefText = snapshot.brief;
+  }
+
+  // The snapshot's own selections field is already a canonical string, so this is deterministic.
+  const serialise = (snapshot: Snapshot): string => JSON.stringify(snapshot);
+
+  const modified = $derived(
+    draftName !== "" && baseline !== "" && serialise(currentSnapshot()) !== baseline,
+  );
+
+  function saveCurrentDraft(): void {
+    // Re-saving under a name that exists would overwrite it silently, so a free one is chosen.
+    const name = freeName(nameInput || songId, saved.map((entry) => entry.name));
+    const snapshot = currentSnapshot();
+    saved = saveNamed(name, snapshot, songId);
+    draftName = name;
+    nameInput = name;
+    baseline = serialise(snapshot);
+  }
+
+  function loadSavedDraft(name: string): void {
+    draftName = name;
+    if (!name) {
+      baseline = "";
+      return;
+    }
+    const snapshot = loadNamed<Snapshot>(name);
+    if (!snapshot) return;
+    applySnapshot(snapshot);
+    nameInput = name;
+    baseline = serialise(snapshot);
+  }
+
+  function deleteSavedDraft(): void {
+    if (!draftName) return;
+    saved = deleteNamed(draftName);
+    draftName = "";
+    nameInput = "";
+    baseline = "";
+  }
+
   /** A blank song in the browser. A page cannot make a directory, so this is a draft you export. */
   function newSong(): void {
     songId = "untitled-song";
@@ -193,6 +319,9 @@
     briefText = "";
     selections = {};
     duration = null;
+    draftName = "";
+    nameInput = "";
+    baseline = "";
     try {
       lyricText = core?.scaffold({ template_id: templateId }).text ?? "";
     } catch (error) {
@@ -243,6 +372,7 @@
 
   onMount(async () => {
     try {
+      saved = listSaved();
       status = "reading the vocabulary";
       data = await loadStaticData();
 
@@ -316,15 +446,63 @@
       {songId} · {templateId || "…"} · target ACE-Step 1.5 XL turbo
     </span>
     <span class="spacer"></span>
+
+    <div class="drafts">
+      <select
+        value={draftName}
+        onchange={(event) => loadSavedDraft(event.currentTarget.value)}
+        title={saved.length ? "load a saved draft" : "no saved drafts yet"}
+      >
+        <option value="">{saved.length ? "load a draft…" : "no saved drafts"}</option>
+        {#each saved as entry (entry.name)}
+          <option value={entry.name}>{entry.name}</option>
+        {/each}
+      </select>
+      <input class="draft-name" placeholder="draft name" bind:value={nameInput} />
+      <button onclick={saveCurrentDraft} title="save the current state under this name">save</button>
+      {#if draftName}
+        <button onclick={deleteSavedDraft} title="delete this saved draft">delete</button>
+      {/if}
+      {#if modified}
+        <span class="chip warn" title="changed since you saved this draft">modified</span>
+      {/if}
+    </div>
+
     {#if dirty}
       <span
         class="chip warn"
-        title="Held in this browser only. The song directory is the record, and a page cannot write to it."
+        title="Differs from the files in songs/<id>/. A page cannot write them, so export instead."
       >
-        local draft
+        differs from repo
       </span>
       <button onclick={revertToRepository}>revert to {songId}</button>
     {/if}
+
+    <button
+      class="primary"
+      onclick={quickRender}
+      disabled={renderQueue.busy || !artifact}
+      title={renderQueue.keepSeed
+        ? `Re-render with seed ${seed}, holding the arrangement so only your edits vary.`
+        : "Render this graph from any tab. Each render generates a seed, so each take differs."}
+    >
+      {#if renderQueue.busy}
+        {`rendering ${renderQueue.waited}s`}
+      {:else if renderQueue.keepSeed}
+        {`re-render ${seed}`}
+      {:else}
+        render
+      {/if}
+    </button>
+    {#if renderQueue.error}
+      <span class="chip warn" title={renderQueue.error}>render failed</span>
+    {/if}
+    {#if renderQueue.outcome?.ok}
+      <span class="chip" title={renderQueue.outcome.outputs.join("\n")}>
+        {renderQueue.outcome.outputs.length} file(s)
+      </span>
+    {/if}
+
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected={view === "builder"} onclick={() => (view = "builder")}>
         Builder
@@ -391,7 +569,6 @@
             bind:songId
             bind:templateId
             bind:bpm
-            bind:seed
             bind:artists
             bind:brief={briefText}
             templates={data.templates}
@@ -401,7 +578,7 @@
         </div>
       </div>
       <div class="column">
-        <Render {artifact} />
+        <Render {artifact} bind:seed {artifactsFor} />
       </div>
     </div>
   {/if}
