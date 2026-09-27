@@ -690,6 +690,36 @@ This also means the "no captioner, no ASR" gap in Appendix A is *partly* bridged
 generator's own understanding — usable as a flagged, non-authoritative surrogate, but not
 as the basis of a hard gate.
 
+#### Evidence classes
+
+The rules above about self-evaluation generalise past the generator. Evidence about the audio comes in
+fundamentally different kinds — a tempo read by a beat tracker and a genre read from a caption a
+language model wrote are both "the audio says so" and are not remotely the same claim — and the
+enforcement modes in §6 describe how *strongly* something can be checked, not how *reliable* the
+checker is.
+
+So each verdict also carries an **evidence class**: `measurement` (arithmetic or signal processing,
+reproducible to the decimal), `description` (a model's generated account of the artifact), `self_report`
+(the generator's account of its own output) or `oracle` (a System One probability over a stated
+question). Description and self-report are separated because independence is what makes a third-party
+captioner worth more than the generator's own understanding. A `transcription` class is reserved for
+ASR.
+
+The binding rule is that **description is never sole evidence for a hard requirement.** It corroborates;
+it does not decide. Where a description overlaps a measurement the two must agree, and disagreement is
+a first-class finding rather than a footnote — a caption reading "sparse and restrained" over a
+measured 4.94 onsets per second means one of them is wrong, and both matter. What a describer may decide
+is declared by its capability descriptor and earned by its gauge, exactly as the generator's
+capabilities are declared, and every verdict records which model version produced the evidence.
+
+The report therefore carries two headline counts rather than one: **decided by measurement**, which is
+the number to trust, and **decided by description**, which is the number to watch because it is the one
+that can be inflated without anyone noticing.
+
+See [`evidence-classes.md`](evidence-classes.md) for the class table, the per-severity rules and the
+worked report row, and [`captioner.md`](captioner.md) for the component that produces the description
+in the first place.
+
 ## 6. Requirement taxonomy
 
 The `verify` field names a checker. The **enforcement mode** says how strong that check can

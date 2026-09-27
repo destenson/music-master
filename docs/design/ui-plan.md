@@ -30,8 +30,12 @@ What is missing, and what the UI must therefore show honestly rather than fake:
 
 - **No oracle configured.** The whole semantic battery is designed and unrun, so caption/lyric
   consistency, theme adherence and hook payoff are `unverified`.
-- **No captioner and no ASR.** Genre fidelity, production character, intelligibility and
-  `sung == written lyric` have no evidence channel.
+- **No captioner.** Genre fidelity, production character, instrumentation audibility and vocal
+  character have no evidence channel. Building one is now planned **ahead of the UI** — see
+  [`captioner.md`](captioner.md), and [`evidence-classes.md`](evidence-classes.md) for the trust
+  rules it has to obey.
+- **No ASR, deliberately deferred.** Intelligibility and `sung == written lyric` have no evidence
+  channel and will keep reporting `unverified`.
 - **Transitions and per-section arrangement are not controllable** through lyric tags — measured
   twice, 1/9–2/9 met and 0/7–1/7 met. The UI must not render a control that does nothing.
 - **The screening metrics are genre-dependent.** Harmonicity 0.25 is a failure on one song and
@@ -251,6 +255,11 @@ Behaviour:
 └───────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+The pane also gains a **caption panel**: the free caption per section, the structured scores against
+the vocabulary, and the detector-agreement flags. Captions and scores are labelled with their evidence
+class, so a reader can see that "distorted guitar 0.38" is a describer's opinion and "4.94 onsets/s" is
+a measurement.
+
 Every metric carries its **expected direction**, derived from the spec — that is the difference
 between this pane and a dashboard. "harmonicity 0.25 ✓ expected LOW" is information; "0.25" alone is
 noise a user will misread.
@@ -338,6 +347,7 @@ background job, and is entirely separate from the DSH Web GUI on 3080.
 
 | Milestone | Content | Done when |
 | --- | --- | --- |
+| **C** | **Captioner and evidence classes** — `describe.py`, the gauge, structured scoring, captions ([`captioner.md`](captioner.md)) | per-class gauge measured; genre, vocal and instrument classes either decided or explicitly not; `unverified` count falls by the classes that passed |
 | **M0** | Extract `musicmaster/` package + CLI; current scripts become thin wrappers | the two existing songs build, check and report **byte-identically** through the package, and one test asserts it |
 | **M1** | Read-only workspace + report viewer | opening either existing song shows its artifacts and verdicts, with `unverified` correct |
 | **M2** | Brief → spec → builder → structure/time | a new song can be authored to a valid prompt without touching a file |
@@ -356,9 +366,10 @@ the same checks, and the second one would drift.
    declared-expectation field on the requirement, or a per-song expectations block.
 2. **How structured is the lyric editor?** Text-with-lens is the recommendation because it round-trips,
    but section reordering and line-count enforcement are much nicer structurally. Worth a spike.
-3. **Do we build the captioner and ASR before the UI?** The recommendation is no — ship the UI with
-   `unverified` correct, because that state is the product's integrity and it should be visible from
-   day one.
+3. ~~Do we build the captioner and ASR before the UI?~~ **Resolved: the captioner goes first, ASR is
+   deferred.** The captioner covers roughly ten requirement classes, which is most of what the UI
+   would otherwise show as `unverified`; ASR covers two and its weights are not on disk. The `unverified`
+   state is still built into the UI from day one — it just starts smaller than it would have.
 4. **One song at a time or a project?** The bundle is per-song; a project would group songs sharing a
    vocabulary version and a brief.
 5. **Does the vocabulary admin belong in the app?** The file-plus-validator loop is good and the
