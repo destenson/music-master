@@ -1,0 +1,68 @@
+# Build the SPA and publish it to GitHub Pages, so the UI can be opened from a browser that is not
+# running a local server. GitHub Actions is the Pages source, so nothing is pushed to a branch and
+# nothing under web/dist is committed.
+#
+# The bundle is self-contained -- the repository and the Pyodide runtime are copied into it -- but a
+# *render* still needs a ComfyUI the browser can reach. Over HTTPS the page cannot post to a loopback
+# ComfyUI at all, so point the Render tab's target at a non-loopback address (a tunnel, say) and
+# start ComfyUI with --enable-cors-header for this origin; ollama wants OLLAMA_ORIGINS set the same
+# way. See "The UI" in README.md.
+name: pages
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+# The minimum the Pages deployment needs: read the checkout, publish, and mint the OIDC token.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time. Not cancelled in progress, so a running deploy is never torn down
+# half-way; the next one waits its turn.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install the SPA's dependencies
+        working-directory: web
+        run: npm ci
+
+      # vite.config.ts copies musicmaster/, vocabulary/, schemas/ and songs/ plus the Pyodide runtime
+      # into web/dist, so the bundle the browser gets is the one the smoke test reads.
+      - name: Build the static bundle
+        working-directory: web
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+        with:
+          # Enable Pages on the first run, so a fresh clone needs no trip to the repository settings.
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

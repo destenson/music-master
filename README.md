@@ -188,6 +188,13 @@ node scripts/smoke.mjs   # checks the browser glue and the lens against the CLI,
 node scripts/smoke.mjs --generate --theme="…"   # one real draft, scored by the checker
 ```
 
+`.github/workflows/pages.yml` builds that bundle and deploys it to GitHub Pages on every push to
+`master`, so the page can be opened from the internet without a local server. The bundle is
+self-contained — the repository and the Pyodide runtime are copied into it — but a render still needs
+a ComfyUI the **browser** can reach: over HTTPS the page cannot post to a loopback ComfyUI, so point
+the Render tab's target at a non-loopback address and start ComfyUI with `--enable-cors-header` for
+the deployed origin. The render-target note below has the rest.
+
 The page reads the vocabulary, the text tier and the songs out of the repository itself, so the form
 cannot disagree with the renderer about what a bin is: adding an option to `tag-bins.json` adds a
 control, and nothing in `web/` changes.
