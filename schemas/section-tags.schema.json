@@ -5,7 +5,7 @@
   "description": "The metatag vocabulary and grammar for the lyric artifact. Section tags are the strongest structural control the generator offers and also the easiest to misuse: the model may sing a tag it does not recognise, and stacking modifiers both dilutes the instruction and risks that outcome. So the grammar is data, not convention, and every bracket in a lyric is validated against this file before the prompt is rendered.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["section_tags_version", "grammar", "sections", "modifiers", "vocal_tags", "energy_tags", "instrumental_section_tags", "consistency"],
+  "required": ["section_tags_version", "grammar", "sections", "modifiers", "transition_tags", "vocal_tags", "energy_tags", "instrumental_section_tags", "consistency"],
   "properties": {
     "section_tags_version": { "type": "string", "const": "1" },
     "note": { "type": "string" },
@@ -16,6 +16,16 @@
       "properties": {
         "section_tag": { "type": "string", "description": "The accepted shape of a section tag, e.g. '[<section>] or [<section> - <modifier>]'." },
         "max_modifiers": { "type": "integer", "minimum": 0, "maximum": 1, "description": "One. The model's own guide warns that stacked tags get sung or ignored." },
+        "max_tags_per_section": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many standalone performance tags may follow a section header. This is a separate budget from max_modifiers because it is a separate mechanism: the guide presents vocal and energy tags as their own bracket tags rather than as hyphenated modifiers, so the 'do not stack' warning applies to the modifiers and this budget governs the rest."
+        },
+        "max_transitions_per_section": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "How many transition tags a section may declare. One: a section leaves in one way, and a list of boundary instructions is a list the model will ignore."
+        },
         "rules": { "type": "array", "items": { "type": "string" }, "description": "Prose rules the linter enforces where it can and the reviewer enforces where it cannot." },
         "not_recognised": { "type": "string" }
       }
@@ -30,6 +40,11 @@
       "type": "array",
       "items": { "$ref": "#/$defs/Tag" },
       "description": "Performance modifiers appended after a hyphen, at most one per section."
+    },
+    "transition_tags": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Tag" },
+      "description": "How one section moves into the next. Placed as a standalone tag at the end of the outgoing section. Unlike arrangement, a transition leaves a measurable signature -- a gap, a level step, a riser, a fill -- so `signature` names the detector the analyser should apply, and a declared transition can be checked against the audio rather than merely hoped for."
     },
     "vocal_tags": { "type": "array", "items": { "$ref": "#/$defs/Tag" } },
     "energy_tags": { "type": "array", "items": { "$ref": "#/$defs/Tag" } },
@@ -63,6 +78,12 @@
           "description": "The text written inside the brackets, verbatim. No commas or brackets, since those are structural in a lyric."
         },
         "axis": { "type": ["string", "null"], "description": "Grouping for the UI: delivery, energy, emotion, arrangement." },
+        "signature": {
+          "type": ["string", "null"],
+          "enum": ["gap", "riser", "downlifter", "build", "fill", "step_up", "step_down",
+                   "sweep_up", "sweep_down", "smooth", "anticipation", "step_any", null],
+          "description": "For transition tags: the measurable shape this transition leaves in the audio, which the analyser looks for at the boundary."
+        },
         "instrumental": { "type": "boolean", "description": "For sections: carries no vocal." },
         "numbered": { "type": "boolean", "description": "For sections: may take an index, e.g. [Verse 1]." },
         "description": { "type": ["string", "null"] }

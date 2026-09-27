@@ -57,6 +57,7 @@ both.
 | --- | --- |
 | [`docs/design/compliance-architecture.md`](docs/design/compliance-architecture.md) | The design: the artifact bundle, the prompt artifact, stages, requirement taxonomy, the compliance battery, gating policy, repair loop, risks, validation plan |
 | [`docs/design/tag-vocabulary.md`](docs/design/tag-vocabulary.md) | The tag bins: what a bin declares, the UI controls built from them, how selections render into the comma-separated prompt, and how the vocabulary keeps the UI, the prompt and the compliance battery in step |
+| [`docs/design/lyric-templates.md`](docs/design/lyric-templates.md) | Song structures and rhyme schemes as a contract: the writing brief handed to the lyric generator, the bar plan handed to the composer, and the conformance check on the result |
 | [`docs/research/jev-and-decision-models.md`](docs/research/jev-and-decision-models.md) | What Jev is, what it measures, what the sibling projects already learned, and the open alternatives (including self-hosted) |
 | [`docs/research/music-generation-landscape.md`](docs/research/music-generation-landscape.md) | Open lyrics-to-song and text-to-music models, controllability, and the MIR tools that make audio judgeable as text |
 | [`docs/research/prompting-rules.md`](docs/research/prompting-rules.md) | What the generator's own tutorial says about prompting: the caption/metadata split, structure tags, caption↔lyric consistency, control boundaries, and the three sources of randomness |
@@ -64,9 +65,9 @@ both.
 
 ## The tag vocabulary
 
-The tag string is **rendered from selections**, not typed. 29 bins of properties — genre,
+The tag string is **rendered from selections**, not typed. 30 bins of properties — genre,
 scene, tempo, drums, bass, harmonies, synths, vocals, delivery, production, timbre, mood,
-exclusions and more — with **711 options** between them, each labelled with the exact tag text it
+exclusions and more — with **743 options** between them, each labelled with the exact tag text it
 emits. The lyrics have their own vocabulary too: **59 section tags** across 5 pools, with a
 grammar and the caption/lyric consistency rules.
 
@@ -86,11 +87,57 @@ metadata-only.
 
 The lyrics fixtures are the real paired example — the caption and lyrics that ship together with
 the packaged ComfyUI template. Running the checker on them found: no blank line between sections
-(four warnings, against explicit guidance), verse lines at 11–13 syllables against a recommended
-6–10 band, no modifiers or performance tags anywhere, three genuine rhymes missed by the
-spelling-based detector, and heavy technical jargon that the model is likely to slur. That last
-pair is why the design treats a pronunciation lexicon and an independent ASR as real
-dependencies rather than nice-to-haves.
+(four warnings, against explicit guidance), no modifiers or performance tags anywhere, almost no
+internal rhyme or alliteration (it reads as a technical jingle rather than a crafted lyric), and
+heavy technical jargon the model is likely to slur.
+
+It also caught a modelling error in the checker itself. Counting syllables per printed line flagged
+ten verse lines as over-long; counting per **phrase** — `Open up the canvas` / `blank slate on my
+screen` is 6/5, not 11 — flags the two lines that genuinely have no internal break. Cadence splits
+lines, so the line is the wrong unit. Cross-line embedded rhyme is now deliberately not reported at
+all: stress and vowel length decide whether two syllables rhyme and spelling encodes neither, so
+that number would have been an artifact.
+
+## Templates
+
+Writing is easier and checkable when the shape is chosen first. **15 song structures**, **13
+rhyme schemes** and **6 delivery profiles** are held as data, and each template is used four ways —
+as a brief, as a bar plan, as a time budget, and as a conformance check:
+
+```bash
+python3 vocabulary/structure_templates.py --list
+python3 vocabulary/structure_templates.py --template=pop_standard --brief --bpm=95 --duration=180
+python3 vocabulary/structure_templates.py --template=pop_standard --timeline --bpm=95 --duration=180
+python3 vocabulary/check_lyrics.py lyrics.md --template=pop_standard --bpm=95
+```
+
+A template is a contract rather than a label: it carries the section order, bar counts, lines per
+section, the rhyme scheme each section is written to, an energy arc, and where the hook is. The
+`structure` bin in the vocabulary points at one via `template_ref`, so choosing a form in the UI is
+what selects the contract. Section sequence and line counts are checked exactly; rhyme conformance
+is advisory, because the detector is spelling-based and demonstrably misses real rhymes.
+
+### The time budget
+
+A three-minute song is not three minutes of words, so the plan separates them and each section gets
+a **budget** (`lines x band`, what the writer is asked for) and a **ceiling** (`singable seconds x
+syllables per second`, what the clock allows). The budget is clipped by the ceiling, because stating
+a band the section cannot physically hold is advice that is wrong on its face — a 4-bar pre-chorus
+with 4 lines cannot carry 10 syllables a line at 95 BPM, so the brief says "at most 8 here".
+
+The band is delivery-dependent and lives in `delivery-rates.json`: a caption containing "Male Rap
+Vocals" gets 8–16 syllables per line and a 6.5/s ceiling, where a ballad gets 5–9 and 2.6. Intros,
+outros, interludes and solos are instrumental by construction, and writing words into one is an
+**error** — which is exactly what running the real fixture against `pop_standard` produced:
+
+```
+ERROR: [Outro]: 36 syllables written into an instrumental section (10.1s); there is no vocal there
+```
+
+The timeline also reports **density**, which catches what scaling does: filling an exact duration
+stretches every section, so `pop_standard` stretched to three minutes at 95 BPM comes out with five
+sparse sections at 1.58 syllables/s against a comfortable 2.3. Hitting a duration and keeping a
+density are different goals.
 
 Adding a bin is a four-part change — options, a control, a render position, and a checker —
 because a bin is simultaneously a UI element, a prompt field and a compliance obligation.
@@ -109,6 +156,12 @@ bin like `tempo` can create a requirement without contributing a tag.
   bin vocabulary: bins, controls, priorities, render positions, options and cautions.
 - [`schemas/section-tags.schema.json`](schemas/section-tags.schema.json) — the lyric metatag
   vocabulary and its grammar, including the caption/lyric consistency rules.
+- [`schemas/structure-templates.schema.json`](schemas/structure-templates.schema.json) — the shape
+  of a song-structure template: sections, bars, lines, rhyme scheme, energy and hooks.
+- [`schemas/rhyme-schemes.schema.json`](schemas/rhyme-schemes.schema.json) — the rhyme-pattern
+  library and each scheme's strictness.
+- [`schemas/delivery-rates.schema.json`](schemas/delivery-rates.schema.json) — the delivery
+  profiles: syllables per line, and the rate ceilings the time budget is built from.
 - [`schemas/requirement-spec.schema.json`](schemas/requirement-spec.schema.json) — the typed
   interpretation of a brief, where every requirement names its checker and its provenance.
 - [`schemas/compliance-report.schema.json`](schemas/compliance-report.schema.json) — the

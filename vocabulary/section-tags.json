@@ -4,9 +4,15 @@
   "grammar": {
     "section_tag": "[<section>] or [<section> - <modifier>]",
     "max_modifiers": 1,
+    "max_tags_per_section": 4,
+    "max_transitions_per_section": 1,
     "rules": [
       "At most one modifier per section tag. Stacking is explicitly discouraged by the model's own guide: it risks the model singing the tag, and it dilutes the instruction.",
+      "A transition belongs to the section it leaves, not the one it enters, and is written as a standalone tag at the end of that section: [drum fill], [riser], [stop]. One per boundary.",
+      "Beyond the one hyphenated modifier, up to four standalone performance tags may sit on their own lines directly under a section header -- typically a vocal mode (rap, clean vocal), a register or delivery (belting, raspy), and an energy or emotion (building energy, vulnerable). The guide presents these as their own bracket tags, separate from section headers, which is why they are a different mechanism with a different budget.",
+      "A standalone tag applies from where it appears until the next section header.",
       "Separate sections with a blank line, so the boundary is unambiguous.",
+      "A written line is not a phrase. Cadence splits lines in the middle, so a caesura marker ( / or | ) may be written inside a line to mark where the sung phrase breaks; it is never sung. Commas, semicolons, colons and dashes are read as weak breaks when no marker is given.",
       "Uppercase within a lyric line means louder, higher-intensity delivery; use it sparingly and never for a whole verse.",
       "Parentheses around a phrase mean background vocal or harmony, not a stage direction.",
       "Keep complex style description in the caption and only the performance instruction in the tag.",
@@ -15,96 +21,743 @@
     "not_recognised": "Treat an unrecognised tag as a defect: the model may sing it. The prompt-level check validates every bracket against this file before rendering."
   },
   "sections": [
-    { "id": "sec_intro", "label": "Intro", "instrumental": false, "description": "Opening; establishes atmosphere." },
-    { "id": "sec_verse", "label": "Verse", "instrumental": false, "numbered": true, "description": "Narrative progression." },
-    { "id": "sec_pre_chorus", "label": "Pre-Chorus", "instrumental": false, "description": "Builds energy into the chorus." },
-    { "id": "sec_chorus", "label": "Chorus", "instrumental": false, "description": "Emotional climax; the hook." },
-    { "id": "sec_post_chorus", "label": "Post-Chorus", "instrumental": false, "description": "Hook extension after the chorus." },
-    { "id": "sec_bridge", "label": "Bridge", "instrumental": false, "description": "Transition or lift." },
-    { "id": "sec_breakdown", "label": "Breakdown", "instrumental": false, "description": "Reduced instrumentation; space." },
-    { "id": "sec_build", "label": "Build", "instrumental": false, "description": "Energy rising." },
-    { "id": "sec_drop", "label": "Drop", "instrumental": false, "description": "Electronic energy release." },
-    { "id": "sec_outro", "label": "Outro", "instrumental": false, "description": "Conclusion." },
-    { "id": "sec_instrumental", "label": "Instrumental", "instrumental": true, "description": "No vocals." },
-    { "id": "sec_solo", "label": "Solo", "instrumental": true, "description": "Featured solo; name the instrument in the modifier." },
-    { "id": "sec_interlude", "label": "Interlude", "instrumental": true, "description": "Short instrumental passage." },
-    { "id": "sec_fade_out", "label": "Fade Out", "instrumental": false, "description": "Fading ending." },
-    { "id": "sec_silence", "label": "Silence", "instrumental": true, "description": "Deliberate silence." }
+    {
+      "id": "sec_intro",
+      "label": "Intro",
+      "instrumental": false,
+      "description": "Opening; establishes atmosphere."
+    },
+    {
+      "id": "sec_verse",
+      "label": "Verse",
+      "instrumental": false,
+      "numbered": true,
+      "description": "Narrative progression."
+    },
+    {
+      "id": "sec_pre_chorus",
+      "label": "Pre-Chorus",
+      "instrumental": false,
+      "description": "Builds energy into the chorus."
+    },
+    {
+      "id": "sec_chorus",
+      "label": "Chorus",
+      "instrumental": false,
+      "description": "Emotional climax; the hook."
+    },
+    {
+      "id": "sec_post_chorus",
+      "label": "Post-Chorus",
+      "instrumental": false,
+      "description": "Hook extension after the chorus."
+    },
+    {
+      "id": "sec_bridge",
+      "label": "Bridge",
+      "instrumental": false,
+      "description": "Transition or lift."
+    },
+    {
+      "id": "sec_breakdown",
+      "label": "Breakdown",
+      "instrumental": false,
+      "description": "Reduced instrumentation; space."
+    },
+    {
+      "id": "sec_build",
+      "label": "Build",
+      "instrumental": false,
+      "description": "Energy rising."
+    },
+    {
+      "id": "sec_drop",
+      "label": "Drop",
+      "instrumental": false,
+      "description": "Electronic energy release."
+    },
+    {
+      "id": "sec_outro",
+      "label": "Outro",
+      "instrumental": false,
+      "description": "Conclusion."
+    },
+    {
+      "id": "sec_instrumental",
+      "label": "Instrumental",
+      "instrumental": true,
+      "description": "No vocals."
+    },
+    {
+      "id": "sec_solo",
+      "label": "Solo",
+      "instrumental": true,
+      "description": "Featured solo; name the instrument in the modifier."
+    },
+    {
+      "id": "sec_interlude",
+      "label": "Interlude",
+      "instrumental": true,
+      "description": "Short instrumental passage."
+    },
+    {
+      "id": "sec_fade_out",
+      "label": "Fade Out",
+      "instrumental": false,
+      "description": "Fading ending."
+    },
+    {
+      "id": "sec_silence",
+      "label": "Silence",
+      "instrumental": true,
+      "description": "Deliberate silence."
+    }
   ],
   "modifiers": [
-    { "id": "mod_anthemic", "label": "anthemic", "axis": "energy" },
-    { "id": "mod_whispered", "label": "whispered", "axis": "delivery" },
-    { "id": "mod_powerful", "label": "powerful", "axis": "energy" },
-    { "id": "mod_belting", "label": "belting", "axis": "delivery" },
-    { "id": "mod_raspy", "label": "raspy", "axis": "delivery" },
-    { "id": "mod_falsetto", "label": "falsetto", "axis": "delivery" },
-    { "id": "mod_spoken", "label": "spoken", "axis": "delivery" },
-    { "id": "mod_laid_back", "label": "laid-back", "axis": "delivery" },
-    { "id": "mod_intimate", "label": "intimate", "axis": "delivery" },
-    { "id": "mod_building", "label": "building energy", "axis": "energy" },
-    { "id": "mod_explosive", "label": "explosive", "axis": "energy" },
-    { "id": "mod_high_energy", "label": "high energy", "axis": "energy" },
-    { "id": "mod_low_energy", "label": "low energy", "axis": "energy" },
-    { "id": "mod_melancholic", "label": "melancholic", "axis": "emotion" },
-    { "id": "mod_euphoric", "label": "euphoric", "axis": "emotion" },
-    { "id": "mod_dreamy", "label": "dreamy", "axis": "emotion" },
-    { "id": "mod_aggressive", "label": "aggressive", "axis": "emotion" },
-    { "id": "mod_stripped", "label": "stripped back", "axis": "arrangement" },
-    { "id": "mod_minimal", "label": "minimal", "axis": "arrangement" },
-    { "id": "mod_soaring", "label": "soaring", "axis": "delivery" },
-    { "id": "mod_fade", "label": "fade out", "axis": "arrangement" }
+    {
+      "id": "mod_rapped",
+      "label": "rapped",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_clean",
+      "label": "clean",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_melodic",
+      "label": "melodic",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_harsh",
+      "label": "harsh",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_anthemic",
+      "label": "anthemic",
+      "axis": "energy"
+    },
+    {
+      "id": "mod_whispered",
+      "label": "whispered",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_powerful",
+      "label": "powerful",
+      "axis": "energy"
+    },
+    {
+      "id": "mod_belting",
+      "label": "belting",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_raspy",
+      "label": "raspy",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_falsetto",
+      "label": "falsetto",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_spoken",
+      "label": "spoken",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_laid_back",
+      "label": "laid-back",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_intimate",
+      "label": "intimate",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_building",
+      "label": "building energy",
+      "axis": "energy"
+    },
+    {
+      "id": "mod_explosive",
+      "label": "explosive",
+      "axis": "energy"
+    },
+    {
+      "id": "mod_high_energy",
+      "label": "high energy",
+      "axis": "energy"
+    },
+    {
+      "id": "mod_low_energy",
+      "label": "low energy",
+      "axis": "energy"
+    },
+    {
+      "id": "mod_melancholic",
+      "label": "melancholic",
+      "axis": "emotion"
+    },
+    {
+      "id": "mod_euphoric",
+      "label": "euphoric",
+      "axis": "emotion"
+    },
+    {
+      "id": "mod_dreamy",
+      "label": "dreamy",
+      "axis": "emotion"
+    },
+    {
+      "id": "mod_aggressive",
+      "label": "aggressive",
+      "axis": "emotion"
+    },
+    {
+      "id": "mod_stripped",
+      "label": "stripped back",
+      "axis": "arrangement"
+    },
+    {
+      "id": "mod_minimal",
+      "label": "minimal",
+      "axis": "arrangement"
+    },
+    {
+      "id": "mod_soaring",
+      "label": "soaring",
+      "axis": "delivery"
+    },
+    {
+      "id": "mod_fade",
+      "label": "fade out",
+      "axis": "arrangement"
+    },
+    {
+      "id": "mod_guitar",
+      "label": "guitar",
+      "axis": "instrument"
+    },
+    {
+      "id": "mod_bass",
+      "label": "bass",
+      "axis": "instrument"
+    },
+    {
+      "id": "mod_drums",
+      "label": "drums",
+      "axis": "instrument"
+    },
+    {
+      "id": "mod_piano",
+      "label": "piano",
+      "axis": "instrument"
+    },
+    {
+      "id": "mod_synth",
+      "label": "synth",
+      "axis": "instrument"
+    }
+  ],
+  "transition_tags": [
+    {
+      "id": "tt_hard_cut",
+      "label": "hard cut",
+      "signature": "step_any",
+      "description": "No fill, no sweep. One section stops and the next starts."
+    },
+    {
+      "id": "tt_drum_fill",
+      "label": "drum fill",
+      "signature": "fill",
+      "description": "The outgoing section's last bar is filled, which is the commonest transition in rock."
+    },
+    {
+      "id": "tt_fill",
+      "label": "instrumental fill",
+      "signature": "fill",
+      "description": "A short lead or keyboard fill carries the join."
+    },
+    {
+      "id": "tt_riser",
+      "label": "riser",
+      "signature": "riser",
+      "description": "A rising noise or synth sweep into the next section."
+    },
+    {
+      "id": "tt_reverse_cymbal",
+      "label": "reverse cymbal",
+      "signature": "riser",
+      "description": "A reversed cymbal swelling into the downbeat."
+    },
+    {
+      "id": "tt_downlifter",
+      "label": "downlifter",
+      "signature": "downlifter",
+      "description": "A falling sweep, usually into a breakdown or a verse."
+    },
+    {
+      "id": "tt_build",
+      "label": "build-up",
+      "signature": "build",
+      "description": "Density and intensity rising across the join rather than at it."
+    },
+    {
+      "id": "tt_stop",
+      "label": "stop",
+      "signature": "gap",
+      "description": "Everything stops for a beat before the next section lands. The oldest trick there is."
+    },
+    {
+      "id": "tt_break",
+      "label": "break",
+      "signature": "gap",
+      "description": "A short gap with a single element left ringing."
+    },
+    {
+      "id": "tt_silence",
+      "label": "dead silence",
+      "signature": "gap",
+      "description": "A deliberate silence between sections."
+    },
+    {
+      "id": "tt_filter_open",
+      "label": "filter opening",
+      "signature": "sweep_up",
+      "description": "A low-pass filter opens across the join, brightening the mix."
+    },
+    {
+      "id": "tt_filter_close",
+      "label": "filter closing",
+      "signature": "sweep_down",
+      "description": "A filter closes, darkening into the next section."
+    },
+    {
+      "id": "tt_drop",
+      "label": "drop-in",
+      "signature": "step_up",
+      "description": "Full arrangement arrives on the downbeat, much louder than what preceded it."
+    },
+    {
+      "id": "tt_gang_entry",
+      "label": "gang vocal entry",
+      "signature": "step_up",
+      "description": "The next section opens with voices rather than instruments."
+    },
+    {
+      "id": "tt_smooth",
+      "label": "smooth",
+      "signature": "smooth",
+      "description": "No boundary event; the sections run into each other."
+    },
+    {
+      "id": "tt_crossfade",
+      "label": "crossfade",
+      "signature": "smooth",
+      "description": "The outgoing element decays while the incoming one grows."
+    },
+    {
+      "id": "tt_hold",
+      "label": "held note",
+      "signature": "smooth",
+      "description": "A sustained note or chord bridges the two sections."
+    },
+    {
+      "id": "tt_pickup",
+      "label": "early pickup",
+      "signature": "anticipation",
+      "description": "The next section starts a beat or two early, pushing across the bar line."
+    },
+    {
+      "id": "tt_count_in",
+      "label": "count-in",
+      "signature": "fill",
+      "description": "A counted or clicked entry, usually from a stop."
+    }
   ],
   "vocal_tags": [
-    { "id": "vt_raspy", "label": "raspy vocal", "axis": "delivery" },
-    { "id": "vt_whispered", "label": "whispered", "axis": "delivery" },
-    { "id": "vt_falsetto", "label": "falsetto", "axis": "delivery" },
-    { "id": "vt_belting", "label": "powerful belting", "axis": "delivery" },
-    { "id": "vt_spoken_word", "label": "spoken word", "axis": "delivery" },
-    { "id": "vt_harmonies", "label": "harmonies", "axis": "arrangement" },
-    { "id": "vt_call_response", "label": "call and response", "axis": "arrangement" },
-    { "id": "vt_ad_lib", "label": "ad-lib", "axis": "arrangement" }
+    {
+      "id": "vt_rap",
+      "label": "rap",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_rap_laid_back",
+      "label": "laid-back rap",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_rap_double_time",
+      "label": "double-time rap",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_spoken_word",
+      "label": "spoken word",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_clean",
+      "label": "clean vocal",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_melodic",
+      "label": "melodic vocal",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_sung",
+      "label": "sung",
+      "axis": "mode"
+    },
+    {
+      "id": "vt_falsetto",
+      "label": "falsetto",
+      "axis": "register"
+    },
+    {
+      "id": "vt_head_voice",
+      "label": "head voice",
+      "axis": "register"
+    },
+    {
+      "id": "vt_chest_voice",
+      "label": "chest voice",
+      "axis": "register"
+    },
+    {
+      "id": "vt_belting",
+      "label": "powerful belting",
+      "axis": "register"
+    },
+    {
+      "id": "vt_whispered",
+      "label": "whispered",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_breathy",
+      "label": "breathy",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_raspy",
+      "label": "raspy",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_gritty",
+      "label": "gritty",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_growled",
+      "label": "growled",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_harsh",
+      "label": "harsh vocal",
+      "axis": "harsh"
+    },
+    {
+      "id": "vt_screamed",
+      "label": "screamed",
+      "axis": "harsh"
+    },
+    {
+      "id": "vt_pitched_scream",
+      "label": "pitched scream",
+      "axis": "harsh"
+    },
+    {
+      "id": "vt_fry_scream",
+      "label": "fry scream",
+      "axis": "harsh"
+    },
+    {
+      "id": "vt_vibrato",
+      "label": "vibrato",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_straight_tone",
+      "label": "straight tone",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_runs",
+      "label": "melismatic runs",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_ad_lib",
+      "label": "ad-lib",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_oohs",
+      "label": "oohs and aahs",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_hummed",
+      "label": "hummed",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_harmonies",
+      "label": "harmonies",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_stacked",
+      "label": "stacked harmonies",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_layered",
+      "label": "layered harmonies",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_gang",
+      "label": "gang vocals",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_call_response",
+      "label": "call and response",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_octave_doubles",
+      "label": "octave doubles",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_backing",
+      "label": "backing vocals",
+      "axis": "arrangement"
+    },
+    {
+      "id": "vt_auto_tune",
+      "label": "auto-tune",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_vocoder",
+      "label": "vocoder",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_talkbox",
+      "label": "talkbox",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_doubled",
+      "label": "doubled vocals",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_dry",
+      "label": "dry vocal",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_reverb",
+      "label": "reverb-drenched",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_delay",
+      "label": "delay throws",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_filtered",
+      "label": "filtered vocal",
+      "axis": "effect"
+    },
+    {
+      "id": "vt_shouted",
+      "label": "shouted",
+      "axis": "delivery"
+    },
+    {
+      "id": "vt_chant",
+      "label": "chanted",
+      "axis": "delivery"
+    }
   ],
   "energy_tags": [
-    { "id": "et_high", "label": "high energy", "axis": "energy" },
-    { "id": "et_low", "label": "low energy", "axis": "energy" },
-    { "id": "et_building", "label": "building energy", "axis": "energy" },
-    { "id": "et_explosive", "label": "explosive", "axis": "energy" },
-    { "id": "et_melancholic", "label": "melancholic", "axis": "emotion" },
-    { "id": "et_euphoric", "label": "euphoric", "axis": "emotion" },
-    { "id": "et_dreamy", "label": "dreamy", "axis": "emotion" },
-    { "id": "et_aggressive", "label": "aggressive", "axis": "emotion" }
+    {
+      "id": "et_high",
+      "label": "high energy",
+      "axis": "energy"
+    },
+    {
+      "id": "et_low",
+      "label": "low energy",
+      "axis": "energy"
+    },
+    {
+      "id": "et_building",
+      "label": "building energy",
+      "axis": "energy"
+    },
+    {
+      "id": "et_explosive",
+      "label": "explosive",
+      "axis": "energy"
+    },
+    {
+      "id": "et_release",
+      "label": "release",
+      "axis": "energy"
+    },
+    {
+      "id": "et_stripped",
+      "label": "stripped back",
+      "axis": "energy"
+    },
+    {
+      "id": "et_sparse",
+      "label": "sparse",
+      "axis": "energy"
+    },
+    {
+      "id": "et_dense",
+      "label": "dense arrangement",
+      "axis": "energy"
+    },
+    {
+      "id": "et_driving",
+      "label": "driving",
+      "axis": "energy"
+    },
+    {
+      "id": "et_laid_back",
+      "label": "laid-back",
+      "axis": "energy"
+    },
+    {
+      "id": "et_melancholic",
+      "label": "melancholic",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_euphoric",
+      "label": "euphoric",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_dreamy",
+      "label": "dreamy",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_aggressive",
+      "label": "aggressive",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_anthemic",
+      "label": "anthemic",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_triumphant",
+      "label": "triumphant",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_vulnerable",
+      "label": "vulnerable",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_urgent",
+      "label": "urgent",
+      "axis": "emotion"
+    },
+    {
+      "id": "et_calm",
+      "label": "calm",
+      "axis": "emotion"
+    }
   ],
   "instrumental_section_tags": [
-    { "id": "ist_instrumental", "label": "Instrumental" },
-    { "id": "ist_guitar_solo", "label": "Guitar Solo" },
-    { "id": "ist_piano_interlude", "label": "Piano Interlude" },
-    { "id": "ist_synth_solo", "label": "Synth Solo" },
-    { "id": "ist_sax_solo", "label": "Sax Solo" },
-    { "id": "ist_strings_interlude", "label": "Strings Interlude" },
-    { "id": "ist_drum_break", "label": "Drum Break" }
+    {
+      "id": "ist_guitar_solo",
+      "label": "Guitar Solo"
+    },
+    {
+      "id": "ist_piano_interlude",
+      "label": "Piano Interlude"
+    },
+    {
+      "id": "ist_synth_solo",
+      "label": "Synth Solo"
+    },
+    {
+      "id": "ist_sax_solo",
+      "label": "Sax Solo"
+    },
+    {
+      "id": "ist_strings_interlude",
+      "label": "Strings Interlude"
+    },
+    {
+      "id": "ist_drum_break",
+      "label": "Drum Break"
+    }
   ],
   "consistency": [
     {
       "id": "instruments_match_instrumental_tags",
-      "caption_bins": ["drums", "bass", "harmony", "synth", "extra_instrument"],
+      "caption_bins": [
+        "drums",
+        "bass",
+        "harmony",
+        "synth",
+        "extra_instrument"
+      ],
       "section_pool": "instrumental_section_tags",
       "rule": "An instrument named as a solo or interlude in the lyrics should be present in the caption's instrumentation, and vice versa. The model does not resolve conflicts; it degrades."
     },
     {
       "id": "emotion_matches_energy_tags",
-      "caption_bins": ["mood", "energy"],
+      "caption_bins": [
+        "mood",
+        "energy"
+      ],
       "section_pool": "energy_tags",
       "rule": "Energy and emotion tags in the lyrics must not contradict the caption's mood or energy selections."
     },
     {
       "id": "vocal_matches_vocal_tags",
-      "caption_bins": ["lead_vocal", "vocal_delivery", "backing_vocal"],
+      "caption_bins": [
+        "lead_vocal",
+        "vocal_delivery",
+        "backing_vocal"
+      ],
       "section_pool": "vocal_tags",
       "rule": "Vocal control tags in the lyrics must be consistent with the caption's vocal, delivery and backing selections."
     },
     {
       "id": "no_vocals_no_vocal_tags",
-      "caption_bins": ["lead_vocal"],
+      "caption_bins": [
+        "lead_vocal"
+      ],
       "section_pool": "vocal_tags",
       "rule": "When the lead vocal bin is Instrumental or No Vocals, no vocal control tag may appear in the lyrics."
     }

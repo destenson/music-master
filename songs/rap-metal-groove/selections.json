@@ -1,0 +1,39 @@
+{
+  "note": "Bin selections for the rap-metal groove brief. No artist name appears. Three things the brief insists on are expressed structurally rather than by adjectives: Drop D is a tuning selection, the guitar-as-texture method is in the harmony options, and 'no synthesizers, no turntables' is in the avoid bin so those positives are simply never selected. The lyric_theme bin is left out because the lyrics are supplied, so themes live in the words rather than in the caption.",
+  "selections": {
+    "genre": { "options": ["rap_metal"] },
+    "fusion": { "options": ["f_hip_hop", "f_funk", "f_punk"] },
+    "tuning": { "options": ["drop_d"] },
+    "groove": { "options": ["syncopated", "breakbeat", "groovy", "offbeat"] },
+    "drums": { "options": ["live_drums", "punchy_kick"] },
+    "bass": { "options": ["fingerstyle_bass", "distorted_bass"] },
+    "harmony": {
+      "options": ["distorted_guitar", "downtuned_guitar", "guitar_riffs",
+                  "muted_funk_chops", "guitar_scratch_effects"]
+    },
+    "lead_vocal": { "options": ["male_rap_vocals", "spoken_word_vocals"] },
+    "vocal_delivery": {
+      "options": ["rapid_fire_delivery", "shouted", "aggressive_delivery", "harsh_vocals"]
+    },
+    "backing_vocal": { "options": ["gang_vocals", "call_and_response"] },
+    "production": {
+      "options": ["raw_production", "live_room_production", "gritty_production"]
+    },
+    "timbre": { "options": ["tm_raw", "tm_biting", "tm_punchy"] },
+    "mood": { "options": ["aggressive", "defiant", "urgent"] },
+    "energy": { "options": ["energy_very_high"] },
+    "structure": { "options": ["struct_rap_metal_groove"] },
+    "tempo": { "value": 92, "options": [] },
+    "time_signature": { "options": ["ts_4_4"] },
+    "key_mode": { "key": "E", "mode": "minor" },
+    "language": { "options": ["en"] },
+    "explicitness": { "options": ["clean"] },
+    "content_exclusions": {
+      "options": ["no_artist_imitation", "no_real_people", "no_profanity", "no_slurs"]
+    },
+    "avoid": {
+      "options": ["no_synths", "no_keyboards", "no_turntables", "no_samples",
+                  "no_drum_machine", "no_auto_tune", "no_clean_singing", "no_electronic_beats"]
+    }
+  }
+}

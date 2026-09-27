@@ -383,16 +383,31 @@ hard constraints. Then:
 
 **Code gates, per candidate** — all exactly computable:
 
-- syllable count per line against the per-line target, via a syllable counter with an
-  optional pronunciation lexicon; report max/mean deviation rather than a boolean. The target
-  band is the model's own recommendation — 6–10 syllables per line — and lines in the same
-  position across sections should agree within ±1–2 syllables, because the model aligns
-  syllables to beats and a 6-syllable line next to a 14-syllable one produces strange rhythm
+- syllable count per **phrase**, not per printed line, via a syllable counter with an optional
+  pronunciation lexicon. Cadence splits lines in the middle and a phrase can straddle a line break,
+  so the phrase is what meets the beat; the written line is still reported, and one longer than
+  twice the band's maximum is flagged with or without an internal break. Breaks come from an
+  explicit caesura marker (`/` or `|`) or, failing that, punctuation
+- the band is the model's own recommendation — 6–10 syllables per phrase — and lines in the same
+  position across sections should agree within ±1–2 syllables, because a 6-syllable phrase next to
+  a 14-syllable one produces strange rhythm
+- syllables per bar, **derived** from the template's bars and lines rather than counted, for the
+  same reason: it is the number the model actually meets
+- sound devices a line-based model cannot see: **internal rhyme** (stressed pairs inside a line,
+  which is what carries a rap verse) and **alliteration** (repeated onsets). Both are reported as
+  observations; the failure mode for alliteration is over-density, not absence. Cross-line embedded
+  rhyme is deliberately not reported, because it depends on stress and vowel length and spelling
+  encodes neither
 - delivery markup: uppercase inside a line means louder delivery, and parenthesised text means
   background vocal or harmony. Both are semantic signals, not formatting, so the counter must
   strip them and the gate must not treat a parenthesised line as a lyric line
 - metatag grammar, via `vocabulary/check_lyrics.py`: known sections only, at most one modifier,
   and the caption/lyric consistency rules
+- template conformance, via `check_lyrics.py --template=<id>`: the section sequence and the lines
+  per section against the structure template the brief selected, checked exactly; the rhyme scheme
+  per section advisory, weighted by the scheme's own strictness. The template is also what the
+  lyric stage is *given* as a writing brief, so this checks the writer against the specification it
+  received rather than a judgement invented afterwards — see [`lyric-templates.md`](lyric-templates.md)
 - prosody: prefer line endings on open vowels and liquids. The model matches phonemes to melody
   and will drop or slur consonant clusters
 - cliché: a soft lexical gate over stock phrases, overused nouns and overused rhyme pairs

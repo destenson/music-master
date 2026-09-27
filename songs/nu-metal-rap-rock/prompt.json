@@ -1,0 +1,297 @@
+{
+  "prompt_version": "1",
+  "song_id": "nu-metal-rap-rock",
+  "seed": 3307,
+  "style": {
+    "vocabulary_ref": {
+      "path": "vocabulary/tag-bins.json",
+      "version": "1",
+      "sha256": "ca349db5916d94b6cac36708ea6f2034beb224b2ce46d1433f7a5a71adb89d00"
+    },
+    "selections": {
+      "genre": {
+        "options": [
+          "rap_rock"
+        ]
+      },
+      "fusion": {
+        "options": [
+          "f_nu_metal",
+          "f_electronic"
+        ]
+      },
+      "groove": {
+        "options": [
+          "driving",
+          "syncopated"
+        ]
+      },
+      "drums": {
+        "options": [
+          "live_drums",
+          "drum_machine"
+        ]
+      },
+      "bass": {
+        "options": [
+          "distorted_bass"
+        ]
+      },
+      "harmony": {
+        "options": [
+          "distorted_guitar",
+          "power_chords",
+          "palm_muted_guitar",
+          "guitar_riffs",
+          "electric_piano"
+        ]
+      },
+      "synth": {
+        "options": [
+          "detuned_synths"
+        ]
+      },
+      "lead_vocal": {
+        "options": [
+          "male_rap_vocals",
+          "male_tenor_vocals"
+        ]
+      },
+      "vocal_delivery": {
+        "options": [
+          "clean_vocals",
+          "melodic_vocals",
+          "soaring_vocals",
+          "harsh_vocals"
+        ]
+      },
+      "backing_vocal": {
+        "options": [
+          "gang_vocals",
+          "layered_harmonies"
+        ]
+      },
+      "production": {
+        "options": [
+          "polished_production",
+          "layered_production"
+        ]
+      },
+      "timbre": {
+        "options": [
+          "tm_punchy",
+          "tm_bright"
+        ]
+      },
+      "mood": {
+        "options": [
+          "aggressive",
+          "defiant"
+        ]
+      },
+      "energy": {
+        "options": [
+          "energy_dynamic"
+        ]
+      },
+      "structure": {
+        "options": [
+          "struct_nu_metal_rap_rock"
+        ]
+      },
+      "tempo": {
+        "value": 120,
+        "options": []
+      },
+      "time_signature": {
+        "options": [
+          "ts_4_4"
+        ]
+      },
+      "key_mode": {
+        "key": "D",
+        "mode": "minor"
+      },
+      "language": {
+        "options": [
+          "en"
+        ]
+      },
+      "explicitness": {
+        "options": [
+          "clean"
+        ]
+      },
+      "content_exclusions": {
+        "options": [
+          "no_artist_imitation",
+          "no_explicit_content",
+          "no_profanity",
+          "no_slurs"
+        ]
+      },
+      "extra_instrument": {
+        "options": [
+          "vinyl_scratching"
+        ]
+      }
+    },
+    "rendered_tags": [
+      "Rap Rock",
+      "Nu Metal",
+      "Electronic",
+      "Driving",
+      "Syncopated",
+      "Live Drums",
+      "Drum Machine",
+      "Distorted Bass",
+      "Distorted Guitar",
+      "Power Chords",
+      "Palm-Muted Guitar",
+      "Guitar Riffs",
+      "Electric Piano",
+      "Detuned Synths",
+      "Male Rap Vocals",
+      "Male Tenor Vocals",
+      "Clean Vocals",
+      "Melodic Vocals",
+      "Soaring Vocals",
+      "Harsh Vocals",
+      "Gang Vocals",
+      "Layered Harmonies",
+      "Polished Production",
+      "Layered Production",
+      "Punchy",
+      "Bright",
+      "Aggressive",
+      "Defiant",
+      "Dynamic Energy",
+      "Vinyl Scratching",
+      "Nu-Metal Rap-Rock"
+    ],
+    "rendered_string": "Rap Rock, Nu Metal, Electronic, Driving, Syncopated, Live Drums, Drum Machine, Distorted Bass, Distorted Guitar, Power Chords, Palm-Muted Guitar, Guitar Riffs, Electric Piano, Detuned Synths, Male Rap Vocals, Male Tenor Vocals, Clean Vocals, Melodic Vocals, Soaring Vocals, Harsh Vocals, Gang Vocals, Layered Harmonies, Polished Production, Layered Production, Punchy, Bright, Aggressive, Defiant, Dynamic Energy, Vinyl Scratching, Nu-Metal Rap-Rock",
+    "omitted_tags": [],
+    "free_text": ""
+  },
+  "metadata": {
+    "bpm": 120,
+    "key": "D",
+    "mode": "minor",
+    "timesignature": "4",
+    "duration_s": 184.0,
+    "language": "en"
+  },
+  "form": {
+    "composition_ref": "songs/nu-metal-rap-rock/composition.json",
+    "composition_sha256": "2e1824e5b621663566a7b6eb21559c283edf20988342612bd639b89141b7c82a",
+    "sections": [
+      {
+        "name": "intro",
+        "bars": 8,
+        "label": "Intro"
+      },
+      {
+        "name": "verse",
+        "bars": 16,
+        "label": "Verse 1"
+      },
+      {
+        "name": "pre_chorus",
+        "bars": 8,
+        "label": "Pre-Chorus"
+      },
+      {
+        "name": "chorus",
+        "bars": 8,
+        "label": "Chorus"
+      },
+      {
+        "name": "verse",
+        "bars": 16,
+        "label": "Verse 2"
+      },
+      {
+        "name": "pre_chorus",
+        "bars": 8,
+        "label": "Pre-Chorus"
+      },
+      {
+        "name": "chorus",
+        "bars": 8,
+        "label": "Chorus"
+      },
+      {
+        "name": "bridge",
+        "bars": 8,
+        "label": "Bridge"
+      },
+      {
+        "name": "chorus",
+        "bars": 8,
+        "label": "Chorus"
+      },
+      {
+        "name": "outro",
+        "bars": 4,
+        "label": "Outro"
+      }
+    ]
+  },
+  "lyrics": {
+    "ref": "songs/nu-metal-rap-rock/lyrics.md",
+    "sha256": "5e4b61e0bf38dcab52499f6e76a15ab1e553cb11ab2383f6f3010d7db9d30264",
+    "section_tags": true
+  },
+  "negative": {
+    "style": [],
+    "artist_references": [
+      "Linkin Park"
+    ]
+  },
+  "target": {
+    "generator_id": "ace_step_1_5_xl_turbo",
+    "runner": "comfyui",
+    "graph_ref": "songs/nu-metal-rap-rock/workflow.json",
+    "sampler": {
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model_sampling_shift": 3.0
+    },
+    "lm": {
+      "generate_audio_codes": true,
+      "cfg_scale": 2.0,
+      "temperature": 0.85,
+      "top_p": 0.9,
+      "top_k": 0,
+      "min_p": 0.0
+    },
+    "seed": 3307,
+    "batch_size": 1,
+    "candidate_index": 0
+  },
+  "notes": [
+    {
+      "field": "style.selections",
+      "why": "Influence expressed as descriptive characteristics rather than a band name. Genre fusion, instrumentation and vocal split do the work a name cannot."
+    },
+    {
+      "field": "metadata.bpm",
+      "why": "120 BPM, mid-tempo for the genre; carried in metadata, never in the caption."
+    },
+    {
+      "field": "target.seed",
+      "why": "Fixed so the render is re-derivable. With lm.temperature > 0 the LM's audio-code sampling adds randomness, so this is re-derivable and diffable rather than bit-identical."
+    },
+    {
+      "field": "negative.artist_references",
+      "why": "Recorded so the compliance report can prove what was excluded, and so the policy check has something to verify against."
+    }
+  ],
+  "provenance": {
+    "spec_sha256": "145c733202b80db368fb15503865954effa8df92045b85c2ed28d2747b20c28b",
+    "builder": "songs/nu-metal-rap-rock/build_and_submit.py"
+  }
+}

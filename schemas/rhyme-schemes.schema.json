@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/rhyme-schemes.schema.json",
+  "title": "RhymeSchemeLibrary",
+  "description": "The rhyme patterns a lyric section can be written to. Patterns are letter strings over line positions: A, B, C are distinct rhyme sounds and X is a deliberately unrhymed line. Because the checker's rhyme detection is spelling-based and approximate, each scheme carries a strictness that says how much weight a mismatch deserves.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["rhyme_schemes_version", "schemes"],
+  "properties": {
+    "rhyme_schemes_version": { "type": "string", "const": "1" },
+    "note": { "type": "string" },
+    "detectability_note": { "type": "string" },
+    "schemes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "pattern", "description", "strictness"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "name": { "type": "string" },
+          "pattern": {
+            "type": "string",
+            "pattern": "^[A-ZX() ]+$",
+            "description": "Letter string over line positions, e.g. 'AABB'. Parentheses mark a grouping, as in an internal-rhyme scheme."
+          },
+          "description": { "type": "string" },
+          "typical_use": { "type": "array", "items": { "type": "string" } },
+          "strictness": {
+            "type": "string",
+            "enum": ["strict", "lenient"],
+            "description": "strict = a mismatch is worth acting on; lenient = a mismatch is as likely to be the approximate detector's fault as the writer's."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["end", "internal", "none"],
+            "description": "Which device the scheme governs. 'end' is checked against the end-rhyme pattern; 'internal' skips that comparison and instead requires interior rhyme pairs, because end-rhyme conformance is the wrong test for a verse carried by embedded rhyme; 'none' skips the rhyme check entirely."
+          },
+          "example": { "type": "array", "items": { "type": "string" } },
+          "notes": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

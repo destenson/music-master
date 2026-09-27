@@ -1,0 +1,123 @@
+{
+  "1": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "acestep_v1.5_xl_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "2": {
+    "class_type": "DualCLIPLoader",
+    "inputs": {
+      "clip_name1": "qwen_0.6b_ace15.safetensors",
+      "clip_name2": "qwen_4b_ace15.safetensors",
+      "type": "ace"
+    }
+  },
+  "3": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "ace_1.5_vae.safetensors"
+    }
+  },
+  "4": {
+    "class_type": "TextEncodeAceStepAudio1.5",
+    "inputs": {
+      "clip": [
+        "2",
+        0
+      ],
+      "tags": "Rap Rock, Nu Metal, Electronic, Driving, Syncopated, Live Drums, Drum Machine, Distorted Bass, Distorted Guitar, Power Chords, Palm-Muted Guitar, Guitar Riffs, Electric Piano, Detuned Synths, Male Rap Vocals, Male Tenor Vocals, Clean Vocals, Melodic Vocals, Soaring Vocals, Harsh Vocals, Gang Vocals, Layered Harmonies, Polished Production, Layered Production, Punchy, Bright, Aggressive, Defiant, Dynamic Energy, Vinyl Scratching, Nu-Metal Rap-Rock",
+      "lyrics": "[Intro - building energy]\n[drum fill]\n\n[Verse 1]\n[rap]\n[driving]\n[urgent]\nStatic on the wire, a fire I can't put out\nEvery word I swallow leaves me hollow and loud\nRunning from the quiet, running out of ground\nScreaming in my chest, I can't hear any sound\nA frequency beneath it I could never name\nBeating in my ribs before I had a voice\nLouder in the quiet, louder in the crowd\nI turn it up until I can't hear the doubt\n[build-up]\n\n[Pre-Chorus - building energy]\n[sung]\n[clean vocal]\n[urgent]\nAnd I feel it rising up again\nThe pressure underneath the skin\nIt's building like a wave about to break\nAnd I am not afraid to let it in\n[stop]\n\n[Chorus - anthemic]\n[clean vocal]\n[melodic vocal]\n[harmonies]\nCut through the static, let it scream\nI am the signal in the dream\nCut through the static, break the sound\nI am the noise you never found\n[downlifter]\n\n[Verse 2]\n[rap]\n[driving]\n[urgent]\nI built a wall of all the noise I couldn't say\nEvery brick another year I walked away\nNow the quiet has a weight I never knew\nHeavier than every door I never opened\nSo I'm tearing out the drywall with my hands\nLetting all the static in again\nCause a signal that you bury isn't gone\nIt's just waiting for a louder song\n[build-up]\n\n[Pre-Chorus - building energy]\n[sung]\n[clean vocal]\n[urgent]\nAnd I feel it rising up again\nThe pressure underneath the skin\nIt's building like a wave about to break\nAnd I am not afraid to let it in\n[riser]\n\n[Chorus - anthemic]\n[clean vocal]\n[melodic vocal]\n[harmonies]\nCut through the static, let it scream\nI am the signal in the dream\nCut through the static, break the sound\nI am the noise you never found\n[stop]\n\n[Bridge - stripped back]\n[clean vocal]\n[breathy]\n[vulnerable]\nAnd if the signal dies tonight\nI want you to remember\nThe quiet was the loudest thing\nI ever had to carry\n[riser]\n\n[Chorus - anthemic]\n[powerful belting]\n[gang vocals]\n[release]\nCut through the static, let it scream\nI am the signal in the dream\nCut through the static, break the sound\nI am the noise you never found\n[crossfade]\n\n[Outro]\n[release]\n",
+      "seed": 3307,
+      "bpm": 120,
+      "duration": 184.0,
+      "timesignature": "4",
+      "language": "en",
+      "keyscale": "D minor",
+      "generate_audio_codes": true,
+      "cfg_scale": 2.0,
+      "temperature": 0.85,
+      "top_p": 0.9,
+      "top_k": 0,
+      "min_p": 0.0
+    }
+  },
+  "5": {
+    "class_type": "ConditioningZeroOut",
+    "inputs": {
+      "conditioning": [
+        "4",
+        0
+      ]
+    }
+  },
+  "6": {
+    "class_type": "EmptyAceStep1.5LatentAudio",
+    "inputs": {
+      "seconds": 184.0,
+      "batch_size": 1
+    }
+  },
+  "7": {
+    "class_type": "ModelSamplingAuraFlow",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ],
+      "shift": 3.0
+    }
+  },
+  "8": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": [
+        "7",
+        0
+      ],
+      "seed": 3307,
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "4",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "6",
+        0
+      ],
+      "denoise": 1.0
+    }
+  },
+  "9": {
+    "class_type": "VAEDecodeAudio",
+    "inputs": {
+      "samples": [
+        "8",
+        0
+      ],
+      "vae": [
+        "3",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "SaveAudioMP3",
+    "inputs": {
+      "audio": [
+        "9",
+        0
+      ],
+      "filename_prefix": "audio/nu-metal-rap-rock",
+      "quality": "V0"
+    }
+  }
+}

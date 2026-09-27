@@ -1,6 +1,20 @@
 __pycache__/
 *.pyc
-spikes/.numba/
+
+# Generated run outputs. Renders, measurements and per-seed prompt records are produced by
+# songs/<song>/build_and_submit.py and the analyse_*.py scripts. They are regenerated rather than
+# stored: the renders live in ComfyUI's output directory, and a take is reproducible from its seed.
+songs/*/take_*.mp3
+songs/*/audio.mp3
+songs/*/prompt_s*.json
+songs/*/report.json
+songs/*/section_analysis.json
+songs/*/*_analysis_s*.json
+songs/*/*_analysis_take*.json
+songs/*/.numba/
+
+spikes/*.result.json
 spikes/*.wav
+spikes/.numba/
 artifacts/
 .venv/

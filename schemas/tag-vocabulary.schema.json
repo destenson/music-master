@@ -67,6 +67,12 @@
           "description": "The requirement this bin creates, in the same vocabulary as RequirementSpec.verify. Adding a bin means adding a checker; this field is how the two stay in step."
         },
         "help": { "type": ["string", "null"], "description": "Tooltip text for the UI." },
+        "polarity": {
+          "type": "string",
+          "enum": ["positive", "negative"],
+          "default": "positive",
+          "description": "Whether selections in this bin add to the prompt or subtract from it. A negative bin's labels are collected as exclusions and never emitted as tags, because a prompt says what to make rather than what not to."
+        },
         "emits_tag": {
           "type": "boolean",
           "default": true,
@@ -132,6 +138,10 @@
         "caution": {
           "type": ["string", "null"],
           "description": "A known reliability limit of this option on the target model, surfaced in the UI and carried into the pre-prompt check. Used where the model's own documentation says an option is unstable rather than merely unusual."
+        },
+        "template_ref": {
+          "type": ["string", "null"],
+          "description": "For structural options: the id of the structure template in structure-templates.json that this option selects. Choosing the option is what picks the contract the lyrics are written to and checked against."
         }
       }
     }

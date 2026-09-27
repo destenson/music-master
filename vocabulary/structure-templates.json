@@ -1,0 +1,1214 @@
+{
+  "structure_templates_version": "1",
+  "note": "Named song structures as data. A template is a contract, not a label: the lyric generator is handed it as a writing brief, the composer instantiates its bar plan, and check_lyrics.py verifies the result against it. Sections are listed one entry per occurrence, in performance order, so sequence checking is a straight comparison.",
+  "default_syllable_band": [
+    6,
+    10
+  ],
+  "assumptions": "Bar counts assume 4/4 and are the conventional shape for the form, not a law. Section bar counts at 8 and connective sections at 4 are the norm; a template's total bars divided by its tempo gives its duration, which is arithmetic and therefore belongs in code.",
+  "templates": [
+    {
+      "id": "nu_metal_rap_rock",
+      "name": "Nu-metal rap-rock",
+      "summary": "Quiet-loud rap-rock: rapped verses, a building pre-chorus, a cathartic sung chorus, and a stripped bridge before the last one.",
+      "typical_use": [
+        "nu metal",
+        "rap rock",
+        "alternative metal",
+        "industrial rock"
+      ],
+      "duration_range_s": [
+        165,
+        230
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 8,
+          "energy": 3,
+          "energy_tags": [
+            "et_building"
+          ],
+          "note": "Electronic build; no vocal.",
+          "transition_out": "tt_drum_fill"
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "internal",
+          "energy": 3,
+          "vocals": [
+            "vt_rap"
+          ],
+          "energy_tags": [
+            "et_driving",
+            "et_urgent"
+          ],
+          "note": "Rapped, not shouted: the verse is rhythmic and controlled, and it is the section the ear can actually follow.",
+          "transition_out": "tt_build"
+        },
+        {
+          "role": "pre_chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 4,
+          "vocals": [
+            "vt_sung",
+            "vt_clean"
+          ],
+          "energy_tags": [
+            "et_building",
+            "et_urgent"
+          ],
+          "transition_out": "tt_stop"
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true,
+          "vocals": [
+            "vt_clean",
+            "vt_melodic",
+            "vt_harmonies"
+          ],
+          "energy_tags": [
+            "et_anthemic"
+          ],
+          "note": "The chorus is the sung moment. Clean and melodic on top of loud guitars, wide and layered, not shouted.",
+          "transition_out": "tt_downlifter"
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "internal",
+          "energy": 3,
+          "vocals": [
+            "vt_rap"
+          ],
+          "energy_tags": [
+            "et_driving",
+            "et_urgent"
+          ],
+          "transition_out": "tt_build"
+        },
+        {
+          "role": "pre_chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 4,
+          "vocals": [
+            "vt_sung",
+            "vt_clean"
+          ],
+          "energy_tags": [
+            "et_building",
+            "et_urgent"
+          ],
+          "transition_out": "tt_riser"
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true,
+          "vocals": [
+            "vt_clean",
+            "vt_melodic",
+            "vt_harmonies"
+          ],
+          "energy_tags": [
+            "et_anthemic"
+          ],
+          "transition_out": "tt_stop"
+        },
+        {
+          "role": "bridge",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "free",
+          "energy": 2,
+          "vocals": [
+            "vt_clean",
+            "vt_breathy"
+          ],
+          "energy_tags": [
+            "et_stripped",
+            "et_vulnerable"
+          ],
+          "note": "The quiet one, and the only place a ragged edge is wanted: a single voice, exposed, before the last chorus opens up.",
+          "transition_out": "tt_riser"
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true,
+          "vocals": [
+            "vt_belting",
+            "vt_gang"
+          ],
+          "energy_tags": [
+            "et_anthemic",
+            "et_release"
+          ],
+          "note": "Loudest chorus because the bridge was not. Belting over gang vocals, no harsh vocal needed.",
+          "transition_out": "tt_crossfade"
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "energy": 4,
+          "energy_tags": [
+            "et_release"
+          ],
+          "note": "No vocal; the riff out."
+        }
+      ],
+      "notes": "The form depends on dynamics, not on new material: the same chorus three times, the third one loud because the bridge was not. Rapped verses carry internal rhyme rather than end rhyme, so the rhyme check is asked for presence rather than pattern. Eight-line verses are twice a pop verse because a rap line moves at about one per bar, not one per two."
+    },
+    {
+      "id": "pop_standard",
+      "name": "Pop standard",
+      "summary": "Two verses, a pre-chorus lift, a bridge, and a double chorus to finish.",
+      "typical_use": [
+        "contemporary pop",
+        "R&B",
+        "dance-pop"
+      ],
+      "duration_range_s": [
+        150,
+        240
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "pre_chorus",
+          "bars": 4,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "pre_chorus",
+          "bars": 4,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "bridge",
+          "bars": 4,
+          "lines": 4,
+          "rhyme_scheme": "abba",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "The default when a brief names no form. The bridge is the only section that should sound new; the final chorus earns its extra energy from the arrangement rather than new words."
+    },
+    {
+      "id": "verse_chorus",
+      "name": "Verse-chorus",
+      "summary": "The simplest useful form: two verses and two choruses, nothing between them.",
+      "typical_use": [
+        "indie rock",
+        "folk",
+        "punk",
+        "short briefs"
+      ],
+      "duration_range_s": [
+        110,
+        180
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "Use the forgiving ABCB scheme in the verses so the narrative is not bent to fit rhymes, and keep the chorus on a stricter scheme so it lands as the hook."
+    },
+    {
+      "id": "verse_pre_chorus_chorus",
+      "name": "Verse with a lift",
+      "summary": "Verse, pre-chorus, chorus, twice, then out.",
+      "typical_use": [
+        "pop",
+        "K-pop",
+        "musical theatre",
+        "anything needing a build"
+      ],
+      "duration_range_s": [
+        130,
+        200
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "pre_chorus",
+          "bars": 4,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "pre_chorus",
+          "bars": 4,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "The pre-chorus exists to change state, so its rhyme should not repeat the verse's. A short pre-chorus with a rising syllable count is the standard trick."
+    },
+    {
+      "id": "hook_first",
+      "name": "Chorus first",
+      "summary": "Opens on the hook, then verse-chorus, then a final chorus.",
+      "typical_use": [
+        "streaming-era pop",
+        "hip-hop",
+        "short-attention briefs"
+      ],
+      "duration_range_s": [
+        120,
+        190
+      ],
+      "sections": [
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "Puts the hook inside the first twenty seconds, which is a distribution decision rather than a musical one. The opening chorus must work with no setup, so it cannot depend on the verse's imagery."
+    },
+    {
+      "id": "aaba",
+      "name": "AABA (32-bar)",
+      "summary": "The standard form: two statements, a contrasting bridge, and a return.",
+      "typical_use": [
+        "jazz standards",
+        "traditional pop",
+        "show tunes",
+        "crooner ballads"
+      ],
+      "duration_range_s": [
+        120,
+        180
+      ],
+      "sections": [
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaba",
+          "energy": 3
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaba",
+          "energy": 3
+        },
+        {
+          "role": "bridge",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaba",
+          "energy": 4
+        }
+      ],
+      "notes": "The same 32 bars every time: the interest comes from the chords and the delivery, not the form. The 'verse' here is the refrain section, so lyrically it should repeat."
+    },
+    {
+      "id": "twelve_bar_blues",
+      "name": "12-bar blues",
+      "summary": "Three 12-bar choruses over a fixed progression, with an instrumental break.",
+      "typical_use": [
+        "blues",
+        "soul",
+        "rock and roll",
+        "gospel"
+      ],
+      "duration_range_s": [
+        130,
+        210
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 12,
+          "lines": 4,
+          "rhyme_scheme": "aaab",
+          "energy": 3
+        },
+        {
+          "role": "verse",
+          "bars": 12,
+          "lines": 4,
+          "rhyme_scheme": "aaab",
+          "energy": 3
+        },
+        {
+          "role": "solo",
+          "bars": 12,
+          "energy": 4
+        },
+        {
+          "role": "verse",
+          "bars": 12,
+          "lines": 4,
+          "rhyme_scheme": "aaab",
+          "energy": 4
+        }
+      ],
+      "notes": "The AAAB repetition is structural: line 2 restates line 1 and line 3 turns. A template that also demands couplets here would fight the form."
+    },
+    {
+      "id": "through_composed",
+      "name": "Through-composed",
+      "summary": "No section repeats. The song keeps moving.",
+      "typical_use": [
+        "progressive rock",
+        "art pop",
+        "narrative folk",
+        "post-rock"
+      ],
+      "duration_range_s": [
+        150,
+        260
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 8,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "free",
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "free",
+          "energy": 3
+        },
+        {
+          "role": "bridge",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "free",
+          "energy": 4
+        },
+        {
+          "role": "outro",
+          "bars": 8,
+          "energy": 2
+        }
+      ],
+      "notes": "Hardest form to write and the one most likely to lose a listener, because nothing returns to orient them. If a brief asks for no repetition, keep one recurring image or phrase even when the sections do not repeat."
+    },
+    {
+      "id": "loop_based",
+      "name": "Loop-based",
+      "summary": "One hooky figure repeated with sections layered over it.",
+      "typical_use": [
+        "lo-fi",
+        "chillhop",
+        "minimal pop",
+        "instrumental-forward briefs"
+      ],
+      "duration_range_s": [
+        90,
+        160
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "energy": 1
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 3,
+          "hook": true
+        },
+        {
+          "role": "instrumental",
+          "bars": 8,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 3,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 1
+        }
+      ],
+      "notes": "Succeeds or fails on the loop, so the lyric should stay out of its way: few words, repeated, sitting in the same place in the bar every time."
+    },
+    {
+      "id": "build_drop",
+      "name": "Build and drop",
+      "summary": "Two builds into two drops, with a breakdown between.",
+      "typical_use": [
+        "EDM",
+        "house",
+        "dubstep",
+        "electronic pop"
+      ],
+      "duration_range_s": [
+        120,
+        200
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "energy": 2
+        },
+        {
+          "role": "build",
+          "bars": 8,
+          "energy": 3
+        },
+        {
+          "role": "drop",
+          "bars": 8,
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "breakdown",
+          "bars": 4,
+          "energy": 1
+        },
+        {
+          "role": "build",
+          "bars": 8,
+          "energy": 3
+        },
+        {
+          "role": "drop",
+          "bars": 8,
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "energy": 2
+        }
+      ],
+      "notes": "The vocal in a build is usually a short phrase rather than a verse, and the drop is often instrumental. A template demanding four-line verses here would produce something nobody drops."
+    },
+    {
+      "id": "storyteller",
+      "name": "Storyteller",
+      "summary": "Consecutive verses carrying a narrative, with a refrain at most.",
+      "typical_use": [
+        "folk",
+        "country",
+        "Americana",
+        "protest song"
+      ],
+      "duration_range_s": [
+        150,
+        260
+      ],
+      "sections": [
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 3,
+          "optional": true,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 3
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 3
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "ABCB is the right scheme here because forcing line 1 and 3 to rhyme would distort the story. Energy should rise across the verses even though the words do more work than the arrangement."
+    },
+    {
+      "id": "rap_verse_hook",
+      "name": "Rap verse and hook",
+      "summary": "Three 16-bar verses separated by an eight-bar hook.",
+      "typical_use": [
+        "hip-hop",
+        "trap",
+        "drill",
+        "grime"
+      ],
+      "duration_range_s": [
+        150,
+        240
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "internal",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "internal",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "chain",
+          "energy": 3,
+          "optional": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "Eight-line verses, not four: a rap verse is twice the length of a sung one. The hook is short and often monorhyme, and internal rhyme (not end rhyme) carries the verses, so expect the rhyme check to under-report here."
+    },
+    {
+      "id": "ballad_dynamic",
+      "name": "Ballad with a quiet bridge",
+      "summary": "Restrained verses, a big chorus, a stripped bridge, then the biggest chorus.",
+      "typical_use": [
+        "power ballad",
+        "soul",
+        "emotional pop",
+        "film soundtrack"
+      ],
+      "duration_range_s": [
+        170,
+        260
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 1
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 2
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "bridge",
+          "bars": 4,
+          "lines": 4,
+          "rhyme_scheme": "abba",
+          "energy": 1
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        }
+      ],
+      "notes": "The dynamic arc is the point, so the template's energy column is as important as its section list. A bridge marked energy 1 after a chorus at 4 is a deliberate drop, not an inconsistency."
+    },
+    {
+      "id": "radio_short",
+      "name": "Short edit",
+      "summary": "Straight in, two choruses, straight out. No intro, no bridge.",
+      "typical_use": [
+        "radio edit",
+        "short-form video",
+        "jingles",
+        "briefs with a hard duration"
+      ],
+      "duration_range_s": [
+        75,
+        120
+      ],
+      "sections": [
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "energy": 2
+        }
+      ],
+      "notes": "Nothing may be spent on setup. The first line has to establish the whole song, because there is no intro and no second chance."
+    },
+    {
+      "id": "call_response",
+      "name": "Call and response",
+      "summary": "Choruses built from a lead phrase answered by a group.",
+      "typical_use": [
+        "gospel",
+        "soul",
+        "blues",
+        "work song",
+        "stadium chorus"
+      ],
+      "duration_range_s": [
+        140,
+        220
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "optional": true,
+          "energy": 2
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 4,
+          "hook": true
+        },
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abcb",
+          "energy": 3
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "abab",
+          "energy": 5,
+          "hook": true
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "optional": true,
+          "energy": 3
+        }
+      ],
+      "notes": "The answering lines are written in parentheses, which the model reads as backing vocals. That means the chorus needs its own two-part structure in the lyric markup, and the checker will treat parenthesised lines as asides rather than as lyric lines."
+    },
+    {
+      "id": "one_verse_sketch",
+      "name": "Sketch",
+      "summary": "One verse and a short instrumental. A fragment, not a song.",
+      "typical_use": [
+        "idea capture",
+        "loop pack",
+        "prototype before committing to a form"
+      ],
+      "duration_range_s": [
+        25,
+        60
+      ],
+      "sections": [
+        {
+          "role": "verse",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aabb",
+          "energy": 2
+        },
+        {
+          "role": "instrumental",
+          "bars": 4,
+          "energy": 2
+        }
+      ],
+      "notes": "Exists so the pipeline has a legitimate small target. Useful when the brief is exploratory and the intent is to listen to a direction before writing a whole song."
+    },
+    {
+      "id": "rap_metal_groove",
+      "name": "Rap-metal groove",
+      "summary": "A groove-first rap-metal form: riff intro, two dense rap verses around a shouted monorhyme chorus, an instrumental breakdown, then the chorus again.",
+      "typical_use": [
+        "rap metal",
+        "funk metal",
+        "rap rock",
+        "alternative metal"
+      ],
+      "duration_range_s": [
+        165,
+        230
+      ],
+      "sections": [
+        {
+          "role": "intro",
+          "bars": 4,
+          "energy": 4,
+          "energy_tags": [
+            "et_building"
+          ],
+          "transition_out": "tt_hard_cut",
+          "note": "A riff, not a build. No vocal."
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "internal",
+          "energy": 4,
+          "vocals": [
+            "vt_rap",
+            "vt_spoken_word"
+          ],
+          "energy_tags": [
+            "et_driving",
+            "et_aggressive"
+          ],
+          "transition_out": "tt_build",
+          "note": "Dense and rhyme-driven, phrased off the beat. Bass and drums carry the groove; the voice rides it."
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 5,
+          "hook": true,
+          "vocals": [
+            "vt_shouted",
+            "vt_gang"
+          ],
+          "energy_tags": [
+            "et_anthemic",
+            "et_release"
+          ],
+          "transition_out": "tt_hard_cut",
+          "note": "A shouted slogan in monorhyme. Short, repeatable, meant to be chanted back."
+        },
+        {
+          "role": "verse",
+          "bars": 16,
+          "lines": 8,
+          "rhyme_scheme": "internal",
+          "energy": 4,
+          "vocals": [
+            "vt_rap",
+            "vt_spoken_word"
+          ],
+          "energy_tags": [
+            "et_driving",
+            "et_aggressive"
+          ],
+          "transition_out": "tt_build"
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 5,
+          "hook": true,
+          "vocals": [
+            "vt_shouted",
+            "vt_gang"
+          ],
+          "energy_tags": [
+            "et_anthemic"
+          ],
+          "transition_out": "tt_stop",
+          "note": "Stopped dead before the breakdown, which is what makes the breakdown land."
+        },
+        {
+          "role": "solo",
+          "bars": 8,
+          "energy": 4,
+          "energy_tags": [
+            "et_driving"
+          ],
+          "transition_out": "tt_build",
+          "note": "The guitar breakdown. No vocal; this is where the textures are."
+        },
+        {
+          "role": "chorus",
+          "bars": 8,
+          "lines": 4,
+          "rhyme_scheme": "aaaa",
+          "energy": 5,
+          "hook": true,
+          "vocals": [
+            "vt_shouted",
+            "vt_gang"
+          ],
+          "energy_tags": [
+            "et_anthemic",
+            "et_release"
+          ],
+          "transition_out": "tt_hard_cut"
+        },
+        {
+          "role": "outro",
+          "bars": 4,
+          "energy": 4,
+          "energy_tags": [
+            "et_release"
+          ],
+          "note": "No vocal; the groove out."
+        }
+      ],
+      "notes": "Groove first: the bass and drums are as much the hook as the chorus is, so the verse should sit on a repeating funk figure rather than a chord progression. Verses are rapped and phrased off the beat; the chorus is shouted, not sung, and short enough to chant. The breakdown is instrumental because the guitar textures are the point of it."
+    }
+  ]
+}

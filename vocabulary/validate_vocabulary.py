@@ -32,8 +32,143 @@ VOCAB_PATH = ROOT / "vocabulary" / "tag-bins.json"
 SCHEMA_PATH = ROOT / "schemas" / "tag-vocabulary.schema.json"
 SECTION_TAGS_PATH = ROOT / "vocabulary" / "section-tags.json"
 SECTION_SCHEMA_PATH = ROOT / "schemas" / "section-tags.schema.json"
+RHYME_PATH = ROOT / "vocabulary" / "rhyme-schemes.json"
+RHYME_SCHEMA_PATH = ROOT / "schemas" / "rhyme-schemes.schema.json"
+TEMPLATES_PATH = ROOT / "vocabulary" / "structure-templates.json"
+TEMPLATES_SCHEMA_PATH = ROOT / "schemas" / "structure-templates.schema.json"
+RATES_PATH = ROOT / "vocabulary" / "delivery-rates.json"
+RATES_SCHEMA_PATH = ROOT / "schemas" / "delivery-rates.schema.json"
 
-POOLS = ("sections", "modifiers", "vocal_tags", "energy_tags", "instrumental_section_tags")
+POOLS = ("sections", "modifiers", "transition_tags", "vocal_tags", "energy_tags",
+         "instrumental_section_tags")
+
+# Plausible tempo envelope used to sanity-check a bar plan against a claimed duration.
+MIN_TEMPO, MAX_TEMPO = 60.0, 200.0
+
+
+def _schema_check(path: Path, schema_path: Path, label: str, p: Problems) -> dict | None:
+    try:
+        data = json.loads(path.read_text())
+    except FileNotFoundError:
+        p.warn(f"{path.name} not found; skipped {label} validation")
+        return None
+    except json.JSONDecodeError as exc:
+        p.error(f"{path.name} is not valid JSON: {exc}")
+        return None
+    try:
+        import jsonschema  # type: ignore
+    except ImportError:
+        return data
+    schema = json.loads(schema_path.read_text())
+    for err in sorted(jsonschema.Draft202012Validator(schema).iter_errors(data), key=lambda e: list(e.path)):
+        location = "/".join(str(x) for x in err.path) or "<root>"
+        p.error(f"{label} schema: {location}: {err.message}")
+    return data
+
+
+def check_rhyme_schemes(p: Problems) -> set[str]:
+    rs = _schema_check(RHYME_PATH, RHYME_SCHEMA_PATH, "rhyme-schemes", p)
+    if rs is None:
+        return set()
+    ids = [s.get("id") for s in rs.get("schemes", [])]
+    for dup in {i for i in ids if ids.count(i) > 1}:
+        p.error(f"rhyme-schemes: id '{dup}' is duplicated")
+    return set(ids)
+
+
+def check_structure_templates(p: Problems, section_roles: set[str], scheme_ids: set[str],
+                              section_tags: dict | None = None) -> dict:
+    st = _schema_check(TEMPLATES_PATH, TEMPLATES_SCHEMA_PATH, "structure-templates", p)
+    if st is None:
+        return {}
+
+    band = st.get("default_syllable_band", [6, 10])
+    if len(band) == 2 and band[0] > band[1]:
+        p.error(f"structure-templates: syllable band {band} is inverted")
+
+    ids = [t.get("id") for t in st.get("templates", [])]
+    for dup in {i for i in ids if ids.count(i) > 1}:
+        p.error(f"structure-templates: template id '{dup}' is duplicated")
+
+    for t in st.get("templates", []):
+        tid = t.get("id", "<missing id>")
+        sections = t.get("sections", [])
+        if not sections:
+            p.error(f"structure-templates '{tid}': has no sections")
+            continue
+
+        for sec in sections:
+            role = sec.get("role")
+            if role not in section_roles:
+                p.error(
+                    f"structure-templates '{tid}': role '{role}' is not a section in "
+                    f"section-tags.json (expected one of {sorted(section_roles)})"
+                )
+            scheme = sec.get("rhyme_scheme")
+            if scheme is not None and scheme not in scheme_ids:
+                p.error(
+                    f"structure-templates '{tid}': rhyme_scheme '{scheme}' is not in "
+                    f"rhyme-schemes.json"
+                )
+            if sec.get("lines") and scheme is None:
+                p.warn(
+                    f"structure-templates '{tid}': section '{role}' has lyrics but no rhyme scheme"
+                )
+            if scheme is not None and not sec.get("lines"):
+                p.warn(
+                    f"structure-templates '{tid}': section '{role}' names a rhyme scheme but no lines"
+                )
+
+            if section_tags:
+                known_transitions = {t["id"] for t in section_tags.get("transition_tags", [])}
+                if sec.get("transition_out") and sec["transition_out"] not in known_transitions:
+                    p.error(
+                        f"structure-templates '{tid}' section '{role}': transition_out names "
+                        f"'{sec['transition_out']}', which is not in the transition_tags pool"
+                    )
+                for field, pool in (("vocals", "vocal_tags"), ("energy_tags", "energy_tags")):
+                    known = {t["id"] for t in section_tags.get(pool, [])}
+                    for ref in sec.get(field) or []:
+                        if ref not in known:
+                            p.error(
+                                f"structure-templates '{tid}' section '{role}': {field} names "
+                                f"'{ref}', which is not in the {pool} pool"
+                            )
+                budget = section_tags.get("grammar", {}).get("max_tags_per_section", 4)
+                total = len(sec.get("vocals") or []) + len(sec.get("energy_tags") or [])
+                if total > budget:
+                    p.error(
+                        f"structure-templates '{tid}' section '{role}': {total} standalone tags "
+                        f"exceeds max_tags_per_section {budget}"
+                    )
+                if sec.get("vocals") and not sec.get("lines"):
+                    p.warn(
+                        f"structure-templates '{tid}' section '{role}': asks for vocal tags on a "
+                        f"section with no lyric lines"
+                    )
+
+        if any(s.get("role") == "chorus" for s in sections) and not any(s.get("hook") for s in sections):
+            p.warn(f"structure-templates '{tid}': has a chorus but no section marked as the hook")
+
+        energies = [s["energy"] for s in sections if s.get("energy")]
+        rng = t.get("duration_range_s") or []
+        # A sketch is too short for a dynamic arc to be meaningful, so a flat one is fine there.
+        short_form = bool(rng) and rng[-1] < 70
+        if energies and max(energies) == min(energies) and not short_form:
+            p.warn(f"structure-templates '{tid}': the energy arc is flat")
+
+        total_bars = sum(s.get("bars", 0) for s in sections)
+        if len(rng) == 2:
+            low = total_bars * 4 * 60 / MAX_TEMPO
+            high = total_bars * 4 * 60 / MIN_TEMPO
+            if rng[1] < low or rng[0] > high:
+                p.error(
+                    f"structure-templates '{tid}': {total_bars} bars implies {low:.0f}-{high:.0f}s "
+                    f"at {MIN_TEMPO:.0f}-{MAX_TEMPO:.0f} BPM, which does not overlap the claimed "
+                    f"duration {rng}"
+                )
+
+    return st
 
 MULTI_CONTROLS = {"multi_select", "ranked_multi"}
 SELECT_CONTROLS = {"single_select", "multi_select", "ranked_multi", "combo_free"}
@@ -117,6 +252,12 @@ def check_bins(vocab: dict, p: Problems) -> None:
             b = next(x for x in bins if x.get("id") == bin_id)
             if b.get("emits_tag", True):
                 p.warn(f"bin '{bin_id}' emits tags but has no render position")
+    for b in bins:
+        if b.get("polarity", "positive") == "negative" and b.get("emits_tag", True):
+            p.error(
+                f"bin '{b.get('id')}': polarity is negative but emits_tag is true; a bin that "
+                f"subtracts cannot also add"
+            )
 
     dupes = {x for x in render_order if render_order.count(x) > 1}
     for d in dupes:
@@ -195,6 +336,31 @@ def check_section_tags(p: Problems) -> dict:
     if st.get("grammar", {}).get("max_modifiers") != 1:
         p.error("section-tags: max_modifiers should be 1; the model's guide warns against stacking")
 
+    # A label that appears in the sections pool and in a tag pool is unparseable: the checker
+    # decides section header versus standalone tag by label, so the same string in both places
+    # silently turns a transition into a section. Two tag pools sharing a label are merely
+    # ambiguous about which pool a standalone tag came from.
+    section_labels = {t["label"].casefold() for t in st.get("sections", [])}
+    standalone_owner: dict[str, str] = {}
+    for pool in POOLS:
+        if pool == "sections":
+            continue
+        for tag in st.get(pool, []):
+            lab = tag["label"].casefold()
+            if lab in section_labels and pool != "modifiers":
+                p.error(
+                    f"section-tags: label '{tag['label']}' is in the '{pool}' pool and also in "
+                    f"'sections'; the parser cannot tell a section header from a standalone tag"
+                )
+            if pool != "modifiers" and lab in standalone_owner:
+                p.warn(
+                    f"section-tags: label '{tag['label']}' appears in both "
+                    f"'{standalone_owner[lab]}' and '{pool}'; a standalone tag of that label "
+                    f"cannot be attributed to one pool"
+                )
+            if pool != "modifiers":
+                standalone_owner[lab] = pool
+
     seen: dict[str, str] = {}
     for pool in POOLS:
         labels: dict[str, str] = {}
@@ -229,6 +395,66 @@ def check_section_tags(p: Problems) -> dict:
     return st
 
 
+def check_delivery_rates(p: Problems) -> dict:
+    """Validate the delivery profiles that the time budget depends on."""
+    rates = _schema_check(RATES_PATH, RATES_SCHEMA_PATH, "delivery-rates", p)
+    if rates is None:
+        return {}
+
+    ids = [r.get("id") for r in rates.get("profiles", [])]
+    for dup in {i for i in ids if ids.count(i) > 1}:
+        p.error(f"delivery-rates: profile id '{dup}' is duplicated")
+    if rates.get("default") not in ids:
+        p.error(f"delivery-rates: default '{rates.get('default')}' is not one of the profiles")
+
+    for r in rates.get("profiles", []):
+        rid = r.get("id", "<missing id>")
+        band = r.get("band", [])
+        if len(band) == 2 and band[0] > band[1]:
+            p.error(f"delivery-rates '{rid}': band {band} is inverted")
+        comfy, hard = r.get("comfortable_max"), r.get("hard_max")
+        if comfy is not None and hard is not None and comfy > hard:
+            p.error(
+                f"delivery-rates '{rid}': comfortable_max {comfy} exceeds hard_max {hard}, "
+                f"so nothing would ever be reported as merely rushed"
+            )
+        if rid != "instrumental" and not band:
+            p.error(f"delivery-rates '{rid}': has no band, so no writing budget could be stated")
+        if rid == "instrumental" and (hard or comfy):
+            p.warn(f"delivery-rates '{rid}': an instrumental profile with a non-zero rate ceiling")
+    return rates
+
+
+def check_template_budget(p: Problems, templates: dict, rates: dict) -> None:
+    """Check that a template's own minimum ask fits the clock.
+
+    A template and a delivery profile can each be internally fine and still disagree: four lines in
+    a four-bar section is a normal shape, and so is a 6-syllable minimum per line, but at 200 BPM
+    the two together are unsingable. Checked at a nominal 100 BPM because a template declares bars
+    rather than a tempo; a warning here means the pairing is tight, not that either file is wrong.
+    """
+    try:
+        import timeline as T  # type: ignore
+    except ImportError:
+        p.warn("timeline.py not importable; skipped the template/time-budget cross-check")
+        return
+
+    section_tags = json.loads(SECTION_TAGS_PATH.read_text())
+    profile = T.rate_profile(rates, None)
+    for t in templates.get("templates", []):
+        plan = T.build_timeline(t, 100.0, section_tags, profile, templates)
+        for row in plan["rows"]:
+            if row["instrumental"] or not row["lines"]:
+                continue
+            if not row["budget_fits"]:
+                p.warn(
+                    f"structure-templates '{t['id']}' section '{row['role']}': {row['lines']} lines "
+                    f"in {row['bars']} bars needs at least {row['budget_min']} syllables in "
+                    f"{row['singable_s']:.1f}s, above the {profile['label']} ceiling of "
+                    f"{row['ceiling']}; at 100 BPM this shape and this delivery disagree"
+                )
+
+
 def main() -> int:
     p = Problems()
     try:
@@ -255,9 +481,40 @@ def main() -> int:
         section_tags = {}
         p.error(f"section-tags.json is not valid JSON: {exc}")
 
+    scheme_ids = check_rhyme_schemes(p)
+    roles = {s["id"].removeprefix("sec_") for s in section_tags.get("sections", [])}
+    templates = check_structure_templates(p, roles, scheme_ids, section_tags)
+
+    # Structural options point at templates; check both directions of that link.
+    known_templates = {t["id"] for t in templates.get("templates", [])}
+    referenced: set[str] = set()
+    for b in vocab.get("bins", []):
+        for opt in b.get("options") or []:
+            ref = opt.get("template_ref")
+            if ref is None:
+                continue
+            if ref not in known_templates:
+                p.error(
+                    f"bin '{b['id']}' option '{opt['id']}': template_ref '{ref}' is not a known "
+                    f"structure template"
+                )
+            else:
+                referenced.add(ref)
+    for missing in sorted(known_templates - referenced):
+        p.warn(
+            f"structure template '{missing}' is not reachable from any bin option, so no UI "
+            f"control selects it"
+        )
+
     bin_count = len(vocab.get("bins", []))
     option_count = sum(len(b.get("options") or []) for b in vocab.get("bins", []))
     tag_count = sum(len(section_tags.get(pool, [])) for pool in POOLS)
+    scheme_count = len(scheme_ids)
+    template_count = len(templates.get("templates", []))
+    rates = check_delivery_rates(p)
+    profile_count = len(rates.get("profiles", []))
+    if rates:
+        check_template_budget(p, templates, rates)
 
     for w in p.warnings:
         print(f"warn: {w}")
@@ -267,6 +524,8 @@ def main() -> int:
     print(
         f"\n{bin_count} bins, {option_count} options, tag budget {vocab.get('tag_budget')}"
         f"\n{tag_count} section tags across {len(POOLS)} pools"
+        f"\n{scheme_count} rhyme schemes, {template_count} structure templates"
+        f"\n{profile_count} delivery profiles"
     )
     if p.errors:
         print(f"FAILED with {len(p.errors)} error(s) and {len(p.warnings)} warning(s)")

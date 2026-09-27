@@ -1,0 +1,275 @@
+{
+  "rhyme_schemes_version": "1",
+  "note": "The rhyme patterns a lyric section can be written to, as data, so that a template can demand one and the checker can verify it. Patterns are written as letter strings over line positions: A, B, C mark distinct rhyme sounds and X marks a deliberately unrhymed line.",
+  "detectability_note": "The checker's rhyme detection is spelling-based and approximate (see docs/design/tag-vocabulary.md 7.1). A missed rhyme may be the detector's fault rather than the writer's, so every result here is advisory and the `strictness` field says how much weight to give a mismatch.",
+  "schemes": [
+    {
+      "id": "aabb",
+      "name": "Couplets",
+      "pattern": "AABB",
+      "kind": "end",
+      "description": "Lines 1-2 rhyme, then lines 3-4 rhyme. Two independent pairs.",
+      "typical_use": [
+        "pop verses",
+        "hip-hop",
+        "rap",
+        "simple hooks"
+      ],
+      "strictness": "strict",
+      "example": [
+        "blank slate on my screen (A)",
+        "you know what I mean (A)",
+        "VAE on the right (B)",
+        "I'm building tonight (B)"
+      ],
+      "notes": "The most common scheme in modern popular lyric. Easy to write, easy to make monotonous: vary the pair sounds between sections."
+    },
+    {
+      "id": "abab",
+      "name": "Alternating",
+      "pattern": "ABAB",
+      "kind": "end",
+      "description": "Lines 1 and 3 rhyme; lines 2 and 4 rhyme.",
+      "typical_use": [
+        "ballads",
+        "country",
+        "singer-songwriter",
+        "verses that need forward motion"
+      ],
+      "strictness": "strict",
+      "example": [
+        "walking through the rain (A)",
+        "I hear your name (B)",
+        "I feel it all again (A)",
+        "it's never quite the same (B)"
+      ],
+      "notes": "Carries a section forward better than couplets because the rhyme resolves late. Harder to sustain over four lines without forcing."
+    },
+    {
+      "id": "abcb",
+      "name": "Common metre / ballad",
+      "pattern": "ABCB",
+      "kind": "end",
+      "description": "Only lines 2 and 4 rhyme. Lines 1 and 3 are free.",
+      "typical_use": [
+        "folk ballads",
+        "hymns",
+        "narrative song",
+        "storytelling verses"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "the diner on the corner shut its doors (A)",
+        "the payphone lost its tone (B)",
+        "I memorised the number anyway (C)",
+        "in case I'm not alone (B)"
+      ],
+      "notes": "The most forgiving useful scheme: half the lines are unconstrained, which suits narrative where forcing a rhyme would distort the story. A good default when the brief is content-led rather than hook-led."
+    },
+    {
+      "id": "aaaa",
+      "name": "Monorhyme",
+      "pattern": "AAAA",
+      "kind": "end",
+      "description": "Every line rhymes with every other.",
+      "typical_use": [
+        "rap verses",
+        "chants",
+        "hooks",
+        "drill"
+      ],
+      "strictness": "strict",
+      "example": [
+        "link it up (A)",
+        "in my cup (A)",
+        "running out of luck (A)",
+        "never going to stop (A)"
+      ],
+      "notes": "Powerful and quickly tiring. Works best in short sections, or where the rhyme sound is chosen for its vowel colour rather than for the words it forces."
+    },
+    {
+      "id": "abba",
+      "name": "Enclosed",
+      "pattern": "ABBA",
+      "kind": "end",
+      "description": "Lines 1 and 4 rhyme; the inner pair rhyme with each other.",
+      "typical_use": [
+        "poetic verse",
+        "indie folk",
+        "art pop",
+        "bridges"
+      ],
+      "strictness": "strict",
+      "example": [
+        "I drive the long way home (A)",
+        "past the corner where we stand (B)",
+        "your voice still in my hand (B)",
+        "and I am not alone (A)"
+      ],
+      "notes": "Feels enclosed and deliberate. Rare in pop because the delayed resolution can read as fussy; very effective in a bridge."
+    },
+    {
+      "id": "aaab",
+      "name": "Blues quatrain",
+      "pattern": "AAAB",
+      "kind": "end",
+      "description": "The first line is repeated, then a rhyming punchline.",
+      "typical_use": [
+        "12-bar blues",
+        "soul",
+        "gospel",
+        "rock and roll"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "woke up this morning and the sky was grey (A)",
+        "woke up this morning and the sky was grey (A)",
+        "looked out my window, nothing went my way (A)",
+        "and I've got to get away (B)"
+      ],
+      "notes": "The repetition is structural, not a mistake: line 2 restates line 1 and line 3 turns it. Pairs with the twelve_bar_blues structure template."
+    },
+    {
+      "id": "aaba",
+      "name": "AABA",
+      "pattern": "AABA",
+      "kind": "end",
+      "description": "Two rhyming lines, a contrasting line, then a return to the first rhyme.",
+      "typical_use": [
+        "jazz standards",
+        "traditional pop",
+        "show tunes"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "the night is young (A)",
+        "the song's unsung (A)",
+        "and here we are (B)",
+        "the night is young (A)"
+      ],
+      "notes": "The rhyme sound returns after a detour, which gives the section a small arc. The basis of the 32-bar AABA form."
+    },
+    {
+      "id": "abac",
+      "name": "Sparse",
+      "pattern": "ABAC",
+      "kind": "end",
+      "description": "Only lines 1 and 3 rhyme.",
+      "typical_use": [
+        "spoken-word influenced verses",
+        "indie",
+        "verses carrying dense imagery"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "city lights below (A)",
+        "I count the hours down (B)",
+        "a phone that will not glow (A)",
+        "I drive another round (C)"
+      ],
+      "notes": "Leaves most lines unrhymed, so the ones that do rhyme land hard. Useful when the syllable count matters more than the rhyme."
+    },
+    {
+      "id": "xaxa",
+      "name": "Even lines only",
+      "pattern": "XAXA",
+      "kind": "end",
+      "description": "Odd lines are explicitly unrhymed; even lines rhyme.",
+      "typical_use": [
+        "rap",
+        "spoken verses",
+        "conversational delivery"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "open up the canvas and the slate is blank (X)",
+        "drag another node into the light (A)",
+        "checkpoint loader first and then you set the rank (X)",
+        "and the queue is running right (A)"
+      ],
+      "notes": "Distinct from ABCB only in intent: X is a decision, not an accident. Useful for technical or narrative content where an odd-line rhyme would be forced."
+    },
+    {
+      "id": "aabbccdd",
+      "name": "Extended couplets",
+      "pattern": "AABBCCDD",
+      "kind": "end",
+      "description": "Couplets continued across eight lines, each pair with a new sound.",
+      "typical_use": [
+        "rap verses",
+        "long verses",
+        "storytelling"
+      ],
+      "strictness": "strict",
+      "example": [
+        "eight lines",
+        "eight times",
+        "new sound",
+        "new ground"
+      ],
+      "notes": "Only for sections long enough to carry eight lines. Demands four distinct rhyme sounds, so it is prone to forced pairs near the end."
+    },
+    {
+      "id": "chain",
+      "name": "Chained",
+      "pattern": "ABAB CDCD",
+      "kind": "end",
+      "description": "Each four-line block uses its own pair of rhymes, and blocks alternate to form an eight-line section.",
+      "typical_use": [
+        "pop verses",
+        "eight-line verses",
+        "musical theatre"
+      ],
+      "strictness": "strict",
+      "example": [
+        "first block A/B",
+        "first block A/B",
+        "second block C/D",
+        "second block C/D"
+      ],
+      "notes": "A common way to keep a long verse from settling. Treat each four-line block as its own scheme when checking."
+    },
+    {
+      "id": "free",
+      "name": "Free verse",
+      "pattern": "XXXX",
+      "kind": "none",
+      "description": "No rhyme required. Rhythm and imagery carry the section instead.",
+      "typical_use": [
+        "ambient",
+        "spoken word",
+        "post-rock",
+        "deliberately unresolved endings"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "nothing rhymes here",
+        "and nothing needs to",
+        "the image is enough",
+        "if the image is good"
+      ],
+      "notes": "A legitimate choice rather than an absence of one. In a template it means the rhyme check is skipped, not that it is expected to fail."
+    },
+    {
+      "id": "internal",
+      "name": "Internal rhyme",
+      "pattern": "A(AA)A",
+      "kind": "internal",
+      "description": "The rhyme falls inside the line as well as at the end; there may be no end rhyme at all.",
+      "typical_use": [
+        "rap",
+        "drill",
+        "UK grime",
+        "fast delivery"
+      ],
+      "strictness": "lenient",
+      "example": [
+        "I drive the lon- way home alon-",
+        "no li- no pho- just the road",
+        "cold ni-, old fli-, hold tight",
+        "and the radio is low"
+      ],
+      "notes": "The dominant technique in modern rap. The end-rhyme detector cannot see it, so a template using this scheme should expect the rhyme check to report a mismatch rather than trusting it."
+    }
+  ]
+}

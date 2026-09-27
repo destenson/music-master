@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/structure-templates.schema.json",
+  "title": "StructureTemplateLibrary",
+  "description": "Named song structures as data. A template is a contract rather than a label: the lyric generator is handed it as a writing brief, the composer instantiates its bar plan against a tempo and duration, and check_lyrics.py verifies the result against it. Sections are listed one entry per occurrence in performance order, so sequence conformance is a straight comparison rather than a repeat-count calculation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["structure_templates_version", "default_syllable_band", "templates"],
+  "properties": {
+    "structure_templates_version": { "type": "string", "const": "1" },
+    "note": { "type": "string" },
+    "default_syllable_band": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer", "minimum": 1 },
+      "description": "Inclusive lower and upper syllable count per line. Defaults to the generator's documented recommendation of 6-10."
+    },
+    "assumptions": { "type": "string" },
+    "templates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "name", "summary", "sections"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "name": { "type": "string" },
+          "summary": { "type": "string" },
+          "typical_use": { "type": "array", "items": { "type": "string" } },
+          "duration_range_s": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number", "minimum": 1 },
+            "description": "The usual span for this form. Used to reject a brief before generation rather than after, and to sanity-check the instantiated bar plan."
+          },
+          "sections": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "$ref": "#/$defs/Section" }
+          },
+          "notes": { "type": ["string", "null"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "Section": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "bars"],
+      "properties": {
+        "role": {
+          "type": "string",
+          "description": "Must match a section in section-tags.json, named without its 'sec_' prefix, so a template cannot reference a section the lyric vocabulary does not know."
+        },
+        "bars": { "type": "integer", "minimum": 1 },
+        "lines": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "Expected lyric lines. Absent for instrumental sections, which carry none."
+        },
+        "rhyme_scheme": {
+          "type": ["string", "null"],
+          "description": "Must match an id in rhyme-schemes.json, or be null where there are no lyrics."
+        },
+        "energy": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "maximum": 5,
+          "description": "The intended intensity. Checked only as a shape: a template's arc should not be flat where the form is meant to build."
+        },
+        "optional": { "type": "boolean", "default": false, "description": "May be omitted without the template being considered unmet." },
+        "hook": { "type": "boolean", "default": false, "description": "Marks the section that carries the hook, so the checker can verify a hook exists and the oracle knows what to score." },
+        "vocals": {
+          "type": ["array", "null"],
+          "description": "Ids from the vocal_tags pool in section-tags.json: the performance mode, register and delivery for this section. They become standalone bracket tags in the lyric, placed under the section header -- [rap], [clean vocal], [powerful belting] -- which is the mechanism the model's guide presents for vocal control, as distinct from the one hyphenated modifier a section header may take.",
+          "items": { "type": "string" }
+        },
+        "energy_tags": {
+          "type": ["array", "null"],
+          "description": "Ids from the energy_tags pool: how this section should feel, as standalone bracket tags such as [building energy] or [vulnerable].",
+          "items": { "type": "string" }
+        },
+        "transition_out": {
+          "type": ["string", "null"],
+          "description": "How this section leaves, as an id from the transition_tags pool. Written in the lyric as a standalone tag at the end of the section, because a transition belongs to the section it leaves rather than the one it enters. Unlike arrangement, this is checkable: the analyser measures the boundary for the signature the transition implies."
+        },
+        "note": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

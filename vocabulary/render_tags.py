@@ -118,6 +118,22 @@ def collect_tags(vocab: dict, selections: dict) -> list[tuple[int, int, str]]:
     return out
 
 
+def collect_negatives(vocab: dict, selections: dict) -> list[str]:
+    """Labels from negative-polarity bins: exclusions, never tags."""
+    out: list[str] = []
+    for b in vocab["bins"]:
+        if b.get("polarity", "positive") != "negative":
+            continue
+        sel = selections.get(b["id"])
+        if not sel:
+            continue
+        for oid in sel.get("options") or []:
+            opt = next((o for o in (b.get("options") or []) if o["id"] == oid), None)
+            if opt:
+                out.append(opt["label"])
+    return out
+
+
 def render(vocab: dict, selections: dict) -> dict:
     tags = collect_tags(vocab, selections)
 
@@ -131,11 +147,13 @@ def render(vocab: dict, selections: dict) -> dict:
 
     budget = vocab.get("tag_budget", 10**9)
     if len(unique) > budget:
-        # Keep the most defining tags first; ties broken by render order.
-        ranked = sorted(unique, key=lambda t: (t[0], t[1]))
-        keep = {(p, i) for p, i, _ in ranked[:budget]}
-        kept = [t for t in unique if (t[0], t[1]) in keep]
-        omitted = [label for p, i, label in unique if (p, i) not in keep]
+        # Keep the most defining tags first; ties broken by render order. Rank by position, not by
+        # the (priority, index) pair: several options in one bin share that pair, so using it as a
+        # key kept whole bins and overran the budget.
+        ranked = sorted(range(len(unique)), key=lambda k: (unique[k][0], unique[k][1]))
+        keep = set(ranked[:budget])
+        kept = [tag for k, tag in enumerate(unique) if k in keep]
+        omitted = [label for k, (_, _, label) in enumerate(unique) if k not in keep]
     else:
         kept, omitted = unique, []
 
@@ -145,6 +163,7 @@ def render(vocab: dict, selections: dict) -> dict:
         "tags": rendered,
         "string": ", ".join(rendered),
         "omitted": omitted,
+        "negatives": collect_negatives(vocab, selections),
     }
 
 

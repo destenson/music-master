@@ -117,15 +117,20 @@ The rules, in order, as implemented in `render_tags.py`:
 3. **Emit labels verbatim**, options first, then the numeric template (`{value} BPM`), then the
    key and mode, then any free text for that bin.
 4. **Collapse duplicate labels**, keeping the first in render order.
-5. **Enforce the tag budget by priority.** If the string exceeds `tag_budget` (14), tags are
+5. **Enforce the tag budget by priority.** If the string exceeds `tag_budget` (32), tags are
    ranked by bin priority and then by render order, and the lowest-priority surplus is dropped.
 6. **Record every omission.** Dropped tags go into the prompt's `omitted` list. A tag that never
    reaches the model must still be visible in the artifact, or reproducibility is a lie.
 7. **Join with `", "`.**
 
-Step 5 deserves a note. A long tag list does not make a better prompt; it dilutes it. But a
-truncation the user cannot see is worse than no truncation, so the budget is displayed live and
-`omitted` is stored.
+Step 5 deserves a note. A long tag list is not automatically a better prompt, which is why the cap
+is enforced by priority rather than by hoping — but the number itself is model-specific. It sat at
+14 on the strength of a Suno community figure (4–8 descriptors, ~20 ceiling), which was the wrong
+model to borrow from: ACE-Step's own guide says it accepts comma-separated tags, plain style words
+and long natural-language descriptions alike, and that the text format does not significantly
+change performance. A full selection across the nine caption dimensions lands around 30, so the
+budget is now **32**. What matters is that a truncation the user cannot see is worse than no
+truncation, so the budget is displayed live and `omitted` is stored.
 
 ### 4.1 What never becomes a tag
 
@@ -189,7 +194,7 @@ control, a prompt field, and a compliance obligation. The three are kept in step
 | `energy` | `jev.energy` | one score |
 | `lyric_theme` | `jev.theme_adherence` | Jev on lyrics and plan |
 | `hook` | `jev.hook_payoff` | Jev on lyrics |
-| `structure` | `code.audio.sections` | segment the render and compare the section map |
+| `structure` | `code.audio.sections` | segment the render and compare the section map; its option carries a `template_ref`, so choosing a form selects the contract the lyrics are written to and checked against ([lyric templates](lyric-templates.md)) |
 | `explicitness`, `content_exclusions` | `jev.explicitness`, `jev.content_policy` | lexical gates plus Jev policy nouls |
 
 Note that `tempo`, `time_signature` and `key_mode` appear here as obligations even though they
@@ -208,8 +213,8 @@ aliases case-insensitively, then report what did not match for the user to assig
 is a convenience, not a source of truth: the imported result is shown as selections for review
 before it becomes a prompt artifact.
 
-`vocabulary/examples/late-night-trap.json` is that example resolved. Rendering it produces 14
-tags against a budget of 14:
+`vocabulary/examples/late-night-trap.json` is that example resolved. Rendering it produces 13
+tags, well inside the budget of 32:
 
 ```
 Trap, West-Coast Feel, Late Night, 95 BPM, Heavy 808 Bass, Slap Bass, Deep Sub Bass,
@@ -226,8 +231,10 @@ the genre `Trap` plus the scene `Late Night` so either can be changed independen
 
 The tag string is the caption. The **section tags in the lyrics are a separate control surface**,
 and ACE-Step's tutorial calls them "the most powerful tool in Lyrics" — the temporal script to the
-caption's overall portrait. They live in `vocabulary/section-tags.json` and get their own grammar,
-because the guide names two specific failure modes:
+caption's overall portrait. The *shape* those sections form is itself data, in
+[`lyric-templates.md`](lyric-templates.md): 15 structures and 13 rhyme schemes, used as a writing
+brief, a bar plan, and a conformance check. They live in `vocabulary/section-tags.json` and get
+their own grammar, because the guide names two specific failure modes:
 
 > Stacking too many tags has two risks: the model might mistake tag content as lyrics to sing;
 > too many instructions confuse the model, making effects worse.
@@ -274,9 +281,9 @@ Running the checker on it produced five findings worth keeping:
 | Finding | Why it matters |
 | --- | --- |
 | No blank line between sections; four warnings | The guide asks for blank-line separation so boundaries are unambiguous. Cheap to fix, easy to miss |
-| Verse lines at 11–13 syllables, above the 6–10 band; chorus and outro inside it | The counts are at least consistent *within* a verse, so same-position lines agree within the ±2 tolerance. The band is a soft warning, not a gate |
+| Verse lines at 11–13 syllables per *printed line* — but that is the wrong unit | Every verse line except two breaks at its internal comma into phrases of 4–7 syllables, inside the band. The two with no internal punctuation are the only genuinely long ones. A line-based count flagged ten; a phrase-aware count flags two, and those two are real. See [lyric-templates.md](lyric-templates.md) §5 |
 | No modifier and no performance, vocal or energy tags anywhere | Legitimate — all direction is in the caption — but it leaves the consistency check nothing to compare against, so three caption selections have no lyric counterpart |
-| Three genuine rhymes missed (queue/through, height/right, chain/insane) | The detector is spelling-based. This is the concrete argument for the pronunciation lexicon the design already names |
+| Rhymes missed and false pairs found | The detector is spelling-based. A silent-final-*e* bug was making `insane`, `image` and `node` share the key `e`; fixing it recovered `insane`/`chain`, `node`/`code` and `slate`/`late`. Cross-line embedded rhyme is now not reported at all, because stress and vowel length decide it and spelling does not encode either |
 | Technical jargon — KSampler, VAE, CFG, ControlNet, ComfyUI | Hard phoneme sequences, and the guide warns the model drops or slurs consonant clusters. This is the content that most needs the independent ASR currently marked unverified |
 
 The first and fourth are the useful ones for the design: the blank-line rule was a doc sentence

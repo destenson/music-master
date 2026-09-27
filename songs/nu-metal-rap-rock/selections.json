@@ -1,0 +1,131 @@
+{
+  "note": "Bin selections for the nu-metal/rap-rock brief. Thirty-two tags is exactly the budget, so nothing is dropped; the tempo, key, time signature, language, policy and structure bins are selected for their side effects rather than their tags, and the structure tag is the only one of them that reaches the caption. No artist name appears: the influence is expressed as genre fusion, instrumentation, the vocal split and dynamics, because a name is not a control and a description is.",
+  "selections": {
+    "genre": {
+      "options": [
+        "rap_rock"
+      ]
+    },
+    "fusion": {
+      "options": [
+        "f_nu_metal",
+        "f_electronic"
+      ]
+    },
+    "groove": {
+      "options": [
+        "driving",
+        "syncopated"
+      ]
+    },
+    "drums": {
+      "options": [
+        "live_drums",
+        "drum_machine"
+      ]
+    },
+    "bass": {
+      "options": [
+        "distorted_bass"
+      ]
+    },
+    "harmony": {
+      "options": [
+        "distorted_guitar",
+        "power_chords",
+        "palm_muted_guitar",
+        "guitar_riffs",
+        "electric_piano"
+      ]
+    },
+    "synth": {
+      "options": [
+        "detuned_synths"
+      ]
+    },
+    "lead_vocal": {
+      "options": [
+        "male_rap_vocals",
+        "male_tenor_vocals"
+      ]
+    },
+    "vocal_delivery": {
+      "options": [
+        "clean_vocals",
+        "melodic_vocals",
+        "soaring_vocals",
+        "harsh_vocals"
+      ]
+    },
+    "backing_vocal": {
+      "options": [
+        "gang_vocals",
+        "layered_harmonies"
+      ]
+    },
+    "production": {
+      "options": [
+        "polished_production",
+        "layered_production"
+      ]
+    },
+    "timbre": {
+      "options": [
+        "tm_punchy",
+        "tm_bright"
+      ]
+    },
+    "mood": {
+      "options": [
+        "aggressive",
+        "defiant"
+      ]
+    },
+    "energy": {
+      "options": [
+        "energy_dynamic"
+      ]
+    },
+    "structure": {
+      "options": [
+        "struct_nu_metal_rap_rock"
+      ]
+    },
+    "tempo": {
+      "value": 120,
+      "options": []
+    },
+    "time_signature": {
+      "options": [
+        "ts_4_4"
+      ]
+    },
+    "key_mode": {
+      "key": "D",
+      "mode": "minor"
+    },
+    "language": {
+      "options": [
+        "en"
+      ]
+    },
+    "explicitness": {
+      "options": [
+        "clean"
+      ]
+    },
+    "content_exclusions": {
+      "options": [
+        "no_artist_imitation",
+        "no_explicit_content",
+        "no_profanity",
+        "no_slurs"
+      ]
+    },
+    "extra_instrument": {
+      "options": [
+        "vinyl_scratching"
+      ]
+    }
+  }
+}

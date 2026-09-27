@@ -1,0 +1,317 @@
+{
+  "prompt_version": "1",
+  "song_id": "rap-metal-groove",
+  "seed": 4409,
+  "style": {
+    "vocabulary_ref": {
+      "path": "vocabulary/tag-bins.json",
+      "version": "1",
+      "sha256": "ca349db5916d94b6cac36708ea6f2034beb224b2ce46d1433f7a5a71adb89d00"
+    },
+    "selections": {
+      "genre": {
+        "options": [
+          "rap_metal"
+        ]
+      },
+      "fusion": {
+        "options": [
+          "f_hip_hop",
+          "f_funk",
+          "f_punk"
+        ]
+      },
+      "tuning": {
+        "options": [
+          "drop_d"
+        ]
+      },
+      "groove": {
+        "options": [
+          "syncopated",
+          "breakbeat",
+          "groovy",
+          "offbeat"
+        ]
+      },
+      "drums": {
+        "options": [
+          "live_drums",
+          "punchy_kick"
+        ]
+      },
+      "bass": {
+        "options": [
+          "fingerstyle_bass",
+          "distorted_bass"
+        ]
+      },
+      "harmony": {
+        "options": [
+          "distorted_guitar",
+          "downtuned_guitar",
+          "guitar_riffs",
+          "muted_funk_chops",
+          "guitar_scratch_effects"
+        ]
+      },
+      "lead_vocal": {
+        "options": [
+          "male_rap_vocals",
+          "spoken_word_vocals"
+        ]
+      },
+      "vocal_delivery": {
+        "options": [
+          "rapid_fire_delivery",
+          "shouted",
+          "aggressive_delivery",
+          "harsh_vocals"
+        ]
+      },
+      "backing_vocal": {
+        "options": [
+          "gang_vocals",
+          "call_and_response"
+        ]
+      },
+      "production": {
+        "options": [
+          "raw_production",
+          "live_room_production",
+          "gritty_production"
+        ]
+      },
+      "timbre": {
+        "options": [
+          "tm_raw",
+          "tm_biting",
+          "tm_punchy"
+        ]
+      },
+      "mood": {
+        "options": [
+          "aggressive",
+          "defiant",
+          "urgent"
+        ]
+      },
+      "energy": {
+        "options": [
+          "energy_very_high"
+        ]
+      },
+      "structure": {
+        "options": [
+          "struct_rap_metal_groove"
+        ]
+      },
+      "tempo": {
+        "value": 92,
+        "options": []
+      },
+      "time_signature": {
+        "options": [
+          "ts_4_4"
+        ]
+      },
+      "key_mode": {
+        "key": "E",
+        "mode": "minor"
+      },
+      "language": {
+        "options": [
+          "en"
+        ]
+      },
+      "explicitness": {
+        "options": [
+          "clean"
+        ]
+      },
+      "content_exclusions": {
+        "options": [
+          "no_artist_imitation",
+          "no_real_people",
+          "no_profanity",
+          "no_slurs"
+        ]
+      },
+      "avoid": {
+        "options": [
+          "no_synths",
+          "no_keyboards",
+          "no_turntables",
+          "no_samples",
+          "no_drum_machine",
+          "no_auto_tune",
+          "no_clean_singing",
+          "no_electronic_beats"
+        ]
+      }
+    },
+    "rendered_tags": [
+      "Rap Metal",
+      "Hip-Hop",
+      "Funk",
+      "Punk",
+      "Syncopated",
+      "Breakbeat",
+      "Groovy",
+      "Offbeat",
+      "Live Drums",
+      "Punchy Kick",
+      "Fingerstyle Bass",
+      "Distorted Bass",
+      "Distorted Guitar",
+      "Downtuned Guitar",
+      "Guitar Riffs",
+      "Muted Funk Chops",
+      "Guitar Scratch Effects",
+      "Drop D Tuning",
+      "Male Rap Vocals",
+      "Spoken Word Vocals",
+      "Rapid-Fire Delivery",
+      "Shouted",
+      "Aggressive Delivery",
+      "Harsh Vocals",
+      "Gang Vocals",
+      "Raw Production",
+      "Live-Room Production",
+      "Gritty Production",
+      "Aggressive",
+      "Defiant",
+      "Urgent",
+      "Very High Energy"
+    ],
+    "rendered_string": "Rap Metal, Hip-Hop, Funk, Punk, Syncopated, Breakbeat, Groovy, Offbeat, Live Drums, Punchy Kick, Fingerstyle Bass, Distorted Bass, Distorted Guitar, Downtuned Guitar, Guitar Riffs, Muted Funk Chops, Guitar Scratch Effects, Drop D Tuning, Male Rap Vocals, Spoken Word Vocals, Rapid-Fire Delivery, Shouted, Aggressive Delivery, Harsh Vocals, Gang Vocals, Raw Production, Live-Room Production, Gritty Production, Aggressive, Defiant, Urgent, Very High Energy",
+    "omitted_tags": [
+      "Call-and-Response Vocals",
+      "Raw",
+      "Biting",
+      "Punchy",
+      "Rap-Metal Groove"
+    ],
+    "free_text": ""
+  },
+  "metadata": {
+    "bpm": 92,
+    "key": "E",
+    "mode": "minor",
+    "timesignature": "4",
+    "duration_s": 187.8,
+    "language": "en"
+  },
+  "form": {
+    "composition_ref": "songs/rap-metal-groove/composition.json",
+    "composition_sha256": "9f760c25c1b3aefc72029c7eb4374a0efc02ed192708469b61305e22dea67de9",
+    "sections": [
+      {
+        "name": "intro",
+        "bars": 4,
+        "label": "Intro"
+      },
+      {
+        "name": "verse",
+        "bars": 16,
+        "label": "Verse 1"
+      },
+      {
+        "name": "chorus",
+        "bars": 8,
+        "label": "Chorus"
+      },
+      {
+        "name": "verse",
+        "bars": 16,
+        "label": "Verse 2"
+      },
+      {
+        "name": "chorus",
+        "bars": 8,
+        "label": "Chorus"
+      },
+      {
+        "name": "solo",
+        "bars": 8,
+        "label": "Solo"
+      },
+      {
+        "name": "chorus",
+        "bars": 8,
+        "label": "Chorus"
+      },
+      {
+        "name": "outro",
+        "bars": 4,
+        "label": "Outro"
+      }
+    ]
+  },
+  "lyrics": {
+    "ref": "songs/rap-metal-groove/lyrics.md",
+    "sha256": "00256e3b5160ee47060660ad759dda6a39da8fe662a597558022ce9306497f65",
+    "section_tags": true
+  },
+  "negative": {
+    "style": [
+      "No Synthesizers",
+      "No Keyboards",
+      "No Turntables",
+      "No Samples",
+      "No Drum Machine",
+      "No Auto-Tune",
+      "No Clean Singing",
+      "No Electronic Beats"
+    ],
+    "artist_references": [
+      "Rage Against the Machine"
+    ]
+  },
+  "target": {
+    "generator_id": "ace_step_1_5_xl_turbo",
+    "runner": "comfyui",
+    "graph_ref": "songs/rap-metal-groove/workflow.json",
+    "sampler": {
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model_sampling_shift": 3.0
+    },
+    "lm": {
+      "generate_audio_codes": true,
+      "cfg_scale": 2.0,
+      "temperature": 0.85,
+      "top_p": 0.9,
+      "top_k": 0,
+      "min_p": 0.0
+    },
+    "seed": 4409,
+    "batch_size": 1,
+    "candidate_index": 0
+  },
+  "notes": [
+    {
+      "field": "style.selections",
+      "why": "Influence expressed as descriptive characteristics rather than a band name. Genre fusion, instrumentation and vocal split do the work a name cannot."
+    },
+    {
+      "field": "metadata.bpm",
+      "why": "120 BPM, mid-tempo for the genre; carried in metadata, never in the caption."
+    },
+    {
+      "field": "target.seed",
+      "why": "Fixed so the render is re-derivable. With lm.temperature > 0 the LM's audio-code sampling adds randomness, so this is re-derivable and diffable rather than bit-identical."
+    },
+    {
+      "field": "negative.artist_references",
+      "why": "Recorded so the compliance report can prove what was excluded, and so the policy check has something to verify against."
+    }
+  ],
+  "provenance": {
+    "spec_sha256": "218328d35e6cb580740e569c07619d8cdd94a9960cf21fa01f2562453244da23",
+    "builder": "songs/rap-metal-groove/build_and_submit.py"
+  }
+}

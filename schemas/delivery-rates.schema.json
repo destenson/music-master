@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/delivery-rates.schema.json",
+  "title": "DeliveryRateLibrary",
+  "description": "How densely a vocal can carry syllables. Each profile supplies the syllables-per-line band that the writing brief states, and the two syllables-per-second ceilings that decide whether what was written actually fits the time. The band is where good writing usually sits; the ceiling is where the clock runs out, and they are deliberately separate numbers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["delivery_rates_version", "unit", "default", "profiles"],
+  "properties": {
+    "delivery_rates_version": { "type": "string", "const": "1" },
+    "note": { "type": "string" },
+    "unit": { "type": "string", "const": "syllables per second" },
+    "derivation": { "type": "string", "description": "How the numbers were arrived at, so a later reader can tell a calibrated estimate from a guess." },
+    "default": { "type": "string", "description": "Profile id used when nothing selects one." },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "label", "band", "comfortable_max", "hard_max"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "label": { "type": "string" },
+          "band": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "integer", "minimum": 0 },
+            "description": "Inclusive syllables-per-line guidance for this delivery."
+          },
+          "comfortable_max": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Syllables per second above which the delivery starts to sound rushed."
+          },
+          "hard_max": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Syllables per second above which the section cannot hold the words in the time available."
+          },
+          "typical_use": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "delivery_rates_version": "1",
+  "note": "How densely a vocal can carry syllables. A profile supplies two things: `band`, the syllables-per-line guidance the writing brief states, and the two rate ceilings that decide whether a section can physically hold what was written. They are different numbers on purpose -- the band is where good writing usually sits, the ceiling is where the clock runs out.",
+  "unit": "syllables per second",
+  "derivation": "The mid-tempo profile's band is the generator's own documented recommendation of 6-10 syllables per line. The ceilings are calibrated against the structure templates: at 95 BPM a one-bar line is 2.53s, so the band's upper end needs about 4.0 syllables/s if a line occupies a single bar, and about 2.0 if it occupies two. sung_mid's ceiling of 3.2 sits between those, which is the intended reading -- a template that gives two bars per line has headroom, and a writer who crams a line into one bar does not. These are estimates from arithmetic and the model's own guidance, not measurements of a singer, so every rate they produce is reported as approximate.",
+  "default": "sung_mid",
+  "profiles": [
+    {
+      "id": "instrumental",
+      "label": "Instrumental",
+      "band": [0, 0],
+      "comfortable_max": 0.0,
+      "hard_max": 0.0,
+      "typical_use": ["no vocal", "instrumental beds"]
+    },
+    {
+      "id": "sung_slow",
+      "label": "Sustained / ballad",
+      "band": [5, 9],
+      "comfortable_max": 1.8,
+      "hard_max": 2.6,
+      "typical_use": ["ballads", "ambient", "slow soul", "hymns"]
+    },
+    {
+      "id": "sung_mid",
+      "label": "Mid-tempo sung",
+      "band": [6, 10],
+      "comfortable_max": 2.3,
+      "hard_max": 3.2,
+      "typical_use": ["pop", "rock", "R&B", "folk", "most sung material"]
+    },
+    {
+      "id": "sung_fast",
+      "label": "Up-tempo sung",
+      "band": [6, 12],
+      "comfortable_max": 3.1,
+      "hard_max": 4.2,
+      "typical_use": ["punk", "up-tempo pop", "metal", "drum and bass vocals"]
+    },
+    {
+      "id": "rapped",
+      "label": "Rapped",
+      "band": [8, 16],
+      "comfortable_max": 4.5,
+      "hard_max": 6.5,
+      "typical_use": ["hip-hop", "trap", "drill", "grime"]
+    },
+    {
+      "id": "double_time",
+      "label": "Double-time delivery",
+      "band": [10, 20],
+      "comfortable_max": 6.5,
+      "hard_max": 9.0,
+      "typical_use": ["double-time rap", "rapid-fire verses", "chopper flow"]
+    }
+  ]
+}

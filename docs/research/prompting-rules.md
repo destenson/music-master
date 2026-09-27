@@ -284,8 +284,14 @@ reached for capabilities (§5.8 of the design), arrived at from the opposite dir
   canonical order, and it upgrades the reason for it: the order is chosen for priority, and
   happens to also make the hash stable.
 - **Optimal tag count.** The guide says granularity determines freedom but gives no number.
-  Community practice converges on 4–8 descriptors with roughly 20 as a ceiling, which suggests
-  the design's budget of 14 is above the sweet spot. To be measured, not assumed.
+  Community practice converges on 4–8 descriptors with roughly 20 as a ceiling — and that is a
+  *Suno* number, where a style box has a character limit and the model weighs a short prompt. It
+  is not evidence about ACE-Step, which says it is trained to accept comma-separated tags, plain
+  style words and long natural-language descriptions alike, and that "text format doesn't
+  significantly affect model performance". The design's budget was set to 14 on the Suno figure and
+  has since been raised to **32**, which is where a full selection across the nine caption
+  dimensions actually lands. The mechanism still matters — a cap enforced by priority, with every
+  omission recorded — but the number should come from this model's behaviour, not another's.
 ## 13. Closing note
 
 Also carried over from the Suno consensus, because each is cheap and mechanical:

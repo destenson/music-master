@@ -1,0 +1,9 @@
+{
+  "song_id": "rap-metal-groove",
+  "template_id": "rap_metal_groove",
+  "bpm": 92,
+  "seed": 4409,
+  "artist_references": [
+    "Rage Against the Machine"
+  ]
+}
