@@ -1,57 +1,48 @@
 # music-master
 
-A design for a lyrics-and-composition generator that proves its output meets the brief.
+An easy-to-use, full-featured music generator.
 
-The brief can ask for anything: a theme, a mood, a genre, a tempo, a key, a structure, a
-language, an explicitness limit, "don't sound like Bon Iver". Music Master generates the
-song, then returns it with a **compliance report** that says, per requirement, what was
-checked, on what evidence, and whether it passed — and lists the requirements it could not
-satisfy rather than quietly ignoring them.
+Pick the sound from a labelled vocabulary — genre, mood, tempo, key, instruments, vocal delivery,
+structure — write or generate the lyrics, and render the song. Nothing is typed into a prompt box:
+every choice shows the exact tag it contributes, so the caption is something you can read, edit and
+reproduce rather than a string you have to guess your way to.
 
-Status: **design only.** The vocabulary, lyric checker and time-budget tooling are real and packaged
-as `musicmaster/`, and a first slice of the UI runs that same code in the browser. The generator, the
-audio pipeline and the live compliance battery are not built.
+The UI is the product. It runs the `musicmaster/` text tier in the browser under Pyodide, so the
+form, the caption, the time budget and the lyric findings all come from the same implementation the
+renderer uses. Renders go to a ComfyUI target — a local server or Comfy Cloud — running ACE-Step 1.5,
+and a preview auditions the whole song at a couple of sampler steps before committing to a full take.
 
-## The idea in one paragraph
-
-Requirements split into mechanical ones that code computes exactly (duration, BPM, key,
-syllables, rhyme, banned words, loudness) and semantic ones that are irreducibly judgments
-(theme, mood, genre, hook, cliché, imitation, explicitness). The mechanical half never
-touches a model. The semantic half goes to a **Jev-like System One model** — typed
-questions over a state, returning calibrated probabilities rather than prose — because code
-can consume the answers directly. The catch is that such a model takes *text only*, so it
-cannot hear the track; the design therefore renders every audio artifact into text
-surrogates (measured MIR facts, chord transcription, vocal transcript, music caption) and
-judges those. And because a requirement that can only be checked after synthesis is
-expensive to fail, the generation path is chosen so most requirements become observable as
-early as possible.
+Status: the generator works end to end. The vocabulary, the caption renderer, the lyric checker, the
+time budget and the prompt builder are real and packaged as `musicmaster/`, and the browser builds a
+song, renders it and previews it. The compliance battery described under "Checking the brief" is
+designed, not built.
 
 ## What it produces
 
-A song is a **directory of artifacts**, not an audio file. The audio is the expensive,
-opaque, hard-to-diff output of a stochastic process; the prompt, the lyrics and the
-composition are cheap, textual and diffable. So they are the artifacts of record and the
-audio is a build product derived from them — which is what makes the whole thing
-reproducible.
+A song. A render is an audio file — ACE-Step 1.5 writes an MP3 through ComfyUI — and the text that
+produced it is kept beside it: the caption, the lyrics, the composition, the canonical prompt and the
+graph. The audio is the output; the text is the record, because a stochastic render is opaque and
+hard to diff, while the prompt and the lyrics are cheap, textual and comparable, and are what make a
+take reproducible.
 
 ```
 songs/<song_id>/
-  brief.md  spec.json  composition.json  lyrics.md  prompt.json
-  rendered/ace_step_1_5.json   audio.wav   report.json   manifest.json
+  song.json  selections.json  brief.md  lyrics.md
+  composition.json  prompt.json  workflow.json  RESULT.md
 ```
 
-Each of the four generated artifacts is built by its own independently runnable stage, so the
-lyrics can be rewritten and the audio re-rendered without re-planning the composition. The
-**prompt is the first artifact to get right**, because it is the input to the generator and
-therefore the thing that determines the output: it is a canonical, model-agnostic object
-rather than a string, it is rendered per target by the generator adapter, and it is fully
+The render itself lands in ComfyUI's output directory and is played or downloaded from the page; it
+is not part of the record, because a new take is a new file. What is kept is the text that produced
+it, and each part has its own independently runnable stage, so the lyrics can be rewritten and the
+song re-rendered without re-planning the composition. The **prompt is the one to get right first**:
+it is the input to the generator and so determines the output, it is a canonical, model-agnostic
+object rather than a string, it is rendered per target by the generator adapter, and it is fully
 checkable *before* any GPU work.
 
 That split also makes an important distinction explicit. **Intent fidelity** — does the prompt
 faithfully encode the brief? — is cheap and exact, because the prompt is text. **Realization
 fidelity** — does the audio realize the prompt? — is expensive and partly unverifiable. Prompt
-verification does not imply audio compliance, so the compliance battery runs twice and reports
-both.
+verification does not imply audio compliance, so the checking design reports them separately.
 
 ## Documents
 
@@ -267,9 +258,26 @@ answers, the panel says so and prints that command with the real origin filled i
 surfacing a bare "Failed to fetch".
 
 What it does not do yet, and says so rather than showing an empty pane: interpret a brief into typed
-requirements (no oracle is configured), show the canonical prompt (that logic still lives inside
-`build_and_submit.py`), or render and audition audio (which needs the GPU host). It also needs to be
-served over HTTP — WASM and ES modules will not load from a `file://` URL.
+requirements (no oracle is configured), so there is no compliance report — the generator's output is
+the song. It also needs to be served over HTTP — WASM and ES modules will not load from a `file://`
+URL.
+
+## Checking the brief
+
+The generator is the product; checking is what the design aims to add on top of it, and it is why the
+text tier is kept apart from the audio.
+
+Requirements split into mechanical ones that code computes exactly (duration, BPM, key,
+syllables, rhyme, banned words, loudness) and semantic ones that are irreducibly judgments
+(theme, mood, genre, hook, cliché, imitation, explicitness). The mechanical half never
+touches a model. The semantic half goes to a **Jev-like System One model** — typed
+questions over a state, returning calibrated probabilities rather than prose — because code
+can consume the answers directly. The catch is that such a model takes *text only*, so it
+cannot hear the track; the design therefore renders every audio artifact into text
+surrogates (measured MIR facts, chord transcription, vocal transcript, music caption) and
+judges those. And because a requirement that can only be checked after synthesis is
+expensive to fail, the generation path is chosen so most requirements become observable as
+early as possible.
 
 ## Schemas
 
