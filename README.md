@@ -19,11 +19,14 @@ designed, not built.
 
 ## What it produces
 
-A song. A render is an audio file — ACE-Step 1.5 writes an MP3 through ComfyUI — and the text that
-produced it is kept beside it: the caption, the lyrics, the composition, the canonical prompt and the
-graph. The audio is the output; the text is the record, because a stochastic render is opaque and
-hard to diff, while the prompt and the lyrics are cheap, textual and comparable, and are what make a
-take reproducible.
+A song, and the files that make it reproducible. A render is an audio file — ACE-Step 1.5 writes an
+MP3 through ComfyUI — and the page also hands you the exact bytes behind the take: `prompt.json`, the
+canonical, model-agnostic request; `composition.json`, the arrangement it pins; and `workflow.json`,
+the complete ACE-Step 1.5 graph for that take. The graph is not tied to the service the page is
+pointed at: download it and queue it on another ComfyUI instance.
+
+The text is the record, because a stochastic render is opaque and hard to diff while the prompt and
+the lyrics are cheap, textual and comparable. It is what makes a take reproducible.
 
 ```
 songs/<song_id>/
@@ -31,13 +34,12 @@ songs/<song_id>/
   composition.json  prompt.json  workflow.json  RESULT.md
 ```
 
-The render itself lands in ComfyUI's output directory and is played or downloaded from the page; it
-is not part of the record, because a new take is a new file. What is kept is the text that produced
-it, and each part has its own independently runnable stage, so the lyrics can be rewritten and the
-song re-rendered without re-planning the composition. The **prompt is the one to get right first**:
-it is the input to the generator and so determines the output, it is a canonical, model-agnostic
-object rather than a string, it is rendered per target by the generator adapter, and it is fully
-checkable *before* any GPU work.
+The render itself lands in ComfyUI's output directory and is played from the page; it is not part of
+the record, because a new take is a new file. Each part has its own independently runnable stage, so
+the lyrics can be rewritten and the song re-rendered without re-planning the composition. The
+**prompt is the one to get right first**: it is the input to the generator and so determines the
+output, it is a canonical, model-agnostic object rather than a string, it is rendered per target by
+the generator adapter, and it is fully checkable *before* any GPU work.
 
 That split also makes an important distinction explicit. **Intent fidelity** — does the prompt
 faithfully encode the brief? — is cheap and exact, because the prompt is text. **Realization
