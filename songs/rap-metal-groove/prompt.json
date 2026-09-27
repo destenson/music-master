@@ -6,7 +6,7 @@
     "vocabulary_ref": {
       "path": "vocabulary/tag-bins.json",
       "version": "1",
-      "sha256": "ca349db5916d94b6cac36708ea6f2034beb224b2ce46d1433f7a5a71adb89d00"
+      "sha256": "3816ee824fa8aff1bbcbf15b2ecdb82c8918bad0a87960802e33d4002c2c4af6"
     },
     "selections": {
       "genre": {
@@ -176,22 +176,21 @@
       "Aggressive Delivery",
       "Harsh Vocals",
       "Gang Vocals",
+      "Call-and-Response Vocals",
       "Raw Production",
       "Live-Room Production",
       "Gritty Production",
-      "Aggressive",
-      "Defiant",
-      "Urgent",
-      "Very High Energy"
-    ],
-    "rendered_string": "Rap Metal, Hip-Hop, Funk, Punk, Syncopated, Breakbeat, Groovy, Offbeat, Live Drums, Punchy Kick, Fingerstyle Bass, Distorted Bass, Distorted Guitar, Downtuned Guitar, Guitar Riffs, Muted Funk Chops, Guitar Scratch Effects, Drop D Tuning, Male Rap Vocals, Spoken Word Vocals, Rapid-Fire Delivery, Shouted, Aggressive Delivery, Harsh Vocals, Gang Vocals, Raw Production, Live-Room Production, Gritty Production, Aggressive, Defiant, Urgent, Very High Energy",
-    "omitted_tags": [
-      "Call-and-Response Vocals",
       "Raw",
       "Biting",
       "Punchy",
+      "Aggressive",
+      "Defiant",
+      "Urgent",
+      "Very High Energy",
       "Rap-Metal Groove"
     ],
+    "rendered_string": "Rap Metal, Hip-Hop, Funk, Punk, Syncopated, Breakbeat, Groovy, Offbeat, Live Drums, Punchy Kick, Fingerstyle Bass, Distorted Bass, Distorted Guitar, Downtuned Guitar, Guitar Riffs, Muted Funk Chops, Guitar Scratch Effects, Drop D Tuning, Male Rap Vocals, Spoken Word Vocals, Rapid-Fire Delivery, Shouted, Aggressive Delivery, Harsh Vocals, Gang Vocals, Call-and-Response Vocals, Raw Production, Live-Room Production, Gritty Production, Raw, Biting, Punchy, Aggressive, Defiant, Urgent, Very High Energy, Rap-Metal Groove",
+    "omitted_tags": [],
     "free_text": ""
   },
   "metadata": {

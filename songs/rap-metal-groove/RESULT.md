@@ -24,17 +24,19 @@ positive bins. The ACE-Step ComfyUI node exposes no negative-caption input; the 
 ## The caption
 
 ```
-Rap Metal, Hip-Hop, Funk, Punk, Syncopated, Breakbeat, Groovy, Offbeat, Live Drums, Punchy Kick,
-Fingerstyle Bass, Distorted Bass, Distorted Guitar, Downtuned Guitar, Guitar Riffs, Muted Funk
-Chops, Guitar Scratch Effects, Drop D Tuning, Male Rap Vocals, Spoken Word Vocals, Rapid-Fire
-Delivery, Shouted, Aggressive Delivery, Harsh Vocals, Gang Vocals, Raw Production, Live-Room
-Production, Gritty Production, Aggressive, Defiant, Urgent, Very High Energy
+Rap Metal, Hip-Hop, Funk, Punk, Syncopated, Breakbeat, Groovy, Offbeat, Live Drums, Punchy
+Kick, Fingerstyle Bass, Distorted Bass, Distorted Guitar, Downtuned Guitar, Guitar Riffs, Muted
+Funk Chops, Guitar Scratch Effects, Drop D Tuning, Male Rap Vocals, Spoken Word Vocals, Rapid-
+Fire Delivery, Shouted, Aggressive Delivery, Harsh Vocals, Gang Vocals, Call-and-Response
+Vocals, Raw Production, Live-Room Production, Gritty Production, Raw, Biting, Punchy,
+Aggressive, Defiant, Urgent, Very High Energy, Rap-Metal Groove
 ```
 
-32 tags, five dropped by the budget: `Call-and-Response Vocals`, `Raw`, `Biting`, `Punchy` and the
-structure label. No artist name, and no synth or turntable anywhere.
+37 tags, none dropped. The five that the old budget of 32 had been cutting — `Call-and-Response
+Vocals`, `Raw`, `Biting`, `Punchy` and the structure label — are all back now the budget is 64. No
+artist name, and no synth or turntable anywhere.
 
-Fixing the budget also caught a real bug: it was keeping 33 tags against a limit of 32, because
+Fixing the budget also caught a real bug: it was keeping more tags than the cap allowed, because
 tags from the same bin share a `(priority, index)` key and that key was used in a set. Ranked by
 position now.
 

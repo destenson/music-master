@@ -117,20 +117,22 @@ The rules, in order, as implemented in `render_tags.py`:
 3. **Emit labels verbatim**, options first, then the numeric template (`{value} BPM`), then the
    key and mode, then any free text for that bin.
 4. **Collapse duplicate labels**, keeping the first in render order.
-5. **Enforce the tag budget by priority.** If the string exceeds `tag_budget` (32), tags are
+5. **Enforce the tag budget by priority.** If the string exceeds `tag_budget` (64), tags are
    ranked by bin priority and then by render order, and the lowest-priority surplus is dropped.
 6. **Record every omission.** Dropped tags go into the prompt's `omitted` list. A tag that never
    reaches the model must still be visible in the artifact, or reproducibility is a lie.
 7. **Join with `", "`.**
 
 Step 5 deserves a note. A long tag list is not automatically a better prompt, which is why the cap
-is enforced by priority rather than by hoping — but the number itself is model-specific. It sat at
-14 on the strength of a Suno community figure (4–8 descriptors, ~20 ceiling), which was the wrong
+is enforced by priority rather than by hoping — but the number itself is model-specific. An early
+figure of 14 came from Suno community advice (4–8 descriptors, ~20 ceiling), which was the wrong
 model to borrow from: ACE-Step's own guide says it accepts comma-separated tags, plain style words
-and long natural-language descriptions alike, and that the text format does not significantly
-change performance. A full selection across the nine caption dimensions lands around 30, so the
-budget is now **32**. What matters is that a truncation the user cannot see is worse than no
-truncation, so the budget is displayed live and `omitted` is stored.
+and long natural-language descriptions alike, and that the text format does not significantly change
+performance. A full selection across the caption dimensions lands around 30, and a song that states a
+fusion, a whole kit, a vocal split and its exclusions passes that comfortably, so the budget is
+**64**. It is a dilution guard rather than a model limit, and it should still be tuned against
+compliance outcomes rather than by taste. What matters either way is that a truncation the user
+cannot see is worse than no truncation, so the budget is displayed live and `omitted` is stored.
 
 ### 4.1 What never becomes a tag
 
@@ -214,7 +216,7 @@ is a convenience, not a source of truth: the imported result is shown as selecti
 before it becomes a prompt artifact.
 
 `vocabulary/examples/late-night-trap.json` is that example resolved. Rendering it produces 13
-tags, well inside the budget of 32:
+tags, well inside the budget of 64:
 
 ```
 Trap, West-Coast Feel, Late Night, 95 BPM, Heavy 808 Bass, Slap Bass, Deep Sub Bass,
@@ -313,8 +315,9 @@ Two things are deliberately *not* in the vocabulary:
 
 ## 9. Open questions
 
-- **How large should the budget be?** 14 is chosen to fit the motivating example exactly. It
-  should be tuned by measuring tag-count against compliance outcomes on a gauge, not guessed.
+- **How large should the budget be?** It sits at 64, clear of a full selection, so it now truncates
+  only genuinely excessive lists. The number should still be tuned by measuring tag-count against
+  compliance outcomes on a gauge rather than by taste, and that gauge is not built.
 - **Does tag order matter to the model?** The design assumes only weakly, and fixes the order
   for hash stability. Worth testing: shuffle the same tags and compare compliance rates.
 - **Should bins be conditionally shown?** Several are meaningless together (a `drum_machine`

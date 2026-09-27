@@ -6,7 +6,7 @@
     "vocabulary_ref": {
       "path": "vocabulary/tag-bins.json",
       "version": "1",
-      "sha256": "ca349db5916d94b6cac36708ea6f2034beb224b2ce46d1433f7a5a71adb89d00"
+      "sha256": "3816ee824fa8aff1bbcbf15b2ecdb82c8918bad0a87960802e33d4002c2c4af6"
     },
     "selections": {
       "genre": {

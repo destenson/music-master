@@ -1,6 +1,6 @@
 {
   "vocabulary_version": "1",
-  "tag_budget": 32,
+  "tag_budget": 64,
   "render_order": [
     "genre",
     "fusion",
