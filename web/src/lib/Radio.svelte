@@ -39,6 +39,23 @@
   // than on every change: otherwise a status change in the queue would undo a manual pause.
   let wasOn = false;
   let blocked = $state(false);
+  /** Why the browser refused the current take, in words, rather than a silent 0:00. */
+  let audioError = $state<string | null>(null);
+
+  function audioFailure(): string {
+    switch (audio?.error?.code) {
+      case 1:
+        return "playback was aborted";
+      case 2:
+        return "the network refused the file";
+      case 3:
+        return "the file could not be decoded";
+      case 4:
+        return "the browser would not load the file — this page may not be allowed to reach it";
+      default:
+        return "the file could not be played";
+    }
+  }
 
   let models = $state<OllamaModel[]>([]);
   let modelError = $state<string | null>(null);
@@ -49,7 +66,7 @@
 
   /** A one-second tick, so a stage that is slow reads as slow rather than as stuck. */
   let now = $state(Date.now());
-  const RUNNING = new Set<RadioStatus>(["planning", "writing", "queued", "rendering"]);
+  const RUNNING = new Set<RadioStatus>(["planning", "waiting", "writing", "queued", "rendering"]);
 
   function elapsed(song: RadioSong): string {
     if (!song.startedAt || !RUNNING.has(song.status)) return "";
@@ -79,6 +96,7 @@
 
   const STATUS: Record<RadioStatus, string> = {
     planning: "planning",
+    waiting: "waiting for the model",
     writing: "writing lyrics",
     queued: "queued",
     rendering: "rendering",
@@ -120,6 +138,7 @@
         audio.removeAttribute("src");
         audio.load();
       }
+      audioError = null;
       wasOn = radioState.on;
       return;
     }
@@ -127,6 +146,7 @@
     const fresh = url !== loadedUrl;
     if (fresh) {
       loadedUrl = url;
+      audioError = null;
       audio.src = url;
       audio.load();
     }
@@ -150,6 +170,12 @@
       .play()
       .then(() => (blocked = false))
       .catch(() => (blocked = true));
+  }
+
+  /** Open the take itself, which works even where the page is not allowed to embed the file. */
+  function openCurrent(): void {
+    const url = current?.url;
+    if (url) window.open(url, "_blank", "noopener");
   }
 
   function when(at: number): string {
@@ -229,7 +255,22 @@
             </span>
           </div>
 
-          <audio bind:this={audio} controls onended={() => advance()} preload="auto"></audio>
+          <audio
+            bind:this={audio}
+            controls
+            preload="auto"
+            onended={() => advance()}
+            onerror={() => (audioError = audioFailure())}
+          ></audio>
+
+          {#if audioError}
+            <div class="finding error">
+              {audioError}.
+              {#if current?.url}
+                <button class="small" onclick={openCurrent}>open the file</button>
+              {/if}
+            </div>
+          {/if}
 
           {#if current}
             <div>
@@ -378,8 +419,14 @@
               <div class="row queue-row">
                 <span class="small muted mono">{song.index}</span>
                 <span class="small">{song.title}</span>
+                {#if song.theme}<span class="small muted">· {song.theme}</span>{/if}
                 <span class="spacer" style="flex:1"></span>
                 {#if age}<span class="small muted">{age}</span>{/if}
+                {#if song.status === "ready" || song.status === "playing"}
+                  <span class="chip" class:meta={song.lyricSource === "instrumental"}>
+                    {song.lyricSource === "instrumental" ? "instrumental" : "sung"}
+                  </span>
+                {/if}
                 <span class="chip" class:warn={song.status === "failed"}>{STATUS[song.status]}</span>
               </div>
             {/each}

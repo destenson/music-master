@@ -68,6 +68,15 @@ export interface GenerateRequest {
   signal?: AbortSignal;
   /** Called with the whole text so far, so the editor can show a draft as it arrives. */
   onText?: (text: string) => void;
+  /**
+   * Whether a thinking model may reason before answering, where the server supports the field.
+   *
+   * It is left off the request entirely when unset, so a server that does not know it never sees
+   * it. A thinking model spends tens of seconds reasoning before writing anything — measured at
+   * 35 s and 34 KB of reasoning for one song's lyric, against 1.8 s with it off — which is time
+   * nothing downstream can use, since the lyric is the whole answer.
+   */
+  think?: boolean;
 }
 
 /**
@@ -84,11 +93,12 @@ export async function generate({
   base = ollamaBase(),
   signal,
   onText,
+  think,
 }: GenerateRequest): Promise<string> {
   const response = await fetch(`${base}/api/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model, prompt, stream: true }),
+    body: JSON.stringify({ model, prompt, stream: true, ...(think === undefined ? {} : { think }) }),
     signal,
   });
   if (!response.ok || !response.body) {

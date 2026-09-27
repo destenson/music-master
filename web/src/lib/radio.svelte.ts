@@ -37,6 +37,7 @@ import type { Artifacts, RadioPlan, RenderResult, Selections } from "./types";
 
 export type RadioStatus =
   | "planning"
+  | "waiting"
   | "writing"
   | "queued"
   | "rendering"
@@ -335,6 +336,19 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
   };
 }
 
+/**
+ * Put a song in the queue and hand back the one the queue actually holds.
+ *
+ * Svelte's state is proxied deeply and a write only reaches the UI if it goes through the proxy: a
+ * song kept as a plain local updates its own fields while the panel keeps showing whatever it first
+ * read — the elapsed timer ticks on, because it reads real state, and the status never moves. So
+ * every mutation downstream goes through the value the queue holds, never the object pushed into it.
+ */
+function enqueue(song: RadioSong): RadioSong {
+  radioState.queue.push(song);
+  return radioState.queue[radioState.queue.length - 1];
+}
+
 function currentSong(): RadioSong | null {
   return radioState.queue.find((song) => song.id === radioState.currentId) ?? null;
 }
@@ -348,7 +362,7 @@ function readyAfterCurrent(): RadioSong[] {
 
 function inFlight(): number {
   return radioState.queue.filter((song) =>
-    ["planning", "writing", "queued", "rendering"].includes(song.status),
+    ["planning", "waiting", "writing", "queued", "rendering"].includes(song.status),
   ).length;
 }
 
@@ -383,7 +397,9 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       song.lyrics = "";
       song.lyricSource = "instrumental";
     } else {
-      song.status = "writing";
+      // Waiting for the one-at-a-time lyric slot is not the same as being written; saying which is
+      // the difference between a queue and a thing that looks stuck.
+      song.status = "waiting";
       // Its own controller, so a timeout can abandon this one request without looking like a stop.
       const lyric = new AbortController();
       const stopIt = (): void => lyric.abort();
@@ -392,9 +408,18 @@ async function produce(song: RadioSong, token: number): Promise<void> {
         const brief = host.brief(plan.template_id, plan.bpm, plan.selections);
         const prompt = buildPrompt({ brief, caption: song.caption, theme: plan.theme });
         const text = await withTimeout(
-          serializeLyrics(() =>
-            generate({ model: radioState.model, base: ollamaBase(), prompt, signal: lyric.signal }),
-          ),
+          serializeLyrics(() => {
+            song.status = "writing";
+            return generate({
+              model: radioState.model,
+              base: ollamaBase(),
+              prompt,
+              signal: lyric.signal,
+              // The lyric is the whole answer; a thinking model's reasoning is tens of seconds that
+              // nothing downstream can use.
+              think: false,
+            });
+          }),
           LYRIC_TIMEOUT_MS,
           "the lyric model did not answer in time",
           stopIt,
@@ -501,8 +526,7 @@ function ensure(): void {
   let guard = 0;
   while (readyAfterCurrent().length + inFlight() < radioState.bufferTarget && guard < 12) {
     guard += 1;
-    const song = createSong(radioState.stationId);
-    radioState.queue.push(song);
+    const song = enqueue(createSong(radioState.stationId));
     void produce(song, token).finally(() => {
       if (token === session) ensure();
     });
@@ -616,7 +640,7 @@ function seedSongs(existing: SavedRadioSong[]): number {
   );
   // New songs continue the numbering, so a fresh take cannot collide with a recovered one.
   indices[radioState.stationId] = Math.max(indices[radioState.stationId] ?? 0, highest + 1);
-  for (const take of chosen) radioState.queue.push(songFromSaved(take, "ready"));
+  for (const take of chosen) enqueue(songFromSaved(take, "ready"));
   return chosen.length;
 }
 
@@ -735,10 +759,9 @@ export function replay(saved: SavedRadioSong): void {
     radioState.lastError = "that take has no file recorded, so it cannot be re-addressed";
     return;
   }
-  const song = songFromSaved(saved, "playing");
+  const song = enqueue(songFromSaved(saved, "playing"));
   const current = currentSong();
   if (current && current.status === "playing") current.status = "ready";
-  radioState.queue = [...radioState.queue, song];
   radioState.currentId = song.id;
 }
 

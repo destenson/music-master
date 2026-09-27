@@ -21,6 +21,7 @@ import { freeName, stable } from "../src/lib/draft.ts";
 import { editorTheme } from "../src/lib/lens.ts";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { proxy } from "svelte/internal/client";
 import { generate } from "../src/lib/ollama.ts";
 import { reloadUrl, setBuild, withBuild } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
@@ -609,6 +610,27 @@ check(
   false,
 );
 check("an empty history is not an error", takesFromHistory(null, "radio/neon-drive"), []);
+
+// --- Reactive state: a write must go through the proxy ------------------------------------------
+//
+// Svelte's `$state` caches a signal per property and returns the signal's value, so writing to a raw
+// reference updates the object and not the signal: the panel keeps showing whatever it first read,
+// while anything reading real state — an elapsed timer — keeps ticking. A list of records that are
+// mutated as they progress therefore has to be mutated through the value the list holds.
+
+console.log("\nreactive state:\n");
+{
+  const state = proxy({ queue: [] });
+  const pushed = { status: "writing" };
+  state.queue.push(pushed);
+  const queued = state.queue[0];
+  const first = queued.status;
+  pushed.status = "done";
+  check("the queue holds a proxy, not the object pushed into it", queued === pushed, false);
+  check("a write to the pushed object leaves the queued value where it was", queued.status, first);
+  queued.status = "done";
+  check("a write to the queued value is what a reader sees", queued.status, "done");
+}
 
 // --- Reading a model stream ---------------------------------------------------------------------
 //
