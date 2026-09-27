@@ -1,0 +1,29 @@
+{
+  "name": "music-master-web",
+  "version": "1.0.0",
+  "description": "The Music Master SPA: the vocabulary-driven builder, running the text tier in the browser.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "private": "true",
+  "dependencies": {
+    "pyodide": "^314.0.7",
+    "svelte": "^5.57.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@types/node": "^26.6.3",
+    "svelte-check": "^4.7.6",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.1"
+  }
+}

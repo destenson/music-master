@@ -1,6 +1,8 @@
 # Music Master — UI and front-end plan
 
-Status: plan, not built. Companion to [`compliance-architecture.md`](compliance-architecture.md),
+Status: plan. M0 (the core package) and a first slice of the UI — the builder, the live caption, the
+timeline and the lyric checker, all running in the browser — are built; the rest is not. Companion to
+[`compliance-architecture.md`](compliance-architecture.md),
 [`tag-vocabulary.md`](tag-vocabulary.md) and [`lyric-templates.md`](lyric-templates.md).
 
 ## 1. Are we ready?

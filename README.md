@@ -8,8 +8,9 @@ song, then returns it with a **compliance report** that says, per requirement, w
 checked, on what evidence, and whether it passed — and lists the requirements it could not
 satisfy rather than quietly ignoring them.
 
-Status: **design only.** The vocabulary, lyric checker and time-budget tooling are real and now
-packaged as `musicmaster/`; the generator, the UI and the live compliance battery are not built.
+Status: **design only.** The vocabulary, lyric checker and time-budget tooling are real and packaged
+as `musicmaster/`, and a first slice of the UI runs that same code in the browser. The generator, the
+audio pipeline and the live compliance battery are not built.
 
 ## The idea in one paragraph
 
@@ -172,6 +173,33 @@ values the tier computes — the tag budget, the bar-to-seconds arithmetic, the 
 each song satisfying its own template. Expectations are written inline and derived from the
 definitions wherever they can be, so the suite fails when the arithmetic or the mapping is wrong,
 not when a message is reworded or the vocabulary grows.
+
+## The UI
+
+`web/` is a static SPA (Svelte 5 + Vite) that runs the text tier **in the browser** under Pyodide, so
+the form, the caption, the time budget and the lyric findings all come from the same Python the CLI
+uses. No server is in the loop, and there is no second implementation to drift from the first.
+
+```bash
+cd web && npm install
+npx vite                 # http://127.0.0.1:5173/
+npx vite build           # static bundle in web/dist, repository and runtime copied in
+node scripts/smoke.mjs   # checks the browser glue against the CLI, without a browser
+```
+
+The page reads the vocabulary, the text tier and the songs out of the repository itself, so the form
+cannot disagree with the renderer about what a bin is: adding an option to `tag-bins.json` adds a
+control, and nothing in `web/` changes.
+
+What it does today: opens `rap-metal-groove`, generates the whole bin form from the vocabulary,
+renders the caption live with its tag budget, dropped tags, negatives and coherence notes, draws the
+timeline with its syllable budget, and checks a lyric with per-section syllable, phrase and rhyme
+numbers.
+
+What it does not do yet, and says so rather than showing an empty pane: interpret a brief into typed
+requirements (no oracle is configured), show the canonical prompt (that logic still lives inside
+`build_and_submit.py`), or render and audition audio (which needs the GPU host). It also needs to be
+served over HTTP — WASM and ES modules will not load from a `file://` URL.
 
 ## Schemas
 
