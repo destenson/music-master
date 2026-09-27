@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/requirement-spec.schema.json",
+  "title": "RequirementSpec",
+  "description": "The typed interpretation of a user's brief. Produced by the Interpret stage, confirmed before generation, and consumed by every later stage. Every requirement names the checker that decides it, so no requirement can be asserted without evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spec_version", "requirements"],
+  "properties": {
+    "spec_version": { "type": "string", "const": "1" },
+    "brief": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Verbatim record of what the user asked for.",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" },
+        "supplied_lyrics": { "type": ["string", "null"] },
+        "supplied_melody_ref": { "type": ["string", "null"] },
+        "language": { "type": ["string", "null"] }
+      }
+    },
+    "lane": {
+      "type": "string",
+      "enum": ["symbolic_first", "audio_first"],
+      "description": "Which composition path the spec selects. symbolic_first when mechanical requirements dominate, audio_first when the brief is mostly aesthetic."
+    },
+    "oracle": {
+      "type": "string",
+      "enum": ["jev", "local", "replay", "none"],
+      "description": "Which compliance oracle is permitted for this spec. 'none' means deterministic gates only, and every semantic requirement is reported unverified."
+    },
+    "requirements": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/Requirement" }
+    },
+    "assumptions": {
+      "type": "array",
+      "description": "Inferred or defaulted requirements still awaiting confirmation. Generation must not start while this is non-empty in interactive mode.",
+      "items": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "Requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "text", "kind", "verify", "severity", "source"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "description": "Stable identifier used to key answers, map repairs, and report verdicts."
+        },
+        "text": {
+          "type": "string",
+          "description": "The requirement as a person would state it, for display in the compliance report."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["mechanical", "semantic", "policy"],
+          "description": "mechanical = exactly computable in code; semantic = a judgment; policy = a safety or rights constraint with its own action thresholds."
+        },
+        "verify": {
+          "type": "string",
+          "pattern": "^(code|audio|jev|human)\\.[a-z0-9_.]+$",
+          "description": "Names the checker, not a description. A requirement whose only checker is human.* cannot be enforced automatically and is reported as such."
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["hard", "soft", "policy"],
+          "description": "hard = a failure rejects the candidate; soft = contributes to the composite score; policy = uses the policy action thresholds."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["explicit", "inferred", "default"],
+          "description": "Provenance. Inferred requirements must be confirmed; defaults are never silently promoted to explicit."
+        },
+        "confirmed": {
+          "type": "boolean",
+          "default": false,
+          "description": "True once the user has confirmed an inferred requirement."
+        },
+        "target": {
+          "description": "The requirement's value in the shape the named checker expects. Numeric targets are always compared in code.",
+          "type": ["object", "array", "string", "number", "boolean", "null"]
+        },
+        "stage_enforced": {
+          "type": "string",
+          "enum": ["plan", "lyrics", "fact_sheet", "never"],
+          "description": "The earliest stage at which this requirement becomes observable. Requirements are enforced here, not later."
+        },
+        "repair_hint": {
+          "type": ["string", "null"],
+          "description": "Instruction template used by the repair router when this requirement fails. Code fills it; the oracle never writes it."
+        }
+      }
+    }
+  }
+}

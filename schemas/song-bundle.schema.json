@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/song-bundle.schema.json",
+  "title": "SongManifest",
+  "description": "The manifest of one song directory. It records which artifacts exist, the content hash of each, and the dependency edges between them, so that any artifact can be re-derived from its recorded inputs and any output can be traced back to the exact prompt, lyrics and composition that produced it. This is what makes the audio a build product rather than an unrepeatable event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["manifest_version", "song_id", "artifacts", "edges", "status"],
+  "properties": {
+    "manifest_version": { "type": "string", "const": "1" },
+    "song_id": { "type": "string" },
+    "song_seed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The single seed every stage derives from. Changing it changes everything downstream; it is recorded here so a whole song is reproducible from one number plus the brief."
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "artifacts": {
+      "type": "array",
+      "description": "One entry per produced artifact. An absent artifact is a stage that has not run.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "path", "sha256", "stage"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": ["brief", "spec", "composition", "lyrics", "prompt", "rendered_prompt", "audio", "stems", "report"],
+            "description": "The artifact's place in the pipeline. 'brief' is user input; 'spec', 'composition', 'lyrics', 'prompt' are source artifacts; 'rendered_prompt' is a target-specific projection of prompt; 'audio' and 'stems' are build products; 'report' is the verdict."
+          },
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "stage": { "type": "string", "enum": ["brief", "interpret", "compose", "lyrics", "prompt", "render", "analyse", "verify"] },
+          "bytes": { "type": ["integer", "null"], "minimum": 0 },
+          "seed": { "type": ["integer", "null"], "minimum": 0, "description": "The stage-local seed actually used, derived from song_seed. Recorded per artifact so one stage can be re-run without perturbing another." },
+          "generator": {
+            "type": ["string", "null"],
+            "description": "For build products, the generator id that produced it."
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Directed dependencies between artifacts, as (from, to) pairs meaning 'to' was derived from 'from'. This is the regeneration graph: to rebuild one artifact, rebuild it and everything reachable from it.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string", "description": "An artifact role or path." },
+          "to": { "type": "string" }
+        }
+      }
+    },
+    "environment": {
+      "type": ["object", "null"],
+      "description": "What would have to match for a re-render to be bit-identical. Recorded even though bit-exactness is only best-effort, because the measurement layer can still compare two renders when the bytes differ.",
+      "additionalProperties": false,
+      "properties": {
+        "python": { "type": ["string", "null"] },
+        "torch": { "type": ["string", "null"] },
+        "cuda": { "type": ["string", "null"] },
+        "driver": { "type": ["string", "null"] },
+        "gpu": { "type": ["string", "null"] },
+        "comfyui_commit": { "type": ["string", "null"] }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["partial", "rendered", "verified", "failed"],
+      "description": "How far the bundle got. 'partial' means source artifacts exist but no audio; that is a legitimate and useful state, because the prompt, lyrics and composition are reviewable and re-renderable on their own."
+    },
+    "parent_manifest_sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Set when this bundle was derived from an earlier one by changing a single stage, so the lineage of an edit is recoverable."
+    }
+  }
+}

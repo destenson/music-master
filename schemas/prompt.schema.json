@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/prompt.schema.json",
+  "title": "Prompt",
+  "description": "The canonical, model-agnostic generation request. This is the artifact of record for what the generator is asked to produce: the audio is a build product derived from it. It is not a string. It is a pure function of the RequirementSpec, the Composition and the Lyrics, plus the target adapter, and it is rendered into a target-specific form (for example rendered/ace_step_1_5.json) rather than written by hand. Canonicalisation: keys sorted, numbers formatted with a fixed precision, no insignificant whitespace, so the same intent always yields the same bytes; the manifest records prompt_sha256 over that canonical form. Anything that affected the audio and is not recorded here is not reproducible.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["prompt_version", "song_id", "seed", "style", "metadata", "form", "lyrics", "target", "provenance"],
+  "properties": {
+    "prompt_version": { "type": "string", "const": "1" },
+    "song_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The song-level seed. Every stage derives its own seed from this one, so re-running a single stage cannot perturb the others."
+    },
+    "style": {
+      "$ref": "#/$defs/Style",
+      "description": "What the song should sound like. Renders into the generator's style/caption prompt."
+    },
+    "metadata": {
+      "$ref": "#/$defs/Metadata",
+      "description": "The numeric and categorical facts of the request. On ACE-Step 1.5 these render into the prompt-level CoT fields, so they are a strong prior and not a guarantee: each one must also be measured on the rendered audio."
+    },
+    "form": {
+      "$ref": "#/$defs/Form",
+      "description": "The section plan, referenced from composition.json rather than duplicated, so the two cannot drift."
+    },
+    "lyrics": {
+      "$ref": "#/$defs/LyricsRef",
+      "description": "A content-addressed reference to the lyric artifact. The prompt carries the hash, not a stale copy."
+    },
+    "negative": {
+      "$ref": "#/$defs/Negative",
+      "description": "Per-field exclusions mirroring the positive fields. Renders into the generator's negative conditioning, which is a weak lever and never a guarantee on its own."
+    },
+    "references": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional external material the generation is conditioned on.",
+      "properties": {
+        "audio": { "type": ["string", "null"], "description": "Path or handle to reference timbre audio." },
+        "audio_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "melody": { "type": ["string", "null"], "description": "Path or handle to a melody or MIDI reference." },
+        "melody_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "target": {
+      "$ref": "#/$defs/Target",
+      "description": "Which generator, which weights, which graph, which sampler settings. Model identity is recorded rather than assumed, so 'same model' is provable."
+    },
+    "notes": {
+      "type": "array",
+      "description": "Human-readable rationale for each choice, for review. Never sent to the generator.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["field", "why"],
+        "properties": {
+          "field": { "type": "string", "description": "Dotted path into this prompt, e.g. 'metadata.bpm'." },
+          "why": { "type": "string" },
+          "requirement_id": { "type": ["string", "null"], "description": "The RequirementSpec id this choice serves, when there is one." }
+        }
+      }
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance",
+      "description": "Where this prompt came from, so it can be regenerated and audited."
+    }
+  },
+  "$defs": {
+    "Style": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The descriptive half of the request. Tags use a controlled vocabulary so that two prompts meaning the same thing render the same string and hash the same; free_text carries what the vocabulary cannot express. Both are sent to the generator.",
+      "required": ["tags", "free_text"],
+      "properties": {
+        "tags": {
+          "type": "array",
+          "description": "Normalised vocabulary terms, e.g. 'indie folk', 'fingerpicked guitar', 'brushed drums', 'close-mic female alto'. The adapter joins these into the target's tag string in a fixed order.",
+          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9 +#/'-]*$" },
+          "uniqueItems": true
+        },
+        "free_text": {
+          "type": "string",
+          "description": "The residual descriptive clause in natural language, for what the vocabulary cannot hold. Renders after the tags."
+        },
+        "dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The same intent, split by axis. Kept because the compliance battery scores these axes separately; a single blob cannot be checked per requirement.",
+          "properties": {
+            "genre": { "type": "array", "items": { "type": "string" } },
+            "era": { "type": ["string", "null"] },
+            "production": { "type": "array", "items": { "type": "string" } },
+            "instrumentation": { "type": "array", "items": { "type": "string" } },
+            "mood": { "type": "array", "items": { "type": "string" } },
+            "vocal": {
+              "type": ["object", "null"],
+              "additionalProperties": false,
+              "properties": {
+                "present": { "type": "boolean" },
+                "voice": { "type": ["string", "null"], "description": "e.g. 'female', 'male', 'duet', 'instrumental'." },
+                "register": { "type": ["string", "null"], "description": "e.g. 'alto', 'tenor'." },
+                "delivery": { "type": ["string", "null"], "description": "e.g. \"close-mic'd\", 'belted', 'breathy'." }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The exactly-checkable half of the request. Every field here has a corresponding measurement on the rendered audio; the value recorded here is what was asked for, not what was produced.",
+      "required": ["duration_s"],
+      "properties": {
+        "bpm": { "type": ["number", "null"], "minimum": 10, "maximum": 300, "description": "ACE-Step 1.5 accepts 10-300." },
+        "key": { "type": ["string", "null"], "description": "Tonic, e.g. 'F#'." },
+        "mode": { "type": ["string", "null"], "enum": ["major", "minor", null] },
+        "timesignature": { "type": ["string", "null"], "enum": ["2", "3", "4", "6", null], "description": "ACE-Step 1.5 accepts 2, 3, 4 or 6." },
+        "duration_s": { "type": "number", "minimum": 1, "maximum": 600, "description": "ACE-Step 1.5 supports 10 s to 600 s; the adapter must reject or route outside that." },
+        "language": { "type": ["string", "null"], "description": "ISO 639-1 code, restricted to the target's supported set at render time." }
+      }
+    },
+    "Form": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A reference to the section plan in composition.json, not a copy. The composer owns the structure; the prompt points at it.",
+      "required": ["composition_ref", "composition_sha256"],
+      "properties": {
+        "composition_ref": { "type": "string", "description": "Path to composition.json." },
+        "composition_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "sections": {
+          "type": "array",
+          "description": "Denormalised view for the renderer and for human review. Generated from composition.json; never edited by hand.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "bars"],
+            "properties": {
+              "name": { "type": "string", "enum": ["intro", "verse", "prechorus", "chorus", "bridge", "solo", "outro", "break"] },
+              "bars": { "type": "integer", "minimum": 1 },
+              "label": { "type": ["string", "null"], "description": "The tag written into the lyric text, e.g. '[Verse 1]'." }
+            }
+          }
+        }
+      }
+    },
+    "LyricsRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "sha256"],
+      "properties": {
+        "ref": { "type": "string", "description": "Path to the lyric artifact." },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$", "description": "Content hash, so the prompt cannot silently refer to a lyric that has since changed." },
+        "section_tags": { "type": "boolean", "default": true, "description": "Whether the rendered lyric text carries [Verse]/[Chorus] tags. ACE-Step uses them for structure." },
+        "metrical": {
+          "type": ["object", "null"],
+          "description": "Derived per-line syllable and stress data, computed in code. Present because the melody and the prompt both depend on it; never produced by the oracle.",
+          "additionalProperties": true
+        }
+      }
+    },
+    "Negative": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What to avoid. Each field mirrors a positive field. Negative conditioning is a weak lever: it biases away, it does not exclude, so a requirement expressed only here is not enforced by it.",
+      "properties": {
+        "style": { "type": "array", "items": { "type": "string" }, "description": "Renders to the negative caption." },
+        "bpm": { "type": ["number", "null"] },
+        "key": { "type": ["string", "null"] },
+        "timesignature": { "type": ["string", "null"] },
+        "language": { "type": ["string", "null"] },
+        "artist_references": {
+          "type": "array",
+          "description": "Named artists whose style must not be imitated. Recorded here so the render and the compliance report can both prove what was excluded; the policy check is a separate oracle question.",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "Target": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Everything needed to reproduce the render, including the parts a human would otherwise remember: the graph and the sampler settings.",
+      "required": ["generator_id", "runner", "seed"],
+      "properties": {
+        "generator_id": { "type": "string", "description": "e.g. 'ace_step_1_5_xl_turbo'." },
+        "runner": { "type": "string", "enum": ["comfyui", "http", "python"] },
+        "weights_sha256": {
+          "type": ["object", "null"],
+          "description": "Content hash per weight file. Optional because hashing multi-gigabyte files is slow; when present it makes 'same model' provable rather than declared.",
+          "additionalProperties": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        },
+        "graph_ref": { "type": ["string", "null"], "description": "For a graph runner, the workflow that was executed, e.g. the packaged audio_ace_step1_5_xl_turbo template." },
+        "graph_sha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "sampler": {
+          "type": ["object", "null"],
+          "additionalProperties": true,
+          "description": "Diffusion sampler settings: steps, cfg, sampler name, scheduler, denoise."
+        },
+        "lm": {
+          "type": ["object", "null"],
+          "additionalProperties": true,
+          "description": "Language-model settings that generate audio codes (generate_audio_codes, cfg_scale, temperature, top_p, top_k, min_p). Distinct from the diffusion sampler and must not be conflated with it."
+        },
+        "seed": { "type": "integer", "minimum": 0 },
+        "batch_size": { "type": "integer", "minimum": 1, "default": 1, "description": "Best-of-N is native on ACE-Step 1.5; the batch that was rendered is recorded here." },
+        "candidate_index": { "type": ["integer", "null"], "minimum": 0, "description": "Which candidate of the batch this artifact is, so a specific render is addressable." }
+      }
+    },
+    "Provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["spec_sha256"],
+      "properties": {
+        "spec_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "built_at": { "type": ["string", "null"], "description": "ISO 8601. Recorded but excluded from the canonical form used for hashing." },
+        "builder": { "type": ["string", "null"], "description": "Tool and version that built this prompt." }
+      }
+    }
+  }
+}

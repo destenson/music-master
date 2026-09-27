@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://music-master.local/schemas/compliance-report.schema.json",
+  "title": "ComplianceReport",
+  "description": "The evidence-backed verdict for one generated song. Returned to the user alongside the artifact. States per requirement what was checked, by whom, with what evidence, and what the verdict was. A requirement that was not checked is 'unverified', never 'met'.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["report_version", "song_id", "oracle", "verdicts", "overall"],
+  "properties": {
+    "report_version": { "type": "string", "const": "1" },
+    "song_id": { "type": "string" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Which oracle answered, and which version, so a verdict can be re-derived later.",
+      "required": ["kind", "model", "reachable"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["jev", "local", "replay", "none"] },
+        "model": { "type": ["string", "null"] },
+        "reachable": { "type": "boolean" },
+        "degraded_reason": {
+          "type": ["string", "null"],
+          "description": "Set when the oracle failed and semantic checks fell back to unverified."
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "audio_path": { "type": ["string", "null"] },
+        "lyrics_path": { "type": ["string", "null"] },
+        "midi_path": { "type": ["string", "null"] },
+        "fact_sheet_path": { "type": ["string", "null"] }
+      }
+    },
+    "verdicts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Verdict" }
+    },
+    "overall": {
+      "type": "string",
+      "enum": ["compliant", "compliant_with_unmet_soft", "non_compliant", "unverified"],
+      "description": "compliant requires every hard and policy requirement met and no requirement uncertain."
+    },
+    "unmet": {
+      "type": "array",
+      "description": "The explicit list of what the system could not satisfy. This is the honest-output contract: it is never empty when overall is not 'compliant'.",
+      "items": { "type": "string" }
+    },
+    "iterations": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many repair rounds ran before this candidate was returned."
+    }
+  },
+  "$defs": {
+    "Verdict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requirement_id", "verdict", "checker"],
+      "properties": {
+        "requirement_id": { "type": "string" },
+        "text": { "type": "string" },
+        "severity": { "type": "string", "enum": ["hard", "soft", "policy"] },
+        "checker": {
+          "type": "string",
+          "description": "The verify field from the spec, echoed so the report shows who decided."
+        },
+        "verdict": {
+          "type": "string",
+          "enum": ["met", "unmet", "uncertain", "unverified"],
+          "description": "uncertain = inside the uncertainty band. unverified = not checked, e.g. the oracle was unreachable. Neither is a pass."
+        },
+        "probability": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "The oracle's noul, or the top-option probability, for semantic requirements."
+        },
+        "confidence": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Recorded for completeness and audit, not used for gating; the top-two margin is the discrimination signal."
+        },
+        "top2_margin": { "type": ["number", "null"] },
+        "measured": {
+          "description": "For code and audio checkers: the actual measured value and the target it was compared against.",
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "value": {},
+            "target": {},
+            "within_tolerance": { "type": "boolean" }
+          }
+        },
+        "evidence": {
+          "type": "array",
+          "description": "Pointers to the exact material the checker read, so a wrong verdict can be traced to a wrong input.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

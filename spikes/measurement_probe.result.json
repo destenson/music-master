@@ -1,0 +1,21 @@
+{
+  "measured": {
+    "duration_s": 12.0,
+    "tempo_bpm": 92.29,
+    "n_beats": 17,
+    "key": "F# minor",
+    "key_correlation": 0.817,
+    "integrated_lufs": -21.14,
+    "true_peak_dbfs": 1.64,
+    "clipped_samples": 256,
+    "spectral_centroid_hz": 213.9,
+    "onset_count": 34
+  },
+  "expected": {
+    "tempo_bpm": 92.0,
+    "key": "F# minor"
+  },
+  "tempo_absolute_error": 0.29,
+  "tempo_octave_tolerant_error": 0.29,
+  "key_match": true
+}
