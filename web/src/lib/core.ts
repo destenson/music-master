@@ -11,7 +11,10 @@ import glueSource from "./core_glue.py?raw";
 import { asset, withBuild } from "./paths";
 import type {
   Artifacts,
+  ComplianceReport,
+  JevRequest,
   LyricReport,
+  MechanicalVerdict,
   RadioPlan,
   RadioStation,
   RenderResult,
@@ -212,5 +215,49 @@ export class MusicMasterCore {
     instrumental?: boolean;
   }): RadioPlan {
     return this.call<RadioPlan>("radio_plan", request);
+  }
+
+  /**
+   * The requirement spec and the exact Jev body for one song.
+   *
+   * `request` is what the transport posts verbatim, so the page never assembles a question itself:
+   * the spec, the state and the typed questions all come from the same Python the battery uses.
+   */
+  jevRequest(request: {
+    selections: Selections;
+    bpm: number;
+    duration_s?: number | null;
+    template_id?: string | null;
+    lyrics: string;
+    /** The rendered caption: almost every semantic question reads it, so it cannot be left out. */
+    caption: string;
+    /** A chord chart, when the page has one. A text-to-music draft usually does not. */
+    chords?: string;
+    theme: string;
+    artist_references: string[];
+    model?: string | null;
+  }): { spec: unknown; request: JevRequest } {
+    return this.call<{ spec: unknown; request: JevRequest }>("jev_request", request);
+  }
+
+  /**
+   * The evidence-backed report for a song.
+   *
+   * `response` is the oracle's answers when the call succeeded; `error` is the transport's own
+   * message when it did not. Supplying the error rather than nothing is what turns every semantic
+   * requirement into `unverified` with a reason, which is the honest outcome when the oracle was
+   * never reached. `mechanical` carries verdicts the page decided itself, so the battery does not
+   * have to pretend they were never checked.
+   */
+  complianceReport(request: {
+    spec: unknown;
+    state: unknown;
+    model?: string | null;
+    response?: unknown;
+    error?: string | null;
+    song_id?: string;
+    mechanical?: MechanicalVerdict[];
+  }): ComplianceReport {
+    return this.call<ComplianceReport>("compliance_report", request);
   }
 }

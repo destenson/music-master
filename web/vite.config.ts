@@ -83,6 +83,64 @@ function dropOrigin(proxy: Parameters<NonNullable<ProxyOptions["configure"]>>[0]
   proxy.on("proxyReq", (request) => request.removeHeader("origin"));
 }
 
+/** Must match `JEV_ENDPOINT` in `src/lib/jev.ts`; the relay is the same call with the key added. */
+const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
+
+/**
+ * A development relay for the compliance oracle, so the page can reach TypeSafe without the key
+ * ever entering the browser.
+ *
+ * Two reasons this exists rather than a direct call. The API does not return
+ * `access-control-allow-origin` for any origin, so a page cannot call it from a browser at all; and
+ * a key typed into a page is a key in a page. In development the request goes same-origin to this
+ * relay, which adds the `Authorization` header from the shell environment -- the same
+ * `TYPESAFE_API_KEY` the CLI reads -- and forwards the body and the response unchanged. A static
+ * build has no relay, so there the page talks to the API directly and the user supplies their own
+ * key, stored per their choice.
+ */
+function jevRelay(): Plugin {
+  return {
+    name: "music-master:jev-relay",
+
+    configureServer(server) {
+      server.middlewares.use("/jev", async (req, res) => {
+        const key = process.env.TYPESAFE_API_KEY;
+        const reply = (status: number, body: unknown): void => {
+          res.statusCode = status;
+          res.setHeader("Content-Type", MIME[".json"]);
+          res.end(JSON.stringify(body));
+        };
+
+        if (!key) {
+          // Said plainly, because a relay with no key and a rejected key look the same from the page.
+          reply(503, { error: "the dev server has no TYPESAFE_API_KEY in its environment" });
+          return;
+        }
+        if (req.method !== "POST") {
+          reply(405, { error: "the relay only accepts POST" });
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        for await (const chunk of req) chunks.push(chunk as Buffer);
+
+        try {
+          const upstream = await fetch(JEV_ENDPOINT, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+            body: Buffer.concat(chunks),
+          });
+          res.statusCode = upstream.status;
+          res.setHeader("Content-Type", upstream.headers.get("content-type") ?? MIME[".json"]);
+          res.end(Buffer.from(await upstream.arrayBuffer()));
+        } catch (error) {
+          reply(502, { error: `the relay could not reach the API: ${(error as Error).message}` });
+        }
+      });
+    },
+  };
+}
+
 /**
  * Serves the repository and the Pyodide runtime in dev, and copies both into the bundle for a
  * static build. The same list drives both, so what you develop against is what gets deployed.
@@ -164,7 +222,7 @@ function sharedAssets(build: string): Plugin {
 const BUILD = buildId();
 
 export default defineConfig({
-  plugins: [svelte(), sharedAssets(BUILD)],
+  plugins: [svelte(), sharedAssets(BUILD), jevRelay()],
   // Compiled into the bundle, so a page knows which build it is rather than asking the host — a
   // cached page that asks is told the new id and never reloads.
   define: { __BUILD_ID__: JSON.stringify(BUILD) },

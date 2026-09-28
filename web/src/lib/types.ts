@@ -261,6 +261,122 @@ export interface RadioStationsFile {
   stations: RadioStation[];
 }
 
+/** One requirement's verdict, as `schemas/compliance-report.schema.json` describes it. */
+export type ComplianceVerdictValue = "met" | "unmet" | "uncertain" | "unverified";
+
+export type EvidenceClass = "measurement" | "description" | "self_report" | "oracle" | "transcription";
+
+export type EnforcementMode =
+  | "enforced"
+  | "verified"
+  | "conditioned + verified"
+  | "measured"
+  | "unverified";
+
+/** One piece of evidence behind a verdict, each item carrying its own class and source. */
+export interface ComplianceEvidence {
+  class: EvidenceClass;
+  source: string;
+  value?: unknown;
+  threshold?: number | null;
+  note?: string | null;
+}
+
+export interface ComplianceVerdict {
+  requirement_id: string;
+  text?: string;
+  severity?: "hard" | "soft" | "policy";
+  /** The `verify` field from the spec, echoed so the report shows who decided. */
+  checker: string;
+  verdict: ComplianceVerdictValue;
+  probability?: number | null;
+  confidence?: number | null;
+  top2_margin?: number | null;
+  enforcement?: EnforcementMode | null;
+  evidence_class?: EvidenceClass | null;
+  supported_by?: ComplianceEvidence[];
+  note?: string | null;
+  measured?: {
+    value?: unknown;
+    target?: unknown;
+    within_tolerance?: boolean;
+  } | null;
+  evidence?: string[];
+}
+
+export type ComplianceOverall =
+  | "compliant"
+  | "compliant_with_unmet_soft"
+  | "non_compliant"
+  | "unverified";
+
+export interface ComplianceCounts {
+  met?: number;
+  total?: number;
+  /** Met verdicts resting on arithmetic or signal processing. The number to trust. */
+  decided_by_measurement?: number;
+  /** Met verdicts resting on a model's generated account. The number to watch. */
+  decided_by_description?: number;
+  uncertain?: number;
+  unverified?: number;
+}
+
+/** The summary question, reported alongside the individual verdicts rather than as a substitute. */
+export interface ComplianceCrossCheck {
+  noul?: number | null;
+  fired?: boolean;
+  agrees_with_individual_verdicts?: boolean;
+  note?: string | null;
+}
+
+export interface ComplianceOracle {
+  kind: "jev" | "local" | "replay" | "none";
+  model: string | null;
+  reachable: boolean;
+  /** Set when the oracle failed and semantic checks fell back to unverified. */
+  degraded_reason?: string | null;
+}
+
+export interface ComplianceReport {
+  report_version: "1";
+  song_id: string;
+  generated_at?: string;
+  oracle: ComplianceOracle;
+  artifacts?: {
+    audio_path?: string | null;
+    lyrics_path?: string | null;
+    midi_path?: string | null;
+    fact_sheet_path?: string | null;
+  };
+  verdicts: ComplianceVerdict[];
+  overall: ComplianceOverall;
+  /** Explicitly what could not be satisfied; never empty when `overall` is not compliant. */
+  unmet?: string[];
+  counts?: ComplianceCounts;
+  cross_check?: ComplianceCrossCheck;
+  /** How many repair rounds ran before this candidate was returned. */
+  iterations?: number;
+}
+
+/** The body `jev_request` builds and the transport posts to `/v1/systemone`. */
+export interface JevRequest {
+  state: unknown;
+  model: string;
+  questions: Record<string, unknown>;
+}
+
+/**
+ * A verdict code and audio checkers already produced. The battery does not recompute mechanical
+ * requirements, so the page reports the ones it can decide itself rather than leaving them to the
+ * oracle or silently unverified.
+ */
+export interface MechanicalVerdict {
+  requirement_id: string;
+  verdict: string;
+  checker?: string;
+  severity?: string;
+}
+
 /** One song of one station, as `musicmaster.radio.plan_song` returns it. */
 export interface RadioPlan {
   station_id: string;

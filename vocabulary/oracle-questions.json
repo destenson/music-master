@@ -1,6 +1,7 @@
 {
-  "bank_version": "1",
-  "note": "The compliance battery's questions, keyed by checker id. A requirement whose verify field names one of these checkers is turned into a question by musicmaster.oracle.build_questions; adding a semantic requirement is an entry here plus a spec entry, not a code change. The wording names the fields each question should read, by backticked path, because Jev-style models answer the question you wrote and their accuracy falls as unrelated detail grows. The thresholds below are defaults carried from the sibling projects' operating manual; rule 7 of the gating policy says they must be re-measured per question and per model version, and a verdict records the one that actually decided it. `levels` for a score is ordered weakest to strongest, and `default_bound` is the level a requirement with no numeric target must reach -- level 3 is 'recognisably the thing', which is the weakest defensible pass.",
+  "bank_version": "2",
+  "note": "The compliance battery's questions, keyed by checker id. A requirement whose verify field names one of these checkers is turned into a question by musicmaster.oracle.build_questions; adding a semantic requirement is an entry here plus a spec entry, not a code change. Three things make a question answerable and are therefore not optional: the wording names the fields it reads by backticked path, because a model answers the question you wrote and its accuracy falls as unrelated detail grows; every noul says what does *not* count, because the near miss is where a judgement actually gets made; and every score level says what distinguishes it from its neighbours, because a level that is only a label invites a model to split the difference between the two it cannot tell apart. Levels are anchored rather than ranked: a higher level is not a better song, it is a different description, and for a question like absence or explicitness the lower level is the pass.",
+  "judging_rules": "Judge the state as written. Do not credit a quality merely because nothing contradicts it, and do not supply a detail the state never gives. Where a field a question names is absent from the state, judge from the fields that are present rather than assuming the missing one either way, and let the absence make the answer weaker rather than stronger. Choose the single level or verdict whose description fits best. The levels are distinguished by what their descriptions say, not by how good the song is.",
   "always_ask": ["jev.any_serious_violation"],
   "questions": {
     "jev.theme_adherence": {
@@ -8,47 +9,51 @@
       "reads": ["brief.theme", "caption", "lyrics"],
       "instructions": "Do `lyrics` and `caption` together convey a song about the theme named in `brief.theme`, rather than about a different subject?",
       "criteria": {
-        "true": "The subject of `brief.theme` is identifiable in the words or in the described setting.",
-        "false": "The song is about a different subject, time or place."
+        "true": "The subject named in brief.theme is identifiable from the words or the described setting: at least one concrete element of it appears, and nothing in the song places it somewhere else.",
+        "false": "The song is about a different subject, time or place. This includes a song that borrows one image from the theme, such as a season or a place name, while being about something else."
       }
     },
     "jev.mood_axis": {
       "type": "score",
       "target_split": "axes",
       "reads": ["caption", "lyrics"],
-      "instructions": "How {axis} does `caption` and `lyrics` read?",
+      "instructions": {
+        "axis": "{axis}",
+        "question": "How far do `caption` and `lyrics` convey the quality named in `axis`, whether that quality is a mood or a setting?"
+      },
       "levels": [
-        "Not {axis} at all",
-        "Slightly {axis}",
-        "Moderately {axis}",
-        "Strongly {axis}",
-        "Defined by {axis}"
+        "Absent: nothing in the caption or lyrics speaks to the quality, and nothing contradicts it either",
+        "A hint: one word or image gestures at the quality, but a reader would not name it unprompted",
+        "Present: the quality is recognisable from more than one detail, though other qualities share the song",
+        "Strong: the quality is one of the first things the song conveys, and several details support it",
+        "Defining: remove the quality and the song has no character left"
       ],
-      "note": "One question per axis in the target. An axis named `x_max` is an upper bound -- the song must not read as x -- while a bare axis is a lower bound."
+      "note": "One question per axis in the target. The axis travels as a field of the instructions rather than as a word spliced into the question, because half these labels are settings rather than adjectives: 'How night drive does the caption read' is not a question, while a question pointing at `axis` reads the same for a mood and a setting. An axis named `x_max` is an upper bound -- the song must not read as x -- while a bare axis is a lower bound."
     },
     "jev.genre_fidelity": {
       "type": "score",
       "reads": ["brief.genre", "caption", "chords", "measured"],
       "instructions": "How well do `caption`, `chords` and `measured` fit the genre named in `brief.genre`?",
       "levels": [
-        "A different genre",
-        "Same broad family, wrong corner",
-        "Recognisably the genre",
-        "A clear example of the genre",
-        "A textbook example of the genre"
+        "A different genre: the defining elements belong to another genre entirely, as a four-on-the-floor club track does for an indie folk brief",
+        "Same broad family, wrong corner: the same broad family, but a different tradition inside it, as Nashville country is to British folk",
+        "Recognisably the genre: the elements that define the genre are present, though the description also fits its neighbours",
+        "A clear example: the defining elements lead the description and nothing in it argues for another genre",
+        "A textbook example: it could be printed beside the genre's definition without qualification"
       ],
-      "default_bound": 3
+      "default_bound": 3,
+      "note": "Levels 3 and 4 are the pair a model cannot tell apart from labels alone, so each names what separates it: fitting the neighbours as well, against the defining elements leading."
     },
     "jev.era_production": {
       "type": "score",
       "reads": ["brief.era", "caption", "measured"],
       "instructions": "How well does the production described in `caption` match the era named in `brief.era`?",
       "levels": [
-        "A different era",
-        "Adjacent era, wrong decade",
-        "Recognisably the era",
-        "A clear example of the era",
-        "A textbook example of the era"
+        "A different era: the production markers belong to another period, as a modern loud master does for a 1970s brief",
+        "Adjacent era, wrong decade: the same technology and idiom, but a neighbouring decade",
+        "Recognisably the era: the period's markers are present but mixed with markers of other periods",
+        "A clear example: the period's markers lead, and none of them contradicts it",
+        "A textbook example: it could be dated to the era confidently and without qualification"
       ],
       "default_bound": 3
     },
@@ -57,8 +62,8 @@
       "reads": ["caption", "lyrics"],
       "instructions": "Does `caption` describe the vocal the brief asked for in `target` -- its type, register and delivery -- rather than a different voice?",
       "criteria": {
-        "true": "The vocal type, register and delivery asked for are all identifiable in `caption`.",
-        "false": "A different vocal is described, or the voice is left unspecified where the brief required one."
+        "true": "The vocal type, register and delivery asked for are all identifiable in the caption.",
+        "false": "A different vocal is described, or the voice is left unspecified where the brief required one. A caption with no vocal at all is false unless the brief asked for an instrumental."
       }
     },
     "jev.instrumentation": {
@@ -66,8 +71,8 @@
       "reads": ["brief", "caption", "measured"],
       "instructions": "Is every instrument the brief asked for present in `caption`, with nothing it excluded?",
       "criteria": {
-        "true": "Each required instrument is named in `caption`, and no excluded one appears.",
-        "false": "A required instrument is missing, or an excluded one is described."
+        "true": "Each required instrument is named in the caption, or unmistakably implied by a description only it would produce.",
+        "false": "A required instrument is missing, or an excluded one is described. A generic mention does not count for a named instrument: 'acoustic instruments' is not a banjo."
       }
     },
     "jev.hook_payoff": {
@@ -75,8 +80,8 @@
       "reads": ["lyrics", "composition.hook"],
       "instructions": "Does the section flagged as the hook in `lyrics` deliver a payoff -- a repeatable, memorable line -- rather than an ordinary section?",
       "criteria": {
-        "true": "The hook section carries a line a listener could repeat after one hearing.",
-        "false": "The hook section is indistinguishable from an ordinary verse."
+        "true": "The hook section carries a short line whose phrasing invites repetition, and it is the line a listener would carry away.",
+        "false": "The hook section is indistinguishable from an ordinary verse. Being the loudest, the last, or the most repeated line is not enough on its own; the line itself has to be the one that sticks."
       }
     },
     "jev.freshness": {
@@ -84,11 +89,11 @@
       "reads": ["lyrics"],
       "instructions": "How fresh does `lyrics` read, rather than reaching for the stock phrases of its genre?",
       "levels": [
-        "Entirely stock phrasing",
-        "Mostly familiar",
-        "Some fresh images among familiar ones",
-        "Distinctly its own",
-        "Nothing about it is borrowed"
+        "Entirely stock: the lyric is built from phrases a listener has heard in this genre many times",
+        "Mostly familiar: one or two images are the writer's own and the rest is genre furniture",
+        "Mixed: fresh images appear among familiar ones, roughly in balance",
+        "Distinctly its own: most images are specific enough that they could not be moved into another song",
+        "Nothing borrowed: no phrase in it is recognisable as a commonplace of the genre"
       ],
       "default_bound": 3
     },
@@ -97,11 +102,11 @@
       "reads": ["lyrics", "composition"],
       "instructions": "How coherent is `lyrics` as a single narrative, rather than a set of unrelated images?",
       "levels": [
-        "Unrelated images",
-        "Loosely associated",
-        "One clear thread",
-        "A developed narrative",
-        "Every section advances the same story"
+        "Unrelated images: the lines could be reordered at random without the song losing anything",
+        "Loosely associated: they share a mood or a topic, but no thread runs through them",
+        "One clear thread: a reader can say what the song is about and trace that through the sections",
+        "A developed narrative: the sections advance one story, and the ending answers the opening",
+        "Every section advances the story: nothing in it is decorative, and the order the sections are in matters"
       ],
       "default_bound": 3
     },
@@ -110,11 +115,11 @@
       "reads": ["brief", "caption"],
       "instructions": "How well does the texture described in `caption` match the timbre the brief asked for in `target`?",
       "levels": [
-        "A different texture",
-        "Adjacent, wrong character",
-        "Recognisably the texture",
-        "A clear match",
-        "Exactly the texture asked for"
+        "A different texture: the described sound would not be recognised as the one asked for at all",
+        "Adjacent, wrong character: the same family of sound, but the opposite quality, as bright is to warm",
+        "Recognisably the texture: the asked-for texture is audible in the description alongside other qualities",
+        "A clear match: every texture word in the description points at the texture asked for",
+        "Exactly the texture asked for: nothing in the description pulls away from it"
       ],
       "default_bound": 3
     },
@@ -123,24 +128,24 @@
       "reads": ["caption", "measured", "lyrics"],
       "instructions": "How well do `caption`, `measured` and `lyrics` match the energy the brief asked for in `target`?",
       "levels": [
-        "Far below the target",
-        "Below the target",
-        "About right",
-        "Above the target",
-        "Far above the target"
+        "Far below: markedly calmer than asked for, as a ballad is to a dance track",
+        "Below: calmer than asked for, but inside the band next to it rather than outside it",
+        "About right: the energy sits in the band asked for, allowing for neighbouring descriptions of it",
+        "Above: more energetic than asked for, but inside the band next to it",
+        "Far above: markedly more energetic than asked for, as a club track is to a ballad"
       ],
-      "note": "A target here is directional, not a magnitude, so the bound is set by the spec's own wording."
+      "note": "The target here is directional, not a magnitude, and the scale is not a quality ranking: for this question the middle is the pass and both ends are misses, which the judging rules say explicitly so that a model does not read 5 as best."
     },
     "jev.groove_fidelity": {
       "type": "score",
       "reads": ["brief", "caption", "chords", "measured"],
       "instructions": "How well does the groove described in `caption` and `measured` match the rhythm the brief asked for in `brief`?",
       "levels": [
-        "A different feel",
-        "Same family, wrong feel",
-        "Recognisably the feel",
-        "A clear match",
-        "Exactly the feel asked for"
+        "A different feel: the rhythm described belongs to another family of groove entirely",
+        "Same family, wrong feel: the right family, but the opposite placement or swing within it",
+        "Recognisably the feel: the asked-for feel is present, though the description also fits neighbouring feels",
+        "A clear match: the defining features of the asked-for feel lead the description",
+        "Exactly the feel asked for: it could be used to illustrate that feel"
       ],
       "default_bound": 3
     },
@@ -149,8 +154,8 @@
       "reads": ["brief", "lyrics"],
       "instructions": "Does `lyrics` stay within the explicitness limit the brief set, in language, subject matter and implication?",
       "criteria": {
-        "true": "Nothing in `lyrics` exceeds the limit the brief asked for.",
-        "false": "The lyric exceeds the limit in explicit language, sexual content, or violence."
+        "true": "Nothing in the lyric exceeds the limit the brief asked for, in its words or in what a listener would take from them.",
+        "false": "The lyric exceeds the limit, including by implication rather than by an explicit word, and including a double meaning a listener would take as sexual or violent."
       },
       "thresholds": { "accept": 0.8 }
     },
@@ -159,8 +164,8 @@
       "reads": ["brief.exclude_artist", "caption", "chords", "lyrics", "measured"],
       "instructions": "Does the description in `caption`, together with `chords`, `lyrics` and `measured`, read as a deliberate imitation of the specific artist named in the brief's exclusion, rather than merely sharing a genre with them?",
       "criteria": {
-        "true": "It reproduces that artist's distinctive signature closely enough to be heard as an imitation.",
-        "false": "It shares a genre at most; nothing distinctive is reproduced."
+        "true": "It reproduces that artist's signature closely enough to be heard as an imitation: at least two distinctive traits of that artist appear together, or one is reproduced unmistakably.",
+        "false": "It shares a genre at most. Sharing instrumentation, tempo, mood or subject with that artist is not imitation; the test is whether something distinctive of the artist has been copied."
       },
       "polarity": "violation",
       "thresholds": { "accept": 0.8 }
@@ -170,8 +175,8 @@
       "reads": ["lyrics"],
       "instructions": "Does `lyrics` contain hateful or harassing content, or content promoting self-harm, directed at any person or group?",
       "criteria": {
-        "true": "It contains such content.",
-        "false": "It does not."
+        "true": "It contains such content, directed at a person or a group, or it promotes self-harm.",
+        "false": "It does not. Depicting hardship, violence or despair is not this, provided it directs hatred at no group and promotes no self-harm."
       },
       "polarity": "violation",
       "thresholds": { "accept": 0.9 }
@@ -181,19 +186,38 @@
       "reads": ["lyrics"],
       "instructions": "Does `lyrics` reproduce a substantial passage of an existing song's words, rather than merely using common phrases?",
       "criteria": {
-        "true": "A passage is recognisably another song's words.",
-        "false": "It is original, or uses only phrases common to the genre."
+        "true": "A passage is recognisably another song's words: a distinctive sequence, long enough that its appearance by chance is implausible.",
+        "false": "It is original, or uses only phrases common to the genre. A shared title, a common idiom, or a single distinctive word is not a passage."
       },
       "polarity": "violation",
       "thresholds": { "accept": 0.8 }
     },
+    "jev.absence_of": {
+      "type": "noul",
+      "reads": ["brief", "caption", "lyrics"],
+      "instructions": "Does the song keep {target} out of `caption` and `lyrics`, as the brief asked?",
+      "criteria": {
+        "true": "Nothing in the caption or lyrics is an instance of what was excluded: not the element itself, and not a synonym or a description only that element would produce.",
+        "false": "At least one excluded element is present, including by description rather than by name."
+      },
+      "note": "The `avoid` bin is the one bin whose selections are things that must not appear, which is why its labels become an exclusion rather than a target."
+    },
+    "jev.tuning_fidelity": {
+      "type": "noul",
+      "reads": ["brief", "caption"],
+      "instructions": "Does `caption` describe the guitar tuning the brief asked for in `brief.tuning`?",
+      "criteria": {
+        "true": "The tuning asked for is identifiable in the caption, or nothing in the song depends on the tuning.",
+        "false": "A different tuning is described or implied, including by a claim that only another tuning would support, such as playing below the range of the tuning asked for."
+      }
+    },
     "jev.any_serious_violation": {
       "type": "noul",
-      "reads": ["state"],
+      "reads": ["brief", "caption", "chords", "lyrics", "measured", "planned"],
       "instructions": "Does anything in `state` indicate that a requirement the user stated was seriously violated?",
-      "criteria": {
-        "true": "At least one stated requirement is seriously violated.",
-        "false": "Nothing stated is seriously violated."
+ "criteria": {
+        "true": "At least one requirement the brief stated is seriously violated: not merely missed, but broken in a way the user would reject the song over.",
+        "false": "Nothing stated is seriously violated. A near miss, a quality weaker than asked for, or a requirement nobody could check does not count as a serious violation."
       },
       "note": "A cross-check over the whole state. It never substitutes for the individual answers, because structural invariants between questions do not hold."
     }

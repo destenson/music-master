@@ -15,8 +15,9 @@ and a preview auditions the whole song at a couple of sampler steps before commi
 Status: the generator works end to end. The vocabulary, the caption renderer, the lyric checker, the
 time budget and the prompt builder are real and packaged as `musicmaster/`, and the browser builds a
 song, renders it, previews it and streams it from a radio station. The compliance battery's seam is
-real too — its question set, uncertainty band, evidence gate and report — but no live oracle is wired
-to it yet, so a semantic requirement comes back `unverified` rather than decided.
+real too — its question set, uncertainty band, evidence gate and report — and a Jev transport is
+wired to it behind a key the user supplies; with no key, or where the API refuses the page's origin,
+a semantic requirement comes back `unverified` rather than decided.
 
 ## What it produces
 
@@ -313,25 +314,47 @@ syllables, rhyme, banned words, loudness) and semantic ones that are irreducibly
 (theme, mood, genre, hook, cliché, imitation, explicitness). The mechanical half runs today
 and never touches a model.
 
-The semantic half is where the ambition sits. Its seam is built: the question set, the uncertainty
-band, the evidence gate and the report are real and packaged in `musicmaster/oracle.py`. No live
-oracle is wired to it yet — no key is configured and no local model is installed — so a semantic
-requirement comes back `unverified` rather than decided. What it needs is a **Jev-like** model: one
-that answers typed questions over a text state with calibrated probabilities rather than prose, so
-code can consume the answer directly. The "-like" is load-bearing. Jev is the quality reference and
-the easiest to adopt, but it is a hosted API, so it needs a key and it sends the lyrics — the user's
-private intent — off the machine. That is a property of the service, not of the interface: a small
-open model read the same way, straight from its logits in one forward pass, gives the same typed
-answers with no egress at all, and the page's no-server shape points at hosting one in the browser
-beside the Pyodide text tier.
+The semantic half is where the ambition sits, and its seam is built: the question set, the
+uncertainty band, the evidence gate and the report are real and packaged in `musicmaster/oracle.py`,
+and the obligations a draft implies are derived from the vocabulary's own `maps_to` in
+`musicmaster/spec.py` rather than from a second hand-kept table. What it needs is a **Jev-like**
+model: one that answers typed questions over a text state with calibrated probabilities rather than
+prose, so code can consume the answer directly. The "-like" is load-bearing. Jev is the quality
+reference and the easiest to adopt, but it is a hosted API, so it needs a key and it sends the
+lyrics — the user's private intent — off the machine. That is a property of the service, not of the
+interface: a small open model read the same way, straight from its logits in one forward pass, gives
+the same typed answers with no egress at all, and the page's no-server shape points at hosting one in
+the browser beside the Pyodide text tier.
 
-The battery runs without one, because the oracle is a seam rather than a dependency. A **replay**
-oracle serves recorded answers, so the whole path — question, band, gate, verdict, report — is
-exercised with no network, no key and no GPU:
+**Jev is the first provider wired up, and it runs on a key the user supplies.** The wire format is
+`musicmaster/jev.py` — one implementation, two transports: urllib for the CLI and `fetch` for the
+page, both handing the seam the same parsed answers, so a difference between them is the transport
+and never the battery. Nothing is asked for without a key, and with no key every semantic requirement
+is reported `unverified` rather than guessed at. Two things are worth knowing before typing one:
+
+- **A page cannot call the API directly.** Its preflight advertises `Authorization` and credentials
+  but never returns `access-control-allow-origin`, for every origin tried, including TypeSafe's own,
+  so a browser refuses the response before the key is ever used. That is why local development goes
+  through the dev server instead: `vite.config.ts` relays `/jev`, adding `Authorization` from the
+  same `TYPESAFE_API_KEY` the CLI reads, so in development the key never enters the browser and CORS
+  never applies. A deployed page has no relay, so it calls the API itself and the panel reports a
+  refusal as a refusal — a CORS block and a bad key are indistinguishable to a naive caller, and
+  saying which one happened is the difference between a five-minute fix and an afternoon.
+- **The key and the song leave the machine.** The request carries the projected fact sheet — the
+  caption, the chords and the lyrics the questions name, and nothing else. In development the key
+  stays in the dev server's environment; in a deployed page it is kept in session storage unless the
+  user ticks "remember this device", and it is never written to a song directory, a report, or a log.
+
+The battery runs without any of that, because the oracle is a seam rather than a dependency. A
+**replay** oracle serves recorded answers, and `--print-request` prints the bytes that would be sent
+before a key is involved, so the egress statement is something readable rather than something to be
+trusted:
 
 ```bash
 python3 vocabulary/check_compliance.py vocabulary/examples/compliance-indie-folk.json
+python3 vocabulary/check_compliance.py vocabulary/examples/compliance-indie-folk.json --print-request
 python3 vocabulary/check_compliance.py vocabulary/examples/compliance-indie-folk.json --json
+TYPESAFE_API_KEY=... python3 vocabulary/check_compliance.py <fixture.json> --oracle=jev
 ```
 
 Every verdict names the class of evidence behind it and the threshold that decided it, and the report

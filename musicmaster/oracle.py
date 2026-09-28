@@ -58,6 +58,15 @@ EVIDENCE_CLASSES = (MEASUREMENT, DESCRIPTION, SELF_REPORT, ORACLE, TRANSCRIPTION
 # Re-measure these per question and per model version; they do not port between primitives,
 # questions or versions. A question in the bank may override any of them, and every verdict
 # records the threshold that actually decided it.
+#
+# The margin gate is already known to be wrong as a single number. Measured against the live
+# service on a five-level question whose answer was in no doubt, the top-two margin came back at
+# 0.03 and at 0.12: Jev puts most of a score's mass on the two adjacent levels, so a margin a
+# two-way noul clears easily is nearly unreachable for a score. Until each score question carries
+# a gate measured for it, expect a bounded score to be reported `uncertain`, and read that as the
+# threshold's fault rather than the song's. The same answers point at the better signal for a
+# *bounded* score: the mass on the passing side of the bound, not the distance between the top two
+# levels.
 DEFAULT_THRESHOLDS = {
     "accept": 0.70,      # a noul at or above this is met
     "reject": 0.30,      # a noul at or below this is unmet
@@ -81,17 +90,46 @@ def load_bank(path: Path | str = QUESTION_BANK_PATH) -> dict:
     return json.loads(Path(path).read_text())
 
 
-def _render(template: str, params: Mapping[str, Any]) -> str:
-    out = template
-    for key, value in params.items():
-        out = out.replace("{" + key + "}", str(value))
-    return out
+def _render(template: Any, params: Mapping[str, Any]) -> Any:
+    """Substitute `{placeholders}` anywhere in a value, leaving its shape alone.
+
+    Instructions may be a string or a structured object, which is what lets an axis be *data* the
+    question refers to by backticked name rather than a word spliced into a sentence: "How {axis}
+    does `caption` read?" is ungrammatical for a scene label like "Night Drive", while a question
+    that points at `axis` reads the same for a mood and a setting alike.
+    """
+    if isinstance(template, str):
+        out = template
+        for key, value in params.items():
+            out = out.replace("{" + key + "}", str(value))
+        return out
+    if isinstance(template, Mapping):
+        return {key: _render(value, params) for key, value in template.items()}
+    if isinstance(template, Sequence) and not isinstance(template, (str, bytes)):
+        return [_render(item, params) for item in template]
+    return template
+
+
+def _with_rules(instructions: Any, rules: str | None) -> Any:
+    """Attach the bank's judging rules to a question, wherever its text lives."""
+    if not rules:
+        return instructions
+    if isinstance(instructions, str):
+        return f"{instructions}\n\n{rules}"
+    if isinstance(instructions, Mapping) and isinstance(instructions.get("question"), str):
+        return {**instructions, "question": f"{instructions['question']}\n\n{rules}"}
+    return instructions
 
 
 def _compact(value: Any) -> str:
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def _slug(text: str) -> str:
+    """A question id is a key in a recorded fixture, so an axis name becomes a usable one."""
+    return "".join(ch if ch.isalnum() else "_" for ch in str(text).strip().lower()).strip("_") or "axis"
 
 
 def _target_params(entry: Mapping[str, Any], target: Any) -> list[dict]:
@@ -106,10 +144,18 @@ def _target_params(entry: Mapping[str, Any], target: Any) -> list[dict]:
     if entry.get("target_split") == "axes" and isinstance(target, Mapping):
         params = []
         for key, value in target.items():
-            if key.endswith("_max"):
-                params.append({"axis": key[:-4], "bound": "max", "bound_value": value})
-            else:
-                params.append({"axis": key, "bound": "min", "bound_value": value})
+            axis = key[:-4] if key.endswith("_max") else key
+            params.append(
+                {
+                    # `axis` is what the question says; `axis_id` is what the question is called.
+                    # They differ because a spec's axis may be a label with spaces in it, while a
+                    # question id has to survive being a JSON key in a recorded fixture.
+                    "axis": axis,
+                    "axis_id": _slug(axis),
+                    "bound": "max" if key.endswith("_max") else "min",
+                    "bound_value": value,
+                }
+            )
         return params
     params = {"target": _compact(target)}
     if entry.get("default_bound") is not None:
@@ -128,6 +174,7 @@ def _question_from(entry: Mapping[str, Any], requirement: Mapping[str, Any], que
         "reads": list(entry.get("reads", [])),
         "severity": requirement.get("severity", "soft"),
     }
+
     if entry["type"] == "noul":
         question["criteria"] = {key: _render(value, params) for key, value in (entry.get("criteria") or {}).items()}
         # `polarity` says which way the noul points at the requirement. A `goal` question asks
@@ -156,6 +203,7 @@ def build_questions(spec: Mapping[str, Any], bank: Mapping[str, Any] | None = No
     """
     bank = bank if bank is not None else load_bank()
     entries = bank.get("questions") or {}
+    rules = bank.get("judging_rules")
     questions: dict[str, dict] = {}
 
     for requirement in spec.get("requirements", []):
@@ -170,8 +218,12 @@ def build_questions(spec: Mapping[str, Any], bank: Mapping[str, Any] | None = No
         for index, params in enumerate(params_list):
             # An axis question is always qualified by its axis, so adding a second axis to a
             # target does not rename the first one and invalidate its recorded answers.
-            question_id = f"{requirement['id']}.{params.get('axis', index)}" if split else requirement["id"]
-            questions[question_id] = _question_from(entry, requirement, question_id, params)
+            question_id = (
+                f"{requirement['id']}.{params.get('axis_id', index)}" if split else requirement["id"]
+            )
+            question = _question_from(entry, requirement, question_id, params)
+            question["instructions"] = _with_rules(question["instructions"], rules)
+            questions[question_id] = question
 
     # The cross-check is asked with every battery: a summary violation question that never
     # substitutes for the individual answers, because structural invariants between questions
@@ -181,6 +233,7 @@ def build_questions(spec: Mapping[str, Any], bank: Mapping[str, Any] | None = No
         if entry is None:
             continue
         question = _question_from(entry, {"id": None, "verify": checker, "severity": "policy"}, checker, {})
+        question["instructions"] = _with_rules(question["instructions"], rules)
         question["cross_check"] = True
         questions[checker] = question
 
@@ -553,6 +606,39 @@ class ReplayOracle:
         return {qid: self.answers[qid] for qid in questions if qid in self.answers}
 
 
+class GivenOracle:
+    """Answers produced somewhere the text tier does not reach.
+
+    The page fetches from TypeScript, so its answers arrive already parsed; this hands them to the
+    seam with the provenance a report needs without pretending the text tier made the call. `kind`
+    names the provider rather than the mechanism, so a report cannot describe a local readout as a
+    hosted one. An `error` records why the answers are missing, which is what turns into the
+    ``unverified`` reason on every requirement the oracle was supposed to decide.
+    """
+
+    def __init__(
+        self,
+        answers: Mapping[str, Any] | None = None,
+        *,
+        kind: str = "jev",
+        model: str | None = None,
+        reachable: bool = True,
+        error: str | None = None,
+        problems: Sequence[str] = (),
+    ):
+        self.answers = dict(answers or {})
+        self.kind = kind
+        self.model = model
+        self.reachable = reachable and not error
+        self.degraded_reason = error
+        self.problems = list(problems)
+
+    def evaluate(self, state: Mapping[str, Any], questions: Mapping[str, Any]) -> dict:
+        if not self.reachable:
+            return {}
+        return {qid: self.answers[qid] for qid in questions if qid in self.answers}
+
+
 def as_oracle(oracle: Any) -> Any:
     """Accept either an oracle object or a plain mapping, so a fixture can carry one inline."""
     if hasattr(oracle, "evaluate"):
@@ -606,6 +692,20 @@ def evaluate(
         except Exception as exc:  # an unreachable oracle degrades; it never fails the run
             answers = {}
             degraded_reason = f"{type(exc).__name__}: {exc}"
+        # A transport can fail inside the call rather than raising out of it -- a refused
+        # connection, a rejected key, a CORS block -- and it records why on itself. Take that
+        # reason, or every requirement would report only that no answer came back.
+        reason_after_the_call = getattr(oracle, "degraded_reason", None)
+        if reason_after_the_call:
+            degraded_reason = reason_after_the_call
+            answers = {}
+
+    # An oracle that could answer most questions and not this one says which and why; carrying
+    # that into the verdict beats a generic "no answer".
+    problems: dict[str, str] = {}
+    for entry in getattr(oracle, "problems", None) or ():
+        question_id, _, detail = str(entry).partition(":")
+        problems[question_id.strip()] = detail.strip() or str(entry)
 
     verdicts: list[dict] = []
     for requirement in spec.get("requirements", []):
@@ -634,7 +734,10 @@ def evaluate(
             answer = answers.get(question["id"])
             if answer is None:
                 produced.append(
-                    unverified_verdict(requirement, f"the oracle returned no answer for {question['id']}")
+                    unverified_verdict(
+                        requirement,
+                        problems.get(question["id"]) or f"the oracle returned no answer for {question['id']}",
+                    )
                 )
                 continue
             produced.append(
@@ -738,6 +841,32 @@ def render_text(report: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _oracle_for(kind: str, fixture: Mapping[str, Any], *, model: str | None = None, endpoint: str | None = None) -> Any:
+    """Build the oracle a fixture asks for, degrading rather than crashing when it is absent.
+
+    The key is read from the environment and passed straight to the transport. It is never
+    written to the fixture, to a report, or to stdout.
+    """
+    if kind == "jev":
+        import os
+
+        from musicmaster import jev
+
+        resolved = endpoint or jev.ENDPOINT
+        return jev.JevOracle(
+            lambda payload: jev.urllib_transport(
+                payload, key=os.environ.get("TYPESAFE_API_KEY"), endpoint=resolved
+            ),
+            model=model or jev.DEFAULT_MODEL,
+            endpoint=resolved,
+        )
+    if kind == "replay":
+        return ReplayOracle(fixture.get("answers") or {}, fixture.get("oracle_model"))
+    if kind == "none":
+        return NoOracle()
+    return GivenOracle({}, kind=kind, error=f"the {kind} oracle is not implemented yet")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     argv = list(sys.argv if argv is None else argv)
     args = argv[1:]
@@ -745,27 +874,67 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(__doc__)
         return 0 if args else 2
 
-    fixture = json.loads(Path(args[0]).read_text())
-    oracle = fixture.get("answers")
-    if oracle is not None:
-        oracle = ReplayOracle(oracle, fixture.get("oracle_model"))
+    positional: list[str] = []
+    want_json = False
+    strict = False
+    print_request = False
+    oracle_kind: str | None = None
+    model: str | None = None
+    endpoint: str | None = None
+    for arg in args:
+        if arg == "--json":
+            want_json = True
+        elif arg == "--strict":
+            strict = True
+        elif arg == "--print-request":
+            print_request = True
+        elif arg.startswith("--oracle="):
+            oracle_kind = arg.split("=", 1)[1]
+        elif arg.startswith("--model="):
+            model = arg.split("=", 1)[1]
+        elif arg.startswith("--endpoint="):
+            endpoint = arg.split("=", 1)[1]
+        elif arg.startswith("-"):
+            print(f"unknown option {arg}\n")
+            print(__doc__)
+            return 2
+        else:
+            positional.append(arg)
+    if not positional:
+        print(__doc__)
+        return 2
 
+    path = Path(positional[0])
+    fixture = json.loads(path.read_text())
+    spec = fixture.get("spec") or {}
+    state = fixture.get("state") or {}
+
+    if print_request:
+        # Exactly the bytes that would leave the machine, so the egress statement is something a
+        # person can read rather than something they are asked to trust.
+        from musicmaster import jev
+
+        request = jev.build_request(state, build_questions(spec), model or jev.DEFAULT_MODEL)
+        print(json.dumps(request, indent=2, ensure_ascii=False))
+        return 0
+
+    kind = oracle_kind or spec.get("oracle") or "none"
     report = evaluate(
-        fixture.get("spec") or {},
-        fixture.get("state") or {},
-        oracle,
+        spec,
+        state,
+        _oracle_for(kind, fixture, model=model, endpoint=endpoint),
         mechanical=fixture.get("mechanical") or (),
-        song_id=fixture.get("song_id", Path(args[0]).stem),
+        song_id=fixture.get("song_id", path.stem),
         generated_at=fixture.get("generated_at"),
     )
-    if "--json" in args:
+    if want_json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
     else:
         print(render_text(report))
     # A reporter by default: the report is the product, and an uncertain or unverified
     # requirement is an outcome to read rather than a shell failure. `--strict` turns the
     # report into a gate for a CI job that only wants to pass a compliant song.
-    if "--strict" in args:
+    if strict:
         return 0 if report["overall"] in ("compliant", "compliant_with_unmet_soft") else 1
     return 0
 

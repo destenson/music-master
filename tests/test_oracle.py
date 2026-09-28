@@ -213,11 +213,50 @@ class QuestionBuildingTest(unittest.TestCase):
         self.assertEqual(questions["mood.sadness"]["bound"], "max")
         self.assertEqual(questions["mood.sadness"]["bound_value"], 1)
 
-    def test_an_axis_name_reaches_the_question_text(self) -> None:
+    def test_the_axis_reaches_the_question_as_data_rather_than_as_prose(self) -> None:
+        # Half these labels are settings, not adjectives: "How night drive does the caption read"
+        # is not a question. The axis therefore travels as a field the question points at by
+        # backticked name, which reads the same for a mood and for a setting.
         spec = spec_with(requirement("mood", "jev.mood_axis", target={"wistful": 3}))
-        questions = oracle.build_questions(spec)
-        self.assertIn("wistful", questions["mood.wistful"]["instructions"])
-        self.assertIn("wistful", questions["mood.wistful"]["levels"][0])
+        instructions = oracle.build_questions(spec)["mood.wistful"]["instructions"]
+        self.assertEqual(instructions["axis"], "wistful")
+        self.assertIn("`axis`", instructions["question"])
+
+    def test_the_banks_judging_rules_reach_every_question(self) -> None:
+        # One rubric for every question, so the model is told the same things about judging a
+        # state each time rather than having to infer them per question.
+        bank = oracle.load_bank()
+        spec = spec_with(
+            requirement("theme", "jev.theme_adherence"),
+            requirement("mood", "jev.mood_axis", target={"wistful": 3}),
+        )
+        for question in oracle.build_questions(spec, bank).values():
+            with self.subTest(question=question["id"]):
+                instructions = question["instructions"]
+                text = instructions if isinstance(instructions, str) else instructions["question"]
+                self.assertIn(bank["judging_rules"], text)
+
+    def test_every_noul_says_what_does_not_count(self) -> None:
+        # The near miss is where a judgement is actually made, so a criteria pair that only names
+        # the two poles is not a question yet.
+        for checker, entry in oracle.load_bank()["questions"].items():
+            if entry["type"] != "noul":
+                continue
+            with self.subTest(checker=checker):
+                self.assertEqual(set(entry["criteria"]), {"true", "false"})
+                for side in ("true", "false"):
+                    self.assertGreater(len(entry["criteria"][side]), 80, f"{checker}.{side}")
+
+    def test_every_score_level_says_what_distinguishes_it(self) -> None:
+        # The live service split levels 3 and 4 of genre fidelity 0.48/0.51 when those levels were
+        # labels alone. A level has to say what separates it from its neighbour to be answerable.
+        for checker, entry in oracle.load_bank()["questions"].items():
+            if entry["type"] != "score":
+                continue
+            with self.subTest(checker=checker):
+                self.assertGreaterEqual(len(entry["levels"]), 2)
+                for level in entry["levels"]:
+                    self.assertGreater(len(level), 60, level)
 
     def test_a_score_requirement_with_no_numeric_target_uses_the_banks_default_bound(self) -> None:
         spec = spec_with(requirement("genre", "jev.genre_fidelity", target="indie folk"))

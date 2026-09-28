@@ -18,7 +18,7 @@ import sys
 if "/repo" not in sys.path:
     sys.path.insert(0, "/repo")
 
-from musicmaster import lyrics, prompt, radio, render, templates, timeline  # noqa: E402
+from musicmaster import jev, lyrics, oracle, prompt, radio, render, spec, templates, timeline  # noqa: E402
 
 _vocab = render.load_vocabulary()
 _section_tags = timeline.load(timeline.SECTION_TAGS_PATH)
@@ -27,6 +27,7 @@ _rates = timeline.load_delivery_rates()
 _tag_labels = timeline.tag_label_map(_section_tags)
 _section_meta = timeline.section_meta(_section_tags)
 _stations = radio.load_stations()
+_questions_bank = oracle.load_bank()
 
 
 def _template(template_id):
@@ -257,6 +258,75 @@ def radio_plan(payload):
         instrumental=bool(request.get("instrumental")),
     )
     return json.dumps(plan)
+
+
+def jev_request(payload):
+    """The RequirementSpec and the request body it becomes, built together and sent by nobody.
+
+    The page has no spec of its own -- it has selections, a caption, a lyric and a tempo -- so the
+    deterministic half of the Interpret stage runs here, and the same `musicmaster.jev` shaping the
+    CLI uses turns the result into the bytes that would go to the service. Nothing leaves the
+    machine in this call: the page's transport does the sending, which is what lets the page show
+    exactly what would be sent before it is.
+    """
+    request = json.loads(payload)
+    built = spec.interpret(
+        {
+            "selections": request.get("selections") or {},
+            "bpm": request.get("bpm"),
+            "duration_s": request.get("duration_s"),
+            "template_id": request.get("template_id"),
+            "lyrics": request.get("lyrics") or "",
+            "caption": request.get("caption") or "",
+            "chords": request.get("chords") or "",
+            "theme": request.get("theme") or "",
+            "artist_references": request.get("artist_references") or [],
+        },
+        vocab=_vocab,
+    )
+    questions = oracle.build_questions(built["spec"], _questions_bank)
+    body = jev.build_request(built["state"], questions, request.get("model") or jev.DEFAULT_MODEL)
+    return json.dumps({"spec": built["spec"], "request": body})
+
+
+def compliance_report(payload):
+    """The battery's report, from answers the page already fetched.
+
+    The fetch happens in TypeScript, because the browser is where it has to, so this takes the
+    response body or the error that replaced it. An error becomes the oracle's degraded reason,
+    which is what turns every requirement it was meant to decide into `unverified` with that reason
+    attached -- the honest outcome, rather than an empty pane.
+    """
+    request = json.loads(payload)
+    requirement_spec = request.get("spec") or {}
+    questions = oracle.build_questions(requirement_spec, _questions_bank)
+
+    if request.get("response"):
+        parsed = jev.parse_response(request["response"], questions)
+        given = oracle.GivenOracle(
+            parsed["answers"],
+            kind="jev",
+            model=parsed["model"] or request.get("model"),
+            problems=parsed["problems"],
+        )
+    else:
+        given = oracle.GivenOracle(
+            {},
+            kind="jev",
+            model=request.get("model"),
+            error=request.get("error") or "the oracle returned nothing",
+        )
+
+    return json.dumps(
+        oracle.evaluate(
+            requirement_spec,
+            request.get("state") or {},
+            given,
+            bank=_questions_bank,
+            mechanical=request.get("mechanical") or (),
+            song_id=request.get("song_id") or "draft",
+        )
+    )
 
 
 def check_lyric(payload):

@@ -871,6 +871,16 @@ a literal reading of "does this sound like Bon Iver" would fire on any indie fol
 `any_serious_violation` is a cross-check that never substitutes for the per-requirement
 answers.
 
+The wording above is illustrative; `vocabulary/oracle-questions.json` holds the questions
+the pipeline actually asks, and it carries two things this fragment leaves out. Every noul
+says what does *not* count, because the near miss is where a judgement is actually made.
+Every score level says what distinguishes it from its neighbour, because a level that is
+only a label invites the model to split the difference between the two it cannot tell
+apart: on a five-level genre question whose levels read "recognisably the genre" and "a
+clear example", the live service returned `{3: 0.48, 4: 0.51}` and the margin gate
+correctly refused to decide. Giving each level its distinguishing clause moved that same
+question to a 0.52–0.59 margin over four runs, which is why the gate stays at 0.5.
+
 ## 8. Gating policy
 
 Carried forward from the measured behaviour of Jev in the sibling projects and the
@@ -911,13 +921,17 @@ class ComplianceOracle(Protocol):
 Three implementations, selected by config:
 
 - **`JevOracle`** — the hosted TypeSafe API. Best measured quality, no local footprint,
-  but the content leaves the machine.
+  but the content leaves the machine. Implemented in `musicmaster/jev.py`, which owns the
+  wire format and no transport: the CLI sends with `urllib` and the page sends with
+  `fetch`, so both hand the seam the same parsed answers and neither reimplements a
+  question.
 - **`LocalOracle`** — an open model scored the way SemIf does it: read the declared option
   probabilities straight from the logits of a small open model (0.6B–4B class) in one
   forward pass, with no answer token sampled. This is the egress-safe path for private
   lyrics, and it is materially weaker: on the published comparison the 4B open baseline
   reaches 0.845 agreement with the public TypeSafe subset against Jev's 0.883, and the
-  0.6B model is far behind at 0.407. It is a real option, not an equal one.
+  0.6B model is far behind at 0.407. It is a real option, not an equal one. It is not
+  built; the seam accepts one whenever it exists.
 - **`ReplayOracle`** — recorded fixture answers. Makes the entire pipeline testable with no
   network, no key, and no GPU, and makes threshold changes reproducible.
 
@@ -927,6 +941,22 @@ intent, and the state sent to the oracle includes them. The default must be
 environment-variable key (never persisted in config), and a documented statement of what
 leaves the machine. This mirrors the unresolved egress decision the sibling projects
 carried; it should be resolved by the user rather than assumed by the design.
+
+Where that key lives depends on who is calling, and the hosted API settles part of the
+question by itself: it returns no `access-control-allow-origin`, so a browser cannot read
+its responses at any origin, and a hosted oracle called from a deployed page is not
+available to build. The three callers differ, and each says what it does:
+
+| Caller | Key | What leaves the machine |
+| --- | --- | --- |
+| CLI | `TYPESAFE_API_KEY` in the environment, passed straight to the transport | the projected fact sheet, for the duration of one request |
+| Local page (dev server) | read from the **dev server's** environment and injected by the `/jev` relay, so it never enters the browser and CORS never applies | the projected fact sheet, relayed same-origin |
+| Deployed page | supplied by the user and kept in session storage, unless they tick "remember this device" (localStorage) | the projected fact sheet; the request is refused by the browser at any origin today |
+
+The projection is the other half of the same decision: `build_request` sends the union of
+the fields the questions name and nothing else, so what leaves is the artifact under
+judgement rather than the working state. `--print-request` prints it before a key is
+involved, which is what makes the statement checkable rather than a claim.
 
 ## 10. Risks and mitigations
 

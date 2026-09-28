@@ -5,6 +5,7 @@
   import Caption from "./lib/Caption.svelte";
   import Inspector from "./lib/Inspector.svelte";
   import Lyrics from "./lib/Lyrics.svelte";
+  import Oracle from "./lib/Oracle.svelte";
   import RadioPanel from "./lib/Radio.svelte";
   import Render from "./lib/Render.svelte";
   import Preview from "./lib/Preview.svelte";
@@ -55,7 +56,7 @@
     brief?: string;
   }
 
-  type View = "builder" | "lyrics" | "render" | "radio";
+  type View = "builder" | "lyrics" | "render" | "radio" | "compliance";
 
   /** Everything a saved draft carries. The view is deliberately not in it: loading a draft should
    * not move you to another tab. */
@@ -162,6 +163,25 @@
       return "";
     }
   });
+
+  /**
+   * What the song is about, for the compliance spec. The page has no single theme field — the
+   * writer types one in the generator panel — but the draft does record it in the `lyric_theme`
+   * bin, so the oracle reads the labels the form already holds rather than a second, invented
+   * source. An empty bin means no theme was stated, which the spec marks as unspecified.
+   */
+  let theme = $derived.by((): string => {
+    const bin = data?.vocabulary.bins.find((entry) => entry.id === "lyric_theme");
+    return bin ? S.labels(bin, selections[bin.id]).join(", ") : "";
+  });
+
+  // The exclusions the prompt already carries, in the shape the Jev request expects.
+  let artistReferences = $derived(
+    artists
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  );
 
   /** The render path: the canonical prompt, the composition it pins, and the ComfyUI graph.
    *
@@ -623,6 +643,13 @@
       <button role="tab" aria-selected={view === "radio"} onclick={() => (view = "radio")}>
         Radio
       </button>
+      <button
+        role="tab"
+        aria-selected={view === "compliance"}
+        onclick={() => (view = "compliance")}
+      >
+        Compliance
+      </button>
     </div>
     <span class="small muted">{status}</span>
   </div>
@@ -689,6 +716,25 @@
       </div>
       <div class="column">
         <Render {artifact} bind:seed {artifactsFor} />
+      </div>
+    </div>
+  {:else if view === "compliance"}
+    <!-- The oracle is one full-width pane rather than the form-and-inspector split: a report is a
+         document to read across, and its unverified block is the part that must not be cramped. -->
+    <div class="columns" style="grid-template-columns: minmax(0, 1fr)">
+      <div class="column">
+        <Oracle
+          {core}
+          {songId}
+          {selections}
+          {bpm}
+          {duration}
+          {templateId}
+          lyrics={lyricText}
+          caption={rendered?.string ?? ""}
+          {theme}
+          {artistReferences}
+        />
       </div>
     </div>
   {/if}

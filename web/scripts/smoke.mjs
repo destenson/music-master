@@ -53,7 +53,7 @@ if (!fs.existsSync(path.join(DIST, "repo", "manifest.json"))) {
 const NATIVE = `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(REPO)})
-from musicmaster import prompt, radio, render, timeline
+from musicmaster import jev, oracle, prompt, radio, render, spec, timeline
 vocab = render.load_vocabulary()
 selections = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "selections.json"))}))["selections"]
 song = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "song.json"))}))
@@ -78,6 +78,17 @@ built = prompt.build({
     "templates_doc": doc,
 })
 radio_plan = radio.plan_song(radio.load_stations(), "neon-drive", 3, seed=12345, vocab=vocab)
+jev_draft = {
+    "selections": selections,
+    "bpm": song["bpm"],
+    "duration_s": None,
+    "template_id": song["template_id"],
+    "lyrics": open(${JSON.stringify(path.join(REPO, "songs", SONG, "lyrics.md"))}).read(),
+    "caption": render.render(vocab, selections)["string"],
+    "theme": "leaving a coastal town in autumn",
+    "artist_references": song.get("artist_references", []),
+}
+jev_built = spec.interpret(jev_draft, vocab=vocab)
 print(json.dumps({
     "render": {**render.render(vocab, selections),
                "problems": sorted(render.coherence_check(vocab, selections))},
@@ -89,6 +100,8 @@ print(json.dumps({
                   "workflow_text": prompt.serialise(built["workflow"])},
     "radio": {"plan": radio_plan,
               "caption": render.render(vocab, radio_plan["selections"])["string"]},
+    "jev": {"spec": jev_built["spec"],
+            "request": jev.build_request(jev_built["state"], oracle.build_questions(jev_built["spec"]))},
 }))
 `;
 
@@ -128,6 +141,25 @@ check("timeline totals", plan.totals, native.plan.totals);
 
 const lyricsText = fs.readFileSync(path.join(DIST, "repo", "songs", SONG, "lyrics.md"), "utf8");
 const briefText = fs.readFileSync(path.join(DIST, "repo", "songs", SONG, "brief.md"), "utf8");
+
+// --- The oracle path: one spec and one request, from the same text tier in both runtimes -------
+
+// The page derives its own requirements from what it holds, and what leaves the machine is
+// whatever this produces. Asserting it against the CLI is the same claim the prompt artifact
+// makes: the page cannot ask a question the repository does not describe.
+const jevDraft = {
+  selections,
+  bpm: song.bpm,
+  duration_s: null,
+  template_id: song.template_id,
+  lyrics: lyricsText,
+  caption: rendered.string,
+  theme: "leaving a coastal town in autumn",
+  artist_references: song.artist_references ?? [],
+};
+const jevBuilt = call("jev_request", jevDraft);
+check("derived requirement spec", jevBuilt.spec, native.jev.spec);
+check("the request the oracle would be sent", jevBuilt.request, native.jev.request);
 const artifact = call("artifacts", {
   song_id: song.song_id,
   template_id: song.template_id,
