@@ -1,0 +1,17 @@
+{
+  "name": "browser-oracle-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Can a small open model running in the browser answer Jev-like typed questions as probabilities, with no key and no server?",
+  "license": "ISC",
+  "type": "module",
+  "scripts": {
+    "selftest": "node selftest.mjs",
+    "agreement": "node node_measure.mjs",
+    "browser": "node browser_measure.mjs"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
+    "playwright": "1.61.1"
+  }
+}

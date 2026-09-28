@@ -1,0 +1,754 @@
+{
+  "dtype": "q8",
+  "withJson": false,
+  "summaries": [
+    {
+      "modelId": "onnx-community/Qwen3-0.6B-ONNX",
+      "dtype": "q8",
+      "loadMs": 2678,
+      "overall": {
+        "correct": 6,
+        "total": 16,
+        "constant": 12
+      },
+      "perQuestion": {
+        "theme_present": {
+          "correct": 3,
+          "total": 4,
+          "constant": 3
+        },
+        "genre_fidelity": {
+          "correct": 1,
+          "total": 4,
+          "constant": 3
+        },
+        "artist_pastiche": {
+          "correct": 1,
+          "total": 4,
+          "constant": 3
+        },
+        "mood_wistful": {
+          "correct": 1,
+          "total": 4,
+          "constant": 3
+        }
+      },
+      "latency": {
+        "p50": 861,
+        "p95": 994
+      },
+      "calibration": {
+        "brier": 0.4815930992498815,
+        "uncertainNouls": 0,
+        "totalNouls": 8,
+        "saturatedNouls": 6,
+        "meanOptionMass": 0.7216631471517773
+      },
+      "json": null,
+      "rows": [
+        {
+          "question": "theme_present",
+          "state": "A",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9992156360294218,
+          "level": null,
+          "optionMass": 0.012667841381018601,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 357,
+          "ms": 994
+        },
+        {
+          "question": "theme_present",
+          "state": "B",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9274945731712632,
+          "level": null,
+          "optionMass": 0.5616850194777894,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 360,
+          "ms": 659
+        },
+        {
+          "question": "theme_present",
+          "state": "C",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9263067414227596,
+          "level": null,
+          "optionMass": 0.9349103443287063,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 346,
+          "ms": 634
+        },
+        {
+          "question": "theme_present",
+          "state": "D",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9964601420423059,
+          "level": null,
+          "optionMass": 0.8222518294044366,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 369,
+          "ms": 866
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "A",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 2,
+          "optionMass": 0.5843661641144513,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 359,
+          "ms": 842
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "B",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.6239056976140251,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 362,
+          "ms": 871
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "C",
+          "expect": 1,
+          "correct": true,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.9988579212266696,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 348,
+          "ms": 819
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "D",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.22554863862150978,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 371,
+          "ms": 867
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "A",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9989571272923121,
+          "level": null,
+          "optionMass": 0.927707677955423,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 371,
+          "ms": 861
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "B",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9952259563873597,
+          "level": null,
+          "optionMass": 0.9834184225985911,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 374,
+          "ms": 887
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "C",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9993280219420423,
+          "level": null,
+          "optionMass": 0.9766492170457155,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 360,
+          "ms": 875
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "D",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9971317806676145,
+          "level": null,
+          "optionMass": 0.8552188837409342,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 383,
+          "ms": 897
+        },
+        {
+          "question": "mood_wistful",
+          "state": "A",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.5899752986625197,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 346,
+          "ms": 845
+        },
+        {
+          "question": "mood_wistful",
+          "state": "B",
+          "expect": 1,
+          "correct": false,
+          "noul": null,
+          "level": 4,
+          "optionMass": 0.9853686064746231,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 349,
+          "ms": 804
+        },
+        {
+          "question": "mood_wistful",
+          "state": "C",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.8606153814276873,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 335,
+          "ms": 807
+        },
+        {
+          "question": "mood_wistful",
+          "state": "D",
+          "expect": 4,
+          "correct": true,
+          "noul": null,
+          "level": 4,
+          "optionMass": 0.6034634103543375,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 358,
+          "ms": 654
+        }
+      ]
+    },
+    {
+      "modelId": "onnx-community/Qwen3-1.7B-ONNX",
+      "dtype": "q8",
+      "loadMs": 53181,
+      "overall": {
+        "correct": 9,
+        "total": 16,
+        "constant": 12
+      },
+      "perQuestion": {
+        "theme_present": {
+          "correct": 3,
+          "total": 4,
+          "constant": 3
+        },
+        "genre_fidelity": {
+          "correct": 2,
+          "total": 4,
+          "constant": 3
+        },
+        "artist_pastiche": {
+          "correct": 2,
+          "total": 4,
+          "constant": 3
+        },
+        "mood_wistful": {
+          "correct": 2,
+          "total": 4,
+          "constant": 3
+        }
+      },
+      "latency": {
+        "p50": 1274,
+        "p95": 2002
+      },
+      "calibration": {
+        "brier": 0.3888656655170886,
+        "uncertainNouls": 1,
+        "totalNouls": 8,
+        "saturatedNouls": 6,
+        "meanOptionMass": 0.4544357680904246
+      },
+      "json": null,
+      "rows": [
+        {
+          "question": "theme_present",
+          "state": "A",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9928703638719746,
+          "level": null,
+          "optionMass": 0.000004300329288487516,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 357,
+          "ms": 2002
+        },
+        {
+          "question": "theme_present",
+          "state": "B",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9974903618467555,
+          "level": null,
+          "optionMass": 0.0007934903838417027,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 360,
+          "ms": 1277
+        },
+        {
+          "question": "theme_present",
+          "state": "C",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9329066518118035,
+          "level": null,
+          "optionMass": 0.9992456095328447,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 346,
+          "ms": 1218
+        },
+        {
+          "question": "theme_present",
+          "state": "D",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9999119012202854,
+          "level": null,
+          "optionMass": 0.2804533109720009,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 369,
+          "ms": 1273
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "A",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.0000020951687022879137,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 359,
+          "ms": 1234
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "B",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.9845724525655176,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 362,
+          "ms": 1309
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "C",
+          "expect": 1,
+          "correct": true,
+          "noul": null,
+          "level": 1,
+          "optionMass": 3.2325998870081588e-9,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 348,
+          "ms": 1196
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "D",
+          "expect": 4,
+          "correct": true,
+          "noul": null,
+          "level": 3,
+          "optionMass": 0.9954416199313654,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 371,
+          "ms": 1284
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "A",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9999247801564523,
+          "level": null,
+          "optionMass": 0.000020869377462841128,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 371,
+          "ms": 1305
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "B",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9961740227651789,
+          "level": null,
+          "optionMass": 0.9998886557809237,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 374,
+          "ms": 1343
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "C",
+          "expect": false,
+          "correct": true,
+          "noul": 0.3447036371575164,
+          "level": null,
+          "optionMass": 0.9960499047803955,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 360,
+          "ms": 1245
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "D",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9812090914798443,
+          "level": null,
+          "optionMass": 3.72805342073832e-7,
+          "usedTemplate": true,
+          "optionIds": {
+            "yes": [
+              9693,
+              9454,
+              14004,
+              9834,
+              7414
+            ],
+            "no": [
+              2152,
+              2753,
+              8996,
+              902,
+              2308
+            ]
+          },
+          "promptTokens": 383,
+          "ms": 1321
+        },
+        {
+          "question": "mood_wistful",
+          "state": "A",
+          "expect": 4,
+          "correct": true,
+          "noul": null,
+          "level": 4,
+          "optionMass": 7.684446960953187e-8,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 346,
+          "ms": 1212
+        },
+        {
+          "question": "mood_wistful",
+          "state": "B",
+          "expect": 1,
+          "correct": false,
+          "noul": null,
+          "level": 3,
+          "optionMass": 0.9999997210529258,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 349,
+          "ms": 1274
+        },
+        {
+          "question": "mood_wistful",
+          "state": "C",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.014507571914080355,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 335,
+          "ms": 1150
+        },
+        {
+          "question": "mood_wistful",
+          "state": "D",
+          "expect": 4,
+          "correct": true,
+          "noul": null,
+          "level": 4,
+          "optionMass": 0.9999922347750324,
+          "usedTemplate": true,
+          "optionIds": null,
+          "promptTokens": 358,
+          "ms": 1238
+        }
+      ]
+    }
+  ]
+}

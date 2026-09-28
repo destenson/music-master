@@ -423,6 +423,28 @@ since the prompt is the input to the generator and is being specified first.
   node latency.mjs     # is the per-caret check inside a frame budget?
   ```
 
+- [`spikes/browser_oracle/`](spikes/browser_oracle/README.md) — asks whether a small open model could
+  answer the battery in the page itself, with no key and no server: one forward pass over the state,
+  the declared option probabilities read straight off the logits, and the battery's own questions
+  crossed with four states that vary one thing at a time. Three findings. The mechanism works and
+  costs about half of generate-and-parse, but a per-option softmax is a silent, total failure — it
+  sums to one by construction, so a two-way question reads `0.500` and a five-level question reads
+  uniform for every input while still looking like a probability vector. A confident answer can be one
+  the model never made: Qwen3-1.7B returned a noul of `1.000` with `0.000` of its probability mass on
+  the options. And at browser-plausible sizes the models score below a constant baseline (6/16
+  and 9/16 against 12/16 for answering the same thing every time), which is consistent with the 0.407
+  the research document records for Qwen3-0.6B. The in-browser figure of 16 s a question is
+  `onnxruntime-web` under WASM rather than a browser limit: SemIf runs the same readout through wllama
+  on WebGPU at 0.70 s for 0.6B and 3.27 s for 4B, so the tier is a real option rather than a dead end,
+  and the spike says which runtime a future attempt has to use.
+
+  ```bash
+  cd spikes/browser_oracle && npm install --cache ./.npm-cache
+  node selftest.mjs                       # the readout arithmetic; needs no model
+  node node_measure.mjs --models=onnx-community/Qwen3-0.6B-ONNX --dtype=q8
+  PLAYWRIGHT_BROWSERS_PATH=./.pw-browsers node browser_measure.mjs --device=wasm
+  ```
+
 - [`spikes/take_similarity.py`](spikes/take_similarity.py) — reads the graph ComfyUI embeds in each
   rendered MP3, so the requested tempo, seed and caption come from the artifact itself rather than
   from a note about it, and measures the audio against them. It exists to test an ear's claim that

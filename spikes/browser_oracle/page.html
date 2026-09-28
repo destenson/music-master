@@ -1,0 +1,134 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>browser_oracle</title>
+<!--
+  The import map is the whole trick that keeps this honest: readout.mjs imports the bare
+  specifier `@huggingface/transformers` in both Node and the browser, so the browser run
+  executes the same readout code the Node run did.
+
+  `/vendor/transformers.min.js` is the local `dist/transformers.min.js`: a self-contained ES
+  module bundle that embeds ONNX Runtime Web, so the page needs nothing but its own server.
+  (`dist/transformers.web.js` is not usable here -- it imports `onnxruntime-web` by bare
+  specifier and would need a second import map entry.)
+-->
+<script type="importmap">
+  {
+    "imports": {
+      "@huggingface/transformers": "/vendor/transformers.min.js"
+    }
+  }
+</script>
+<style>
+  body { font: 13px/1.5 ui-monospace, monospace; margin: 12px; }
+  #log { white-space: pre-wrap; }
+</style>
+<pre id="log"></pre>
+<script type="module">
+  import { QUESTIONS, STATES } from './fixtures.mjs';
+  import { loadModel, readAnswer } from './readout.mjs';
+
+  const params = new URLSearchParams(location.search);
+  const modelId = params.get('model') ?? 'onnx-community/Qwen3-0.6B-ONNX';
+  const dtype = params.get('dtype') ?? 'q4f16';
+  const device = params.get('device') ?? (navigator.gpu ? 'webgpu' : 'wasm');
+  const logEl = document.getElementById('log');
+
+  const log = (m) => {
+    logEl.textContent += `${m}\n`;
+  };
+
+  window.__RESULTS__ = null;
+  window.__ERROR__ = null;
+  window.__DEVICE__ = device;
+  window.__HAS_WEBGPU__ = Boolean(navigator.gpu);
+
+  const cases = [];
+  for (const q of QUESTIONS) {
+    for (const [stateKey, expect] of Object.entries(q.cases)) {
+      cases.push({ question: q, stateKey, state: STATES[stateKey], expect });
+    }
+  }
+
+  (async () => {
+    try {
+      log(`webgpu=${Boolean(navigator.gpu)} device=${device} dtype=${dtype} model=${modelId}`);
+      const t0 = performance.now();
+      let lastPct = -1;
+      const loaded = await loadModel(modelId, {
+        dtype,
+        device,
+        progress_callback: (p) => {
+          if (p.status === 'progress' && p.progress !== undefined) {
+            const pct = Math.floor(p.progress);
+            if (pct >= lastPct + 20) {
+              lastPct = pct;
+              log(`  download ${pct}% ${p.file ?? ''}`);
+            }
+          }
+        },
+      });
+      const loadMs = performance.now() - t0;
+      log(`loaded in ${(loadMs / 1000).toFixed(1)}s (device=${loaded.device} dtype=${loaded.dtype})`);
+
+      const rows = [];
+      for (const c of cases) {
+        const s = performance.now();
+        const ans = await readAnswer(loaded, c.question, c.state);
+        const ms = performance.now() - s;
+        const correct =
+          c.question.type === 'noul'
+            ? ans.top === (c.expect ? 'yes' : 'no')
+            : Math.abs(ans.level - c.expect) <= (c.question.tolerance ?? 0);
+        rows.push({
+          question: c.question.id,
+          state: c.stateKey,
+          expect: c.expect,
+          correct,
+          noul: ans.noul ?? null,
+          level: ans.level ?? null,
+          optionMass: ans.optionMass,
+          promptTokens: ans.promptTokens,
+          usedTemplate: ans.usedTemplate,
+          ms,
+        });
+        log(
+          `  ${c.question.id.padEnd(16)} ${c.stateKey} ` +
+            `${(ans.noul !== undefined ? `noul=${ans.noul.toFixed(3)}` : `level=${ans.level}`).padEnd(14)} ` +
+            `want=${String(c.expect).padEnd(5)} ${correct ? 'ok ' : 'MISS'} ${ms.toFixed(0)}ms`,
+        );
+      }
+
+      const lat = rows.map((r) => r.ms).sort((a, b) => a - b);
+      const q = (p) => lat[Math.min(lat.length - 1, Math.floor(p * lat.length))];
+      const correct = rows.filter((r) => r.correct).length;
+      const nouls = rows.filter((r) => r.noul !== null).map((r) => r.noul);
+      const mass = rows.reduce((a, r) => a + r.optionMass, 0) / rows.length;
+
+      window.__RESULTS__ = {
+        modelId,
+        dtype: loaded.dtype,
+        requestedDtype: dtype,
+        device: loaded.device,
+        hasWebGpu: Boolean(navigator.gpu),
+        loadMs,
+        correct,
+        total: rows.length,
+        latency: { p50: q(0.5), p95: q(0.95) },
+        calibration: {
+          uncertainNouls: nouls.filter((p) => p >= 0.3 && p <= 0.7).length,
+          totalNouls: nouls.length,
+          saturatedNouls: nouls.filter((p) => p > 0.95 || p < 0.05).length,
+          meanOptionMass: mass,
+        },
+        rows,
+      };
+      log(
+        `\nDONE ${correct}/${rows.length} p50=${q(0.5).toFixed(0)}ms p95=${q(0.95).toFixed(0)}ms ` +
+          `mean-mass=${mass.toFixed(3)}`,
+      );
+    } catch (err) {
+      window.__ERROR__ = String(err?.stack ?? err);
+      log(`ERROR ${window.__ERROR__}`);
+    }
+  })();
+</script>

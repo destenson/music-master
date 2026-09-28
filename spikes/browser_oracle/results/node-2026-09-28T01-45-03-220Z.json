@@ -1,0 +1,228 @@
+{
+  "dtype": "q8",
+  "withJson": true,
+  "summaries": [
+    {
+      "modelId": "onnx-community/Qwen3-0.6B-ONNX",
+      "dtype": "q8",
+      "loadMs": 2251,
+      "overall": {
+        "correct": 6,
+        "total": 16
+      },
+      "perQuestion": {
+        "theme_present": {
+          "correct": 3,
+          "total": 4
+        },
+        "genre_fidelity": {
+          "correct": 1,
+          "total": 4
+        },
+        "artist_pastiche": {
+          "correct": 1,
+          "total": 4
+        },
+        "mood_wistful": {
+          "correct": 1,
+          "total": 4
+        }
+      },
+      "latency": {
+        "p50": 659,
+        "p95": 1017
+      },
+      "calibration": {
+        "brier": 0.4815930992498815,
+        "uncertainNouls": 0,
+        "totalNouls": 8,
+        "saturatedNouls": 6,
+        "meanOptionMass": 0.7216631471517773
+      },
+      "json": {
+        "parsed": 16,
+        "correct": 3,
+        "p50": 1355,
+        "p95": 1532
+      },
+      "rows": [
+        {
+          "question": "theme_present",
+          "state": "A",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9992156360294218,
+          "level": null,
+          "optionMass": 0.012667841381018601,
+          "promptTokens": 357,
+          "ms": 1017
+        },
+        {
+          "question": "theme_present",
+          "state": "B",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9274945731712632,
+          "level": null,
+          "optionMass": 0.5616850194777894,
+          "promptTokens": 360,
+          "ms": 666
+        },
+        {
+          "question": "theme_present",
+          "state": "C",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9263067414227596,
+          "level": null,
+          "optionMass": 0.9349103443287063,
+          "promptTokens": 346,
+          "ms": 595
+        },
+        {
+          "question": "theme_present",
+          "state": "D",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9964601420423059,
+          "level": null,
+          "optionMass": 0.8222518294044366,
+          "promptTokens": 369,
+          "ms": 651
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "A",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 2,
+          "optionMass": 0.5843661641144513,
+          "promptTokens": 359,
+          "ms": 639
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "B",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.6239056976140251,
+          "promptTokens": 362,
+          "ms": 659
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "C",
+          "expect": 1,
+          "correct": true,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.9988579212266696,
+          "promptTokens": 348,
+          "ms": 606
+        },
+        {
+          "question": "genre_fidelity",
+          "state": "D",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.22554863862150978,
+          "promptTokens": 371,
+          "ms": 717
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "A",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9989571272923121,
+          "level": null,
+          "optionMass": 0.927707677955423,
+          "promptTokens": 371,
+          "ms": 703
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "B",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9952259563873597,
+          "level": null,
+          "optionMass": 0.9834184225985911,
+          "promptTokens": 374,
+          "ms": 728
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "C",
+          "expect": false,
+          "correct": false,
+          "noul": 0.9993280219420423,
+          "level": null,
+          "optionMass": 0.9766492170457155,
+          "promptTokens": 360,
+          "ms": 654
+        },
+        {
+          "question": "artist_pastiche",
+          "state": "D",
+          "expect": true,
+          "correct": true,
+          "noul": 0.9971317806676145,
+          "level": null,
+          "optionMass": 0.8552188837409342,
+          "promptTokens": 383,
+          "ms": 728
+        },
+        {
+          "question": "mood_wistful",
+          "state": "A",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.5899752986625197,
+          "promptTokens": 346,
+          "ms": 632
+        },
+        {
+          "question": "mood_wistful",
+          "state": "B",
+          "expect": 1,
+          "correct": false,
+          "noul": null,
+          "level": 4,
+          "optionMass": 0.9853686064746231,
+          "promptTokens": 349,
+          "ms": 661
+        },
+        {
+          "question": "mood_wistful",
+          "state": "C",
+          "expect": 4,
+          "correct": false,
+          "noul": null,
+          "level": 1,
+          "optionMass": 0.8606153814276873,
+          "promptTokens": 335,
+          "ms": 620
+        },
+        {
+          "question": "mood_wistful",
+          "state": "D",
+          "expect": 4,
+          "correct": true,
+          "noul": null,
+          "level": 4,
+          "optionMass": 0.6034634103543375,
+          "promptTokens": 358,
+          "ms": 639
+        }
+      ]
+    }
+  ]
+}
