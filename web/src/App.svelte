@@ -26,6 +26,7 @@
     type DraftSummary,
   } from "./lib/draft";
   import { parseFindings, type Finding } from "./lib/lens";
+  import { generate, ollamaBase } from "./lib/ollama";
   import { buildPrompt } from "./lib/prompt";
   import { setPreviewBuilder } from "./lib/preview.svelte";
   import { setRadioHost } from "./lib/radio.svelte";
@@ -500,6 +501,43 @@
     }
   }
 
+  /** Generate.svelte remembers the chosen lyric model here, so the repair uses the same one. */
+  const LYRIC_MODEL_KEY = "mm.ollama.model";
+
+  /**
+   * Rewrite the lyric to satisfy the check's own repair instructions.
+   *
+   * The instructions come from `musicmaster.repairs`, so the generator is told what each failed
+   * check localised rather than being asked to critique its own output. The model is the one chosen
+   * on the Lyrics tab; with none chosen there is nothing to generate with, and the caller shows why
+   * rather than silently doing nothing.
+   */
+  async function repairLyrics(instructions: string): Promise<void> {
+    let model = "";
+    try {
+      model = localStorage.getItem(LYRIC_MODEL_KEY) ?? "";
+    } catch {
+      model = "";
+    }
+    if (!model) {
+      throw new Error("no lyric model selected — choose one on the Lyrics tab, then check again");
+    }
+    const prompt = [
+      buildPromptFor(theme),
+      "",
+      "A draft is below. Rewrite it so it satisfies every point under Repairs, keeping the section",
+      "structure, the line counts and the performance tags. Change only what the repairs name.",
+      "",
+      "## Repairs",
+      instructions,
+      "",
+      "## Current draft",
+      lyricText,
+    ].join("\n");
+    const text = await generate({ model, base: ollamaBase(), prompt, onText: applyDraft });
+    applyFinalDraft(text);
+  }
+
   async function getJson<T>(path: string): Promise<T> {
     const response = await fetch(asset(`repo/${path}`));
     if (!response.ok) throw new Error(`${response.status} ${response.statusText} for ${path}`);
@@ -757,6 +795,7 @@
           caption={rendered?.string ?? ""}
           {theme}
           {artistReferences}
+          onRepair={repairLyrics}
         />
       </div>
     </div>

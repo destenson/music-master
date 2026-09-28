@@ -311,6 +311,13 @@ export interface ComplianceVerdict {
   evidence_class?: EvidenceClass | null;
   supported_by?: ComplianceEvidence[];
   note?: string | null;
+  /**
+   * What to change, for a verdict that did not pass. Written in code from the requirement and the
+   * measured failure, never by the model, so it cannot drift from what was actually checked.
+   */
+  suggestion?: string | null;
+  /** The same fix as an imperative a lyric generator can act on; absent for a caption problem. */
+  repair_instruction?: string | null;
   measured?: {
     value?: unknown;
     target?: unknown;
@@ -365,6 +372,8 @@ export interface ComplianceReport {
   };
   verdicts: ComplianceVerdict[];
   overall: ComplianceOverall;
+  /** The report as one paragraph a person reads first: what holds, what does not, and what to do. */
+  summary?: string | null;
   /** Explicitly what could not be satisfied; never empty when `overall` is not compliant. */
   unmet?: string[];
   counts?: ComplianceCounts;

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import type { MusicMasterCore } from "./core";
   import {
     callJev,
@@ -29,6 +30,7 @@
     caption,
     theme,
     artistReferences,
+    onRepair,
   }: {
     core: MusicMasterCore;
     songId: string;
@@ -42,6 +44,12 @@
     theme: string;
     /** The comma-separated exclusions the page holds, already split into fields. */
     artistReferences: string[];
+    /**
+     * Rewrite the lyric from code-derived repair instructions, and resolve once the new text is in
+     * place. Absent when no generator is configured, in which case the report still suggests the
+     * change and offers no button.
+     */
+    onRepair?: (instructions: string) => Promise<void> | void;
   } = $props();
 
   // The key is never read back into the input: a saved secret rendered on screen is no longer a
@@ -92,9 +100,43 @@
   const unverifiedRows = $derived(
     (report?.verdicts ?? []).filter((verdict) => verdict.verdict === "unverified"),
   );
-  const uncertainRows = $derived(
-    (report?.verdicts ?? []).filter((verdict) => verdict.verdict === "uncertain"),
-  );
+
+  /** What the user has to act on, worst first: an unmet hard requirement before an uncertain soft one. */
+  const attentionRows = $derived.by(() => {
+    const rank = (verdict: ComplianceVerdict) =>
+      (verdict.severity === "hard" || verdict.severity === "policy" ? 0 : 2) +
+      (verdict.verdict === "unmet" ? 0 : 1);
+    return (report?.verdicts ?? [])
+      .filter((verdict) => verdict.verdict === "unmet" || verdict.verdict === "uncertain")
+      .sort((a, b) => rank(a) - rank(b));
+  });
+
+  /** The subset a rewrite can satisfy, which is what the auto-fix button acts on. */
+  const repairable = $derived(attentionRows.filter((verdict) => (verdict.repair_instruction ?? "").trim() !== ""));
+
+  let repairing = $state(false);
+
+  /**
+   * Rewrite the lyric from the code-derived instructions, then check again.
+   *
+   * The suggestions come from `musicmaster.repairs`, so the generator is told exactly what the
+   * failed checks localised rather than being asked to critique its own output.
+   */
+  async function autoFix(): Promise<void> {
+    if (!onRepair || repairing || repairable.length === 0) return;
+    repairing = true;
+    errorText = null;
+    try {
+      const instructions = repairable.map((verdict) => `- ${verdict.repair_instruction}`).join("\n");
+      await onRepair(instructions);
+      await tick();
+      await check();
+    } catch (cause) {
+      errorText = cause instanceof Error ? cause.message : String(cause);
+    } finally {
+      repairing = false;
+    }
+  }
 
   /** The counts are derived from the verdicts rather than trusted, so a report without them still
    * shows the numbers the design is built around. */
@@ -331,6 +373,10 @@
         <p class="finding error" style="margin:0">{report.oracle.degraded_reason}</p>
       {/if}
 
+      {#if report.summary}
+        <p class="summary">{report.summary}</p>
+      {/if}
+
       {#if counts}
         <div class="counts">
           <span class="count met">{counts.met}/{counts.total} met</span>
@@ -338,6 +384,34 @@
           <span class="count describe">{counts.decided_by_description} by description</span>
           <span class="count uncertain">{counts.uncertain} uncertain</span>
           <span class="count unverified">{counts.unverified} unverified</span>
+        </div>
+      {/if}
+
+      {#if attentionRows.length}
+        <div class="loud fix-block">
+          <div class="row">
+            <h3>TO FIX BEFORE RENDERING</h3>
+            {#if onRepair && repairable.length}
+              <button class="primary" onclick={autoFix} disabled={repairing || busy}>
+                {repairing ? "rewriting the lyrics…" : `fix the lyrics (${repairable.length})`}
+              </button>
+            {/if}
+          </div>
+          <ul>
+            {#each attentionRows as verdict (verdict.requirement_id)}
+              <li>
+                <div class="fix-head">
+                  <strong>{verdict.text ?? verdict.requirement_id}</strong>
+                  <span class="verdict {verdict.verdict}">{verdict.verdict}</span>
+                  {#if verdict.severity}<span class="tag">{verdict.severity}</span>{/if}
+                </div>
+                <p class="fix-body">{verdict.suggestion ?? verdict.note ?? "no reason recorded"}</p>
+                {#if verdict.suggestion && verdict.note}
+                  <p class="small muted">{verdict.note}</p>
+                {/if}
+              </li>
+            {/each}
+          </ul>
         </div>
       {/if}
 
@@ -349,22 +423,7 @@
               <li>
                 <span class="mono">{verdict.requirement_id}</span>
                 {#if verdict.severity}<span class="tag">{verdict.severity}</span>{/if}
-                — {verdict.note ?? "no reason recorded"}
-              </li>
-            {/each}
-          </ul>
-        </div>
-      {/if}
-
-      {#if uncertainRows.length}
-        <div class="loud uncertain-block">
-          <h3>UNCERTAIN — checked, but inside the uncertainty band. Neither a pass nor a fail.</h3>
-          <ul>
-            {#each uncertainRows as verdict (verdict.requirement_id)}
-              <li>
-                <span class="mono">{verdict.requirement_id}</span>
-                {#if verdict.severity}<span class="tag">{verdict.severity}</span>{/if}
-                — {verdict.note ?? "no reason recorded"}
+                — {verdict.suggestion ?? verdict.note ?? "no reason recorded"}
               </li>
             {/each}
           </ul>
@@ -377,8 +436,8 @@
             <th>requirement</th>
             <th>verdict</th>
             <th>severity</th>
-            <th>checker</th>
-            <th>note</th>
+            <th>decided by</th>
+            <th>what to do</th>
           </tr>
         </thead>
         <tbody>
@@ -388,22 +447,13 @@
               <td><span class="verdict {verdict.verdict}">{verdict.verdict}</span></td>
               <td>{verdict.severity ?? "—"}</td>
               <td class="mono muted">{verdict.checker}</td>
-              <td>{verdict.note ?? ""}</td>
+              <td class="small">
+                {verdict.verdict === "met" ? "" : (verdict.suggestion ?? verdict.note ?? "")}
+              </td>
             </tr>
           {/each}
         </tbody>
       </table>
-
-      {#if report.unmet?.length}
-        <div class="loud unmet-block">
-          <h3>UNMET — what this song does not satisfy</h3>
-          <ul>
-            {#each report.unmet as item, index (index)}
-              <li>{item}</li>
-            {/each}
-          </ul>
-        </div>
-      {/if}
 
       {#if report.cross_check && report.cross_check.agrees_with_individual_verdicts === false}
         <p class="finding warn" style="margin:0">
@@ -556,20 +606,45 @@
     color: var(--unknown);
   }
 
-  .uncertain-block {
-    background: color-mix(in srgb, var(--warn) 10%, transparent);
-    border-color: color-mix(in srgb, var(--warn) 60%, var(--line));
+  .summary {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
   }
 
-  .uncertain-block h3 {
+  .fix-block {
+    background: color-mix(in srgb, var(--warn) 8%, transparent);
+    border-color: color-mix(in srgb, var(--warn) 55%, var(--line));
+  }
+
+  .fix-block h3 {
     color: var(--warn);
   }
 
-  .unmet-block {
-    border-color: color-mix(in srgb, var(--bad) 45%, var(--line));
+  .fix-block ul {
+    list-style: none;
+    padding-left: 0;
   }
 
-  .unmet-block h3 {
-    color: var(--bad);
+  .fix-block li {
+    padding: 6px 0;
+    border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
+  }
+
+  .fix-block li:first-child {
+    border-top: 0;
+  }
+
+  .fix-head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .fix-body {
+    margin: 2px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
   }
 </style>

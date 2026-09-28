@@ -94,6 +94,15 @@ question bank rather than by convention:
 - **The caption checks**, which are string operations.
 - **The thresholds and the band.** A `noul` inside `[0.30, 0.70]` is `uncertain`, never a pass.
   Thresholds are per question and re-measured, never ported between primitives.
+- **The repair.** A verdict that did not pass carries a `suggestion`: one concrete change, naming the
+  thing that failed — the missing tag, the mood axis, the excluded element. Where a rewrite can
+  satisfy it, it carries a `repair_instruction` too, an imperative the lyric generator can act on.
+  Both are written in `musicmaster/repairs.py` from the requirement and the measured failure, never
+  by the model, because a repair a model wrote about its own judgement would be as unverifiable as
+  the judgement it was explaining. The page offers to apply the instructions and runs the check
+  again afterwards.
+- **The summary.** The report opens with one paragraph saying what already holds and what to do
+  before rendering. Counts are a table; the sentence is what a person reads first.
 - **The verdict and the routing.** The model never writes a repair and never chooses the next step.
 - **The projection.** Only the fields the questions name are sent, so the artifact under judgement
   leaves the machine and the working draft does not.

@@ -44,6 +44,10 @@
       "enum": ["compliant", "compliant_with_unmet_soft", "non_compliant", "unverified"],
       "description": "compliant requires every hard and policy requirement met and no requirement uncertain."
     },
+    "summary": {
+      "type": ["string", "null"],
+      "description": "The report as one paragraph a person reads first: what already holds, what does not, and what to do about it."
+    },
     "unmet": {
       "type": "array",
       "description": "The explicit list of what the system could not satisfy. This is the honest-output contract: it is never empty when overall is not 'compliant'.",
@@ -139,6 +143,14 @@
         "note": {
           "type": ["string", "null"],
           "description": "Why this verdict and not another, in a sentence: the band it fell in, the gate it missed, or what the evidence was."
+        },
+        "suggestion": {
+          "type": ["string", "null"],
+          "description": "What to change, for a verdict that did not pass. Written in code from the requirement and the measured failure, never by the model: a model asked to explain its own judgement would be as unverifiable as the judgement."
+        },
+        "repair_instruction": {
+          "type": ["string", "null"],
+          "description": "The same fix as an imperative a lyric generator can act on. Present only for the requirements a rewrite can satisfy; a caption problem is code's to fix and carries none."
         },
         "measured": {
           "description": "For code and audio checkers: the actual measured value and the target it was compared against.",

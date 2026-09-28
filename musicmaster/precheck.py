@@ -20,7 +20,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Sequence
 
-from musicmaster import render
+from musicmaster import render, repairs
 
 MEASUREMENT = "measurement"
 
@@ -30,7 +30,13 @@ def _tokens(caption: str) -> list[str]:
     return [token.strip() for token in caption.split(",") if token.strip()]
 
 
-def _verdict(requirement: Mapping[str, Any], verdict: str, note: str, value: Any = None) -> dict:
+def _verdict(
+    requirement: Mapping[str, Any],
+    verdict: str,
+    note: str,
+    value: Any = None,
+    detail: Mapping[str, Any] | None = None,
+) -> dict:
     item: dict[str, Any] = {
         "requirement_id": requirement["id"],
         "text": requirement.get("text", ""),
@@ -46,6 +52,10 @@ def _verdict(requirement: Mapping[str, Any], verdict: str, note: str, value: Any
     }
     if value is not None:
         item["measured"] = {"value": value}
+    # The code action that fixes this, and the sentence a person reads instead of the raw value.
+    advice = repairs.advise(requirement, item, detail=detail)
+    item["suggestion"] = advice["suggestion"]
+    item["repair_instruction"] = advice["repair_instruction"]
     return item
 
 
@@ -84,6 +94,7 @@ def caption_verdicts(
                         "unmet",
                         "the caption does not carry: " + ", ".join(missing),
                         missing,
+                        detail={"missing": missing},
                     )
                 )
             else:
@@ -97,7 +108,13 @@ def caption_verdicts(
             present = [label for label in forbidden if label.lower() in lowered]
             if present:
                 verdicts.append(
-                    _verdict(requirement, "unmet", "the caption names what the brief excluded: " + ", ".join(present), present)
+                    _verdict(
+                        requirement,
+                        "unmet",
+                        "the caption names what the brief excluded: " + ", ".join(present),
+                        present,
+                        detail={"present": present},
+                    )
                 )
             else:
                 verdicts.append(_verdict(requirement, "met", "nothing excluded appears in the caption"))
@@ -105,7 +122,7 @@ def caption_verdicts(
         elif checker == "code.caption.coherence":
             problems = render.coherence_check(vocab, selections)
             if problems:
-                verdicts.append(_verdict(requirement, "unmet", "; ".join(problems), problems))
+                verdicts.append(_verdict(requirement, "unmet", "; ".join(problems), problems, detail={"problems": problems}))
             else:
                 verdicts.append(_verdict(requirement, "met", "the selections do not contradict each other"))
 
@@ -115,7 +132,13 @@ def caption_verdicts(
                 # Soft: the budget dropping a tag is intended behaviour, and it is still worth
                 # saying, because a dropped tag is a property the render will not be conditioned on.
                 verdicts.append(
-                    _verdict(requirement, "unmet", "the tag budget dropped: " + ", ".join(omitted), omitted)
+                    _verdict(
+                        requirement,
+                        "unmet",
+                        "the tag budget dropped: " + ", ".join(omitted),
+                        omitted,
+                        detail={"omitted": omitted, "budget": target},
+                    )
                 )
             else:
                 verdicts.append(

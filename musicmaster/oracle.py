@@ -36,6 +36,8 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from musicmaster import repairs
+
 ROOT = Path(__file__).resolve().parent.parent
 QUESTION_BANK_PATH = ROOT / "vocabulary" / "oracle-questions.json"
 
@@ -498,12 +500,17 @@ def verdict_for(
     }
     if requirement.get("enforcement"):
         verdict["enforcement"] = requirement["enforcement"]
+    # The report's numbers are evidence; this is the sentence a person can act on. It is built in
+    # code from the requirement and the answer, never written by the model.
+    advice = repairs.advise(requirement, verdict, question=question)
+    verdict["suggestion"] = advice["suggestion"]
+    verdict["repair_instruction"] = advice["repair_instruction"]
     return verdict
 
 
 def unverified_verdict(requirement: Mapping[str, Any], reason: str) -> dict:
     """A requirement nothing could decide. Never a pass, and never a failure either."""
-    return {
+    verdict: dict[str, Any] = {
         "requirement_id": requirement["id"],
         "text": requirement.get("text", ""),
         "severity": requirement.get("severity", "soft"),
@@ -516,6 +523,10 @@ def unverified_verdict(requirement: Mapping[str, Any], reason: str) -> dict:
         "supported_by": [],
         "note": reason,
     }
+    advice = repairs.advise(requirement, verdict)
+    verdict["suggestion"] = advice["suggestion"]
+    verdict["repair_instruction"] = advice["repair_instruction"]
+    return verdict
 
 
 def normalise_mechanical(verdict: Mapping[str, Any]) -> dict:
@@ -584,12 +595,15 @@ def counts(verdicts: Sequence[Mapping[str, Any]]) -> dict:
 
 
 def unmet_list(verdicts: Sequence[Mapping[str, Any]]) -> list[str]:
-    """What the system could not satisfy or could not check, stated in the report."""
+    """What the system could not satisfy or could not check, and what to do about it."""
     out = []
     for verdict in verdicts:
         if verdict["verdict"] != "met":
             label = verdict.get("text") or verdict["requirement_id"]
-            out.append(f"{verdict['requirement_id']} ({verdict.get('severity', '?')}, {verdict['verdict']}): {label}")
+            line = f"{verdict['requirement_id']} ({verdict.get('severity', '?')}, {verdict['verdict']}): {label}"
+            if verdict.get("suggestion"):
+                line += f" — {verdict['suggestion']}"
+            out.append(line)
     return out
 
 
@@ -801,17 +815,19 @@ def evaluate(
             "note": note,
         }
 
+    oracle_info = {
+        "kind": getattr(oracle, "kind", "none"),
+        "model": getattr(oracle, "model", None),
+        "reachable": bool(getattr(oracle, "reachable", False)),
+        "degraded_reason": degraded_reason,
+    }
     report: dict[str, Any] = {
         "report_version": "1",
         "song_id": song_id,
-        "oracle": {
-            "kind": getattr(oracle, "kind", "none"),
-            "model": getattr(oracle, "model", None),
-            "reachable": bool(getattr(oracle, "reachable", False)),
-            "degraded_reason": degraded_reason,
-        },
+        "oracle": oracle_info,
         "verdicts": verdicts,
         "overall": overall_verdict(verdicts),
+        "summary": repairs.summary(verdicts, oracle_info),
         "unmet": unmet_list(verdicts),
         "counts": counts(verdicts),
         "iterations": iterations,
