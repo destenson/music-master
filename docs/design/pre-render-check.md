@@ -67,6 +67,24 @@ description of a file that does not exist yet.
 | Content policy: the lyric contains none of the excluded content kinds, one question each | lyrics | `jev.content_policy` | oracle |
 | Absence: the lyric does not name an element the brief avoided, one question each | lyrics | `jev.absence_of` | oracle |
 | Imitation: no deliberate reproduction of a named artist | lyrics | `jev.artist_pastiche` | oracle |
+| Caption/lyric consistency: one question per cross-artifact rule in scope | caption + lyrics | `jev.caption_lyric_consistency` | oracle |
+
+The consistency rules are the ones the lyric checker already poses and cannot answer — it shows them
+in the Lyrics tab as its deferred list. They belong here rather than there because they compare the
+caption against the lyric, and both are text this page can read. Each rule in scope becomes one
+requirement and one question, never one answer over all of them, because a satisfied rule would
+otherwise hide a violated one. Two boundaries keep the set honest: the rule the checker *can* decide
+(`no_vocals_no_vocal_tags` is an error in code) is never asked, and a rule with nothing in the
+lyric's pool to contradict is not an obligation — silence does not contradict. The rule's own
+vocabulary entry now carries a `judge` criterion beside its prose, because the prose is written for
+a person and mentions what the generator does with a conflict, which is not something to judge
+against.
+
+An instrument a *section* names — `[Solo - guitar]`, `[Instrumental]` — is the evidence the
+instrumentation rule is actually about, and it is not a pool tag. The checker puts it in the state
+beside the tags (`lyric_surfaces`, and the modifier's instrument name in `lyric_tags`), or the
+question would be asked against an empty list and answered on nothing; that is what moved it from
+`uncertain` at 0.51 to `met` at 0.85 on the rap-metal fixture.
 
 ## 4. The shape of a question
 
@@ -103,6 +121,12 @@ question bank rather than by convention:
   again afterwards.
 - **The summary.** The report opens with one paragraph saying what already holds and what to do
   before rendering. Counts are a table; the sentence is what a person reads first.
+- **The applied repair.** Where the page can act on the instructions, it hands them to the generator
+  and checks the text the generator returned — not whatever the prop happens to hold — so the
+  re-check cannot race the rewrite. The report carries a digest of the state it judged, and the page
+  reports what the repair actually achieved: the same text came back, or these requirements still do
+  not pass. A repair loop that cannot say either of those is indistinguishable from one that did
+  nothing.
 - **The verdict and the routing.** The model never writes a repair and never chooses the next step.
 - **The projection.** Only the fields the questions name are sent, so the artifact under judgement
   leaves the machine and the working draft does not.

@@ -132,6 +132,18 @@ class LyricAdviceTest(unittest.TestCase):
         advice = repairs.advise(requirement("no_imitation", "jev.artist_pastiche", "Bon Iver"), verdict("unmet"))
         self.assertIn("Bon Iver", advice["suggestion"])
 
+    def test_a_consistency_failure_names_the_rule(self) -> None:
+        advice = repairs.advise(
+            requirement(
+                "consistency_emotion_matches_energy_tags",
+                "jev.caption_lyric_consistency",
+                {"rule": "emotion_matches_energy_tags", "caption_bins": ["mood", "energy"]},
+            ),
+            verdict("unmet"),
+        )
+        self.assertIn("emotion matches energy tags", advice["suggestion"])
+        self.assertIsNotNone(advice["repair_instruction"])
+
     def test_an_unknown_lyric_checker_still_says_something_actionable(self) -> None:
         advice = repairs.advise(
             requirement("mystery", "jev.something_new", "a thing", text="the lyric does a thing"),

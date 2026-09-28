@@ -374,6 +374,8 @@ export interface ComplianceReport {
   overall: ComplianceOverall;
   /** The report as one paragraph a person reads first: what holds, what does not, and what to do. */
   summary?: string | null;
+  /** A digest of the state these verdicts were decided on, so a re-check can prove what it judged. */
+  checked?: string | null;
   /** Explicitly what could not be satisfied; never empty when `overall` is not compliant. */
   unmet?: string[];
   counts?: ComplianceCounts;

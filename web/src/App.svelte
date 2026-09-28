@@ -505,14 +505,15 @@
   const LYRIC_MODEL_KEY = "mm.ollama.model";
 
   /**
-   * Rewrite the lyric to satisfy the check's own repair instructions.
+   * Rewrite the lyric to satisfy the check's own repair instructions, and return the new text.
    *
    * The instructions come from `musicmaster.repairs`, so the generator is told what each failed
-   * check localised rather than being asked to critique its own output. The model is the one chosen
-   * on the Lyrics tab; with none chosen there is nothing to generate with, and the caller shows why
-   * rather than silently doing nothing.
+   * check localised rather than being asked to critique its own output. The prompt is a *repair*
+   * prompt, not the writing brief: leading with the brief invites a fresh lyric, and the point is to
+   * change the lines the repairs name and leave the rest alone. The model is the one chosen on the
+   * Lyrics tab; with none chosen there is nothing to generate with, and the caller shows why.
    */
-  async function repairLyrics(instructions: string): Promise<void> {
+  async function repairLyrics(instructions: string): Promise<string> {
     let model = "";
     try {
       model = localStorage.getItem(LYRIC_MODEL_KEY) ?? "";
@@ -522,20 +523,28 @@
     if (!model) {
       throw new Error("no lyric model selected — choose one on the Lyrics tab, then check again");
     }
+    const context = [
+      rendered?.string ? `Caption: ${rendered.string}` : "",
+      theme ? `Theme: ${theme}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
     const prompt = [
-      buildPromptFor(theme),
+      context,
       "",
-      "A draft is below. Rewrite it so it satisfies every point under Repairs, keeping the section",
-      "structure, the line counts and the performance tags. Change only what the repairs name.",
+      "You are repairing an existing lyric, not writing a new one. Apply every repair below and",
+      "return the whole lyric. Keep every section header, performance tag and line that the repairs",
+      "do not name exactly as it is; change only what they name.",
       "",
       "## Repairs",
       instructions,
       "",
-      "## Current draft",
+      "## Lyric to repair",
       lyricText,
     ].join("\n");
     const text = await generate({ model, base: ollamaBase(), prompt, onText: applyDraft });
     applyFinalDraft(text);
+    return lyricText;
   }
 
   async function getJson<T>(path: string): Promise<T> {

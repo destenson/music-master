@@ -166,6 +166,21 @@ def lyric_advice(requirement: Mapping[str, Any], verdict: Mapping[str, Any], que
             "repair_instruction": f"The lyric imitates {target}. Remove the identifying traits while keeping the genre.",
         }
 
+    if checker == "jev.caption_lyric_consistency":
+        target = requirement.get("target") if isinstance(requirement.get("target"), Mapping) else {}
+        readable = _clean(target.get("rule")).replace("_", " ") or "the caption and the lyric"
+        bins = ", ".join(target.get("caption_bins") or [])
+        return {
+            "suggestion": (
+                f"{lead}the caption and the lyric contradict each other on {readable}. Make the caption's "
+                f"{bins} match what the lyric tags say, or change the tags the lyric uses."
+            ),
+            "repair_instruction": (
+                f"The lyric's own tags contradict the caption on {readable}. Change the tags, or the lines "
+                "they describe, so the two agree."
+            ),
+        }
+
     return {
         "suggestion": f"{lead}“{_clean(requirement.get('text'))}” did not hold. Revise the lyrics to satisfy it.",
         "repair_instruction": f"Revise the lyric so it satisfies: {_clean(requirement.get('text'))}.",

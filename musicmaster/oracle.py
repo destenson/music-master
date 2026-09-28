@@ -31,6 +31,7 @@ semantic requirement is a bank entry plus a spec entry, not a code change.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -580,6 +581,17 @@ def overall_verdict(verdicts: Sequence[Mapping[str, Any]]) -> str:
     return "compliant"
 
 
+def checked_digest(state: Mapping[str, Any]) -> str:
+    """A short digest of the state the questions read, so a report says what it judged.
+
+    Two checks over the same text produce the same digest and two checks over different text do not.
+    Without it, "I ran it again and nothing changed" cannot be told apart from "it judged the same
+    text again", which is exactly the question a repair loop has to answer about itself.
+    """
+    payload = json.dumps(state, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()[:12]
+
+
 def counts(verdicts: Sequence[Mapping[str, Any]]) -> dict:
     """The two headline counts. 'Twelve met, six of them on description' is a different
     document from 'twelve met', and only one of them is honest."""
@@ -828,6 +840,7 @@ def evaluate(
         "verdicts": verdicts,
         "overall": overall_verdict(verdicts),
         "summary": repairs.summary(verdicts, oracle_info),
+        "checked": checked_digest(state),
         "unmet": unmet_list(verdicts),
         "counts": counts(verdicts),
         "iterations": iterations,

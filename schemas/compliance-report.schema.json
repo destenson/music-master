@@ -48,6 +48,10 @@
       "type": ["string", "null"],
       "description": "The report as one paragraph a person reads first: what already holds, what does not, and what to do about it."
     },
+    "checked": {
+      "type": ["string", "null"],
+      "description": "A short digest of the state the questions read. Two checks over the same text share it and two checks over different text do not, which is what lets a repair loop say whether it judged new text or the same text again."
+    },
     "unmet": {
       "type": "array",
       "description": "The explicit list of what the system could not satisfy. This is the honest-output contract: it is never empty when overall is not 'compliant'.",

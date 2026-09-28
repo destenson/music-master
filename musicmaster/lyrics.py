@@ -461,6 +461,68 @@ def _instrumental_surfaces(found: list[dict], st: dict) -> list[str]:
     return surfaces
 
 
+def consistency_tasks(found: list[dict], st: dict, selections: dict) -> list[dict]:
+    """The semantic consistency rules the checker can pose but not answer.
+
+    One dict per rule in scope: its id and text, the caption bins that make it applicable, the lyric
+    tag pool it compares against, and the tags actually found in the lyric. ``display`` is the line
+    the Lyrics tab shows; the Check tab turns the same dict into a requirement, so the findings list
+    and the check cannot disagree about what was deferred.
+
+    The one exactly-decidable rule is deliberately absent: ``no_vocals_no_vocal_tags`` is an error in
+    code, and posing it here would ask a model to re-decide something the checker already settled.
+    """
+    tasks: list[dict] = []
+    surfaces = _instrumental_surfaces(found, st)
+    for rule in st["consistency"]:
+        if rule["id"] == "no_vocals_no_vocal_tags":
+            continue
+        bins_present = [bin_id for bin_id in rule["caption_bins"] if selections.get(bin_id)]
+        if not bins_present:
+            continue
+        lyric_tags: list[str] = []
+        for sec in found:
+            for tag in sec.get("standalone", []):
+                if tag["pool"] == rule["section_pool"] and tag["raw"] not in lyric_tags:
+                    lyric_tags.append(tag["raw"])
+        if rule["id"] == "instruments_match_instrumental_tags":
+            # A section names its instrument in the modifier -- `[Solo - guitar]` -- and that name is
+            # the evidence the rule is about, so it joins the pool tags. Without it the rule would be
+            # asked against an empty list and answered on nothing.
+            sections = {s["id"]: s for s in st["sections"]}
+            for sec in found:
+                meta = sections.get(sec.get("section") or "")
+                if meta and meta.get("instrumental") and sec.get("modifier") and sec["modifier"] not in lyric_tags:
+                    lyric_tags.append(sec["modifier"])
+        # Nothing in the lyric of the pool the rule covers means nothing the rule can contradict: the
+        # rules say the tags must not contradict the caption, and silence does not contradict. The
+        # instrumentation rule is the exception, because a section can name the instrument without a
+        # tag, which is what `surfaces` records.
+        if not lyric_tags and not (rule["id"] == "instruments_match_instrumental_tags" and surfaces):
+            continue
+        where = ""
+        if rule["id"] == "instruments_match_instrumental_tags" and surfaces:
+            where = f" ({', '.join(surfaces)})"
+        tasks.append(
+            {
+                "rule": rule["id"],
+                "rule_text": rule.get("judge") or rule.get("rule", ""),
+                "caption_bins": bins_present,
+                "pool": rule["section_pool"],
+                "lyric_tags": lyric_tags,
+                # An instrument a *section* names -- `[Solo - guitar]`, `[Instrumental]` -- is the
+                # evidence the instrumentation rule is actually about, and it is not a pool tag. The
+                # question is told about it, or it would be asked against an empty list.
+                "surfaces": surfaces if rule["id"] == "instruments_match_instrumental_tags" else [],
+                "display": (
+                    f"consistency rule '{rule['id']}': compare caption bins {bins_present} against "
+                    f"{rule['section_pool']} tags in the lyrics{where}"
+                ),
+            }
+        )
+    return tasks
+
+
 def check_consistency(found: list[dict], st: dict, vocab: dict, selections: dict, rep: Report) -> None:
     """Enforce the exactly-checkable consistency rule; give each semantic rule one oracle task.
 
@@ -470,8 +532,6 @@ def check_consistency(found: list[dict], st: dict, vocab: dict, selections: dict
     The instrumentation rule is compared against two lyric surfaces, so naming both in its single
     task keeps one rule from producing two deferrals.
     """
-    surfaces = _instrumental_surfaces(found, st)
-
     lead = (selections.get("lead_vocal") or {}).get("options") or []
     instrumental = bool({"instrumental", "no_vocals"} & set(lead))
     if instrumental:
@@ -483,20 +543,8 @@ def check_consistency(found: list[dict], st: dict, vocab: dict, selections: dict
                         f"lead vocal is Instrumental/No Vocals"
                     )
 
-    for rule in st["consistency"]:
-        if rule["id"] == "no_vocals_no_vocal_tags":
-            continue  # decided in code above; nothing is left for the oracle
-        bins_present = [b for b in rule["caption_bins"] if selections.get(b)]
-        if not bins_present:
-            continue
-        if rule["id"] == "instruments_match_instrumental_tags" and surfaces:
-            where = f" ({', '.join(surfaces)})"
-        else:
-            where = ""
-        rep.oracle(
-            f"consistency rule '{rule['id']}': compare caption bins {bins_present} against "
-            f"{rule['section_pool']} tags in the lyrics{where}"
-        )
+    for task in consistency_tasks(found, st, selections):
+        rep.oracle(task["display"])
 
     if not selections:
         rep.warn("no caption selections supplied; consistency rules not evaluated")

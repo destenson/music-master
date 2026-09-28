@@ -306,14 +306,17 @@ surfacing a bare "Failed to fetch".
 The **Check** tab verifies the caption and the lyrics before a render is spent on them. The caption
 is compared, in code, against what was selected — every tag that should be sent, nothing that was
 excluded, no contradictory pair, and nothing dropped by the tag budget. The lyrics are judged one
-requirement at a time. The report leads with a plain sentence and, for each thing that did not pass,
-says what to change and where — written in code from the measured failure, never by the model. When
-the fixes need a rewrite, the page offers to make them: it hands the generator the instructions the
-failed checks localised, then checks again. With no key and no service the caption is still checked
-and every lyric requirement is reported `unverified` with the reason, which is a report rather than a
-failure. What is not checkable yet is said so rather than shown as an empty pane: a rendered track's
-genre, instrumentation or era need a measurement or an independent caption, and neither exists here.
-The page also needs to be served over HTTP — WASM and ES modules will not load from a `file://` URL.
+requirement at a time, including the cross-artifact consistency rules the lyric checker can pose but
+not answer, which used to sit in the Lyrics tab as a deferred list. The report leads with a plain
+sentence and, for each thing that did not pass, says what to change and where — written in code from
+the measured failure, never by the model. When the fixes need a rewrite, the page offers to make
+them: it hands the generator the instructions the failed checks localised, checks the text the
+generator returned, and says whether the rewrite resolved anything. With no key and no service the
+caption is still checked and every lyric requirement is reported `unverified` with the reason, which
+is a report rather than a failure. What is not checkable yet is said so rather than shown as an empty
+pane: a rendered track's genre, instrumentation or era need a measurement or an independent caption,
+and neither exists here. The page also needs to be served over HTTP — WASM and ES modules will not
+load from a `file://` URL.
 
 ## Checking the brief
 

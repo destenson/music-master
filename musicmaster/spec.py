@@ -133,9 +133,30 @@ def _negative_element(label: str) -> str:
     return text[3:].strip() if text.lower().startswith("no ") else text
 
 
+def _consistency_tasks(draft: Mapping[str, Any]) -> list[dict]:
+    """The caption/lyric consistency rules the lyric leaves in scope.
+
+    The lyric checker already decides which rules apply and which tags the lyric carries; this asks
+    it, rather than re-deriving the rules from the vocabulary a second time. The same dicts drive the
+    Lyrics tab's deferred list and the requirements below, so the two cannot disagree.
+    """
+    text = draft.get("lyrics") or ""
+    if not text.strip():
+        return []
+    from musicmaster import lyrics as lyric_check, timeline
+
+    section_tags = timeline.load(timeline.SECTION_TAGS_PATH)
+    found = lyric_check.analyse(text.splitlines(), section_tags, lyric_check.Report())
+    return lyric_check.consistency_tasks(found, section_tags, draft.get("selections") or {})
+
+
 # --- the spec ------------------------------------------------------------------------------
 
-def build_requirements(draft: Mapping[str, Any], vocab: Mapping[str, Any]) -> list[dict]:
+def build_requirements(
+    draft: Mapping[str, Any],
+    vocab: Mapping[str, Any],
+    consistency: Sequence[Mapping[str, Any]] = (),
+) -> list[dict]:
     selected = _selected_ids(draft.get("selections") or {})
     labels = _label_index(vocab)
     bins = {bin_["id"]: bin_ for bin_ in vocab.get("bins", [])}
@@ -332,6 +353,29 @@ def build_requirements(draft: Mapping[str, Any], vocab: Mapping[str, Any]) -> li
             )
         )
 
+    # --- the caption against the lyric: the rules the checker can pose but not answer -------------
+    # One requirement per rule in scope, never one over all of them, because a single answer would
+    # let a satisfied rule hide a violated one. A rule whose caption bins are not selected is not an
+    # obligation the user chose, so it is not asked.
+    for task in consistency:
+        requirements.append(
+            _requirement(
+                "consistency_" + str(task["rule"]),
+                "jev.caption_lyric_consistency",
+                "semantic",
+                "hard",
+                "explicit",
+                {
+                    "rule": task["rule"],
+                    "caption_bins": task["caption_bins"],
+                    "pool": task["pool"],
+                    "rule_text": task["rule_text"],
+                },
+                stage="lyrics",
+                text=f"caption/lyric consistency: {str(task['rule']).replace('_', ' ')}",
+            )
+        )
+
     # A value the page holds and a bin that maps to the same checker would otherwise produce the
     # same requirement twice, which would put the same obligation in the report two ways.
     seen: set[str] = set()
@@ -379,7 +423,12 @@ def _requirement_text(requirement_id: str, target: Any) -> str:
 
 # --- the state -----------------------------------------------------------------------------
 
-def build_state(draft: Mapping[str, Any], vocab: Mapping[str, Any], requirements: Sequence[Mapping[str, Any]] = ()) -> dict:
+def build_state(
+    draft: Mapping[str, Any],
+    vocab: Mapping[str, Any],
+    requirements: Sequence[Mapping[str, Any]] = (),
+    consistency: Sequence[Mapping[str, Any]] = (),
+) -> dict:
     """The fact sheet the questions read, carrying only what is actually known.
 
     The requirement targets travel in the state under `targets.<requirement_id>`, because a question
@@ -430,6 +479,13 @@ def build_state(draft: Mapping[str, Any], vocab: Mapping[str, Any], requirements
     targets = {r["id"]: r["target"] for r in requirements if r.get("target") is not None}
     if targets:
         state["targets"] = targets
+    # The tags the lyric actually carries, per pool, so a consistency question compares the caption
+    # against what the lyric says rather than asking the model to parse the tag grammar itself.
+    if consistency:
+        state["lyric_tags"] = {str(task["pool"]): list(task["lyric_tags"]) for task in consistency}
+        state["lyric_surfaces"] = sorted(
+            {str(surface) for task in consistency for surface in task.get("surfaces") or []}
+        )
     if requirements:
         state["requirements"] = [{"id": r["id"], "text": r["text"]} for r in requirements]
 
@@ -446,7 +502,8 @@ def build_state(draft: Mapping[str, Any], vocab: Mapping[str, Any], requirements
 def interpret(draft: Mapping[str, Any], vocab: Mapping[str, Any] | None = None) -> dict:
     """A spec and the state its questions read, built together so they cannot disagree."""
     vocab = vocab if vocab is not None else load_vocabulary()
-    requirements = build_requirements(draft, vocab)
+    consistency = _consistency_tasks(draft)
+    requirements = build_requirements(draft, vocab, consistency)
     return {
         "spec": {
             "spec_version": "1",
@@ -454,5 +511,5 @@ def interpret(draft: Mapping[str, Any], vocab: Mapping[str, Any] | None = None) 
             "oracle": "jev",
             "requirements": requirements,
         },
-        "state": build_state(draft, vocab, requirements),
+        "state": build_state(draft, vocab, requirements, consistency),
     }

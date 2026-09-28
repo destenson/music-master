@@ -179,6 +179,54 @@ class LyricDerivationTest(unittest.TestCase):
         self.assertEqual(imitation["target"], "Bon Iver")
 
 
+class ConsistencyTest(unittest.TestCase):
+    """The rules the lyric checker poses but cannot answer become requirements the check decides."""
+
+    LYRIC = "[Verse]\n[driving]\nA line of the verse here\n\n[Chorus - anthemic]\nA line of the chorus here\n"
+
+    def a_consistent_draft(self, **rest) -> dict:
+        draft = a_draft(
+            selections={"mood": {"options": ["aggressive"]}, "energy": {"options": ["energy_high"]}},
+            lyrics=self.LYRIC,
+        )
+        draft.update(rest)
+        return draft
+
+    def test_an_energy_rule_becomes_a_requirement_carrying_the_lyric_tags(self) -> None:
+        built = spec.interpret(self.a_consistent_draft())
+        item = requirement(built["spec"], "consistency_emotion_matches_energy_tags")
+        self.assertEqual(item["verify"], "jev.caption_lyric_consistency")
+        self.assertEqual(item["severity"], "hard")
+        self.assertEqual(item["stage_enforced"], "lyrics")
+        self.assertEqual(item["target"]["caption_bins"], ["mood", "energy"])
+        self.assertIn("driving", built["state"]["lyric_tags"]["energy_tags"])
+
+    def test_a_rule_whose_bins_are_not_selected_is_not_an_obligation(self) -> None:
+        built = spec.interpret(a_draft(selections={"genre": {"options": ["trap"]}}, lyrics=self.LYRIC))
+        ids = [r["id"] for r in built["spec"]["requirements"]]
+        self.assertNotIn("consistency_vocal_matches_vocal_tags", ids)
+        self.assertNotIn("consistency_emotion_matches_energy_tags", ids)
+
+    def test_the_exactly_decidable_rule_is_never_asked_of_the_oracle(self) -> None:
+        # `no_vocals_no_vocal_tags` is an error in code, so posing it would re-decide it.
+        draft = a_draft(selections={"lead_vocal": {"options": ["no_vocals"]}}, lyrics="[Verse]\n[rap]\nA line here\n")
+        ids = [r["id"] for r in spec.interpret(draft)["spec"]["requirements"]]
+        self.assertFalse([item for item in ids if "no_vocals_no_vocal_tags" in item])
+
+    def test_no_lyric_is_no_consistency_requirement(self) -> None:
+        built = spec.interpret(a_draft(lyrics=""))
+        self.assertFalse([r["id"] for r in built["spec"]["requirements"] if r["id"].startswith("consistency_")])
+
+    def test_each_rule_gets_its_own_question(self) -> None:
+        built = spec.interpret(self.a_consistent_draft())
+        questions = oracle.build_questions(built["spec"])
+        asked = {qid for qid in questions if qid.startswith("consistency_")}
+        expected = {r["id"] for r in built["spec"]["requirements"] if r["id"].startswith("consistency_")}
+        self.assertEqual(asked, expected)
+        for qid in asked:
+            self.assertEqual(questions[qid]["type"], "noul")
+
+
 class SpecConformanceTest(unittest.TestCase):
     """The spec is a machine contract, so check it from the schema rather than by hand."""
 
@@ -276,6 +324,16 @@ class QuestionWiringTest(unittest.TestCase):
         instructions = questions[axis_id]["instructions"]
         self.assertEqual(instructions["axis"], label("scene", "late_night").lower())
         self.assertNotIn(label("scene", "late_night").lower(), instructions["question"])
+
+    def test_the_report_says_which_state_it_checked(self) -> None:
+        # Without this, "I ran it again and nothing changed" cannot be told apart from "it judged
+        # the same text again", which is the question a repair loop has to answer about itself.
+        first = oracle.evaluate(self.built["spec"], self.built["state"], oracle.NoOracle())
+        changed = dict(self.built["state"])
+        changed["lyrics"] = (changed.get("lyrics") or "") + "\nA line that was not there before"
+        second = oracle.evaluate(self.built["spec"], changed, oracle.NoOracle())
+        self.assertEqual(len(first["checked"]), 12)
+        self.assertNotEqual(first["checked"], second["checked"])
 
     def test_the_whole_page_flow_produces_a_report_without_an_oracle(self) -> None:
         # Draft -> spec and state -> caption verdicts in code -> report. With no key the caption is

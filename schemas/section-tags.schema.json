@@ -60,7 +60,11 @@
           "id": { "type": "string" },
           "caption_bins": { "type": "array", "items": { "type": "string" } },
           "section_pool": { "type": "string", "enum": ["vocal_tags", "energy_tags", "instrumental_section_tags"] },
-          "rule": { "type": "string" }
+          "rule": { "type": "string" },
+          "judge": {
+            "type": "string",
+            "description": "The rule as one criterion a question can be judged against: no production advice, no 'and vice versa'. `rule` documents the rule for a person; `judge` is what the oracle is asked, because a note about what the generator does with a conflict is not a criterion."
+          }
         }
       }
     }

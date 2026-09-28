@@ -732,7 +732,8 @@
         "extra_instrument"
       ],
       "section_pool": "instrumental_section_tags",
-      "rule": "An instrument named as a solo or interlude in the lyrics should be present in the caption's instrumentation, and vice versa. The model does not resolve conflicts; it degrades."
+      "rule": "An instrument named as a solo or interlude in the lyrics should be present in the caption's instrumentation, and vice versa. The model does not resolve conflicts; it degrades.",
+      "judge": "Every instrument the lyric features as a solo or an interlude is named in the caption's instrumentation."
     },
     {
       "id": "emotion_matches_energy_tags",
@@ -741,7 +742,8 @@
         "energy"
       ],
       "section_pool": "energy_tags",
-      "rule": "Energy and emotion tags in the lyrics must not contradict the caption's mood or energy selections."
+      "rule": "Energy and emotion tags in the lyrics must not contradict the caption's mood or energy selections.",
+      "judge": "No energy or emotion tag in the lyric contradicts the caption's mood or energy selections. A tag the caption does not mention is not a contradiction."
     },
     {
       "id": "vocal_matches_vocal_tags",
@@ -751,7 +753,8 @@
         "backing_vocal"
       ],
       "section_pool": "vocal_tags",
-      "rule": "Vocal control tags in the lyrics must be consistent with the caption's vocal, delivery and backing selections."
+      "rule": "Vocal control tags in the lyrics must be consistent with the caption's vocal, delivery and backing selections.",
+      "judge": "No vocal tag in the lyric contradicts the caption's vocal, delivery or backing selections. A tag the caption does not mention is not a contradiction."
     },
     {
       "id": "no_vocals_no_vocal_tags",
@@ -759,7 +762,8 @@
         "lead_vocal"
       ],
       "section_pool": "vocal_tags",
-      "rule": "When the lead vocal bin is Instrumental or No Vocals, no vocal control tag may appear in the lyrics."
+      "rule": "When the lead vocal bin is Instrumental or No Vocals, no vocal control tag may appear in the lyrics.",
+      "judge": "No vocal control tag appears in the lyric, because the caption's lead vocal is Instrumental or No Vocals."
     }
   ]
 }

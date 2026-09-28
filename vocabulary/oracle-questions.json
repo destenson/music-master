@@ -213,6 +213,16 @@
         "false": "A different tuning is described or implied, including by a claim that only another tuning would support, such as playing below the range of the tuning asked for."
       }
     },
+    "jev.caption_lyric_consistency": {
+      "type": "noul",
+      "reads": ["caption", "lyrics", "lyric_tags", "lyric_surfaces", "targets.{requirement_id}"],
+      "instructions": "`targets.{requirement_id}` names a consistency rule and its `rule_text` is the criterion to judge. Does `caption` satisfy that criterion, given the lyric tags in `lyric_tags` and any instrument a section features in `lyric_surfaces`?",
+      "criteria": {
+        "true": "Nothing in the rule's caption bins contradicts the lyric tags the rule covers, nor any instrument `lyric_surfaces` says a section features. Where the lyric names an instrument, a vocal quality or an energy, the caption agrees or is silent about it.",
+        "false": "At least one contradiction: the lyric names something the rule's caption selections exclude, or the caption promises a quality the lyric tags deny. A tag that merely sits near another is not a contradiction; the two have to be unable to hold at once."
+      },
+      "note": "One question per consistency rule in scope, because a single answer over all of them would let a satisfied rule hide a violated one. A rule whose caption bins are not selected is not an obligation and is not asked. This is the question the lyric checker poses as its deferred list; asking it here is what turns that list into a verdict."
+    },
     "jev.any_serious_violation": {
       "type": "noul",
       "reads": ["brief", "targets", "requirements", "caption", "lyrics"],

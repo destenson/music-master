@@ -45,11 +45,11 @@
     /** The comma-separated exclusions the page holds, already split into fields. */
     artistReferences: string[];
     /**
-     * Rewrite the lyric from code-derived repair instructions, and resolve once the new text is in
-     * place. Absent when no generator is configured, in which case the report still suggests the
-     * change and offers no button.
+     * Rewrite the lyric from code-derived repair instructions, and resolve with the text it wrote.
+     * Absent when no generator is configured, in which case the report still suggests the change and
+     * offers no button.
      */
-    onRepair?: (instructions: string) => Promise<void> | void;
+    onRepair?: (instructions: string) => Promise<string | void> | string | void;
   } = $props();
 
   // The key is never read back into the input: a saved secret rendered on screen is no longer a
@@ -115,24 +115,63 @@
   const repairable = $derived(attentionRows.filter((verdict) => (verdict.repair_instruction ?? "").trim() !== ""));
 
   let repairing = $state(false);
+  /** What the last repair actually achieved, so a rewrite that changed nothing says so. */
+  let notice = $state<string | null>(null);
+
+  /** The hard and policy requirements the report does not pass, which is what a repair is for. */
+  function failingIds(): string[] {
+    return (report?.verdicts ?? [])
+      .filter(
+        (verdict) =>
+          verdict.verdict !== "met" &&
+          (verdict.severity === "hard" || verdict.severity === "policy"),
+      )
+      .map((verdict) => verdict.requirement_id);
+  }
 
   /**
-   * Rewrite the lyric from the code-derived instructions, then check again.
+   * Rewrite the lyric from the code-derived instructions, then check it.
    *
    * The suggestions come from `musicmaster.repairs`, so the generator is told exactly what the
-   * failed checks localised rather than being asked to critique its own output.
+   * failed checks localised rather than being asked to critique its own output. The text the repair
+   * returns is checked directly rather than read back off the prop, and the report's digest says
+   * which text was judged, so "it ran again and nothing changed" can be told apart from "it judged
+   * the same text again".
    */
+  /** What the last repair actually achieved, said plainly rather than left to be inferred. */
+  function reportOutcome(failingBefore: string[], digestBefore: string | null): void {
+    const digestAfter = report?.checked ?? null;
+    if (!report) {
+      notice = "The re-check did not run, so nothing here is about the new lyric.";
+    } else if (digestBefore && digestAfter === digestBefore) {
+      notice = "The rewrite came back with the same text, so the check judged the same lyric again.";
+    } else {
+      const still = failingIds().filter((id) => failingBefore.includes(id));
+      if (still.length) notice = `The rewrite did not resolve: ${still.join(", ")}.`;
+    }
+  }
+
   async function autoFix(): Promise<void> {
     if (!onRepair || repairing || repairable.length === 0) return;
     repairing = true;
     errorText = null;
+    notice = null;
+    const failingBefore = failingIds();
+    const digestBefore = report?.checked ?? null;
+    const lyricsBefore = lyrics;
     try {
       const instructions = repairable.map((verdict) => `- ${verdict.repair_instruction}`).join("\n");
-      await onRepair(instructions);
+      const rewritten = await onRepair(instructions);
       await tick();
-      await check();
+      await check(typeof rewritten === "string" && rewritten.trim() ? rewritten : undefined);
+      reportOutcome(failingBefore, digestBefore);
     } catch (cause) {
-      errorText = cause instanceof Error ? cause.message : String(cause);
+      const message = cause instanceof Error ? cause.message : String(cause);
+      // A repair can stream a new lyric and then fail. Check what is actually there rather than
+      // leaving the report describing the text from before it.
+      await tick();
+      if (lyrics !== lyricsBefore) await check();
+      errorText = message;
     } finally {
       repairing = false;
     }
@@ -190,7 +229,7 @@
    * report, because "the oracle was not reached" is a verdict about every semantic requirement and
    * the honest one to show.
    */
-  async function check(): Promise<void> {
+  async function check(lyricsOverride?: string): Promise<void> {
     if (!core || busy) return;
     const typed = keyInput.trim();
     if (!dev) persistKey();
@@ -202,6 +241,7 @@
 
     busy = true;
     errorText = null;
+    notice = null;
     report = null;
     controller = new AbortController();
 
@@ -218,7 +258,7 @@
         bpm,
         duration_s: duration,
         template_id: templateId || null,
-        lyrics,
+        lyrics: lyricsOverride ?? lyrics,
         caption,
         theme,
         artist_references: artistReferences,
@@ -340,7 +380,7 @@
     </div>
 
     <div class="row">
-      <button class="primary" onclick={check} disabled={!canCheck}>
+      <button class="primary" onclick={() => check()} disabled={!canCheck}>
         {busy ? "checking…" : "check"}
       </button>
       {#if busy}
@@ -356,6 +396,9 @@
     {#if errorText}
       <p class="finding error" style="margin:0; white-space:pre-wrap">{errorText}</p>
     {/if}
+    {#if notice}
+      <p class="finding warn" style="margin:0">{notice}</p>
+    {/if}
   </section>
 
   {#if report}
@@ -364,7 +407,9 @@
         <h2>Report</h2>
         <span class="overall {report.overall}">overall: {report.overall}</span>
         <span class="small muted" style="margin-left:auto">
-          oracle {report.oracle.kind}{report.oracle.model ? `@${report.oracle.model}` : ""}
+          {#if report.checked}checked {report.checked} · {/if}oracle {report.oracle.kind}{report.oracle.model
+            ? `@${report.oracle.model}`
+            : ""}
           {report.oracle.reachable ? "" : " · unreachable"}
         </span>
       </div>
