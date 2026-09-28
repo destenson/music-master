@@ -12,4 +12,4 @@ and contain no logic of their own.
 
 # The modules that must stay pure. Declared here rather than in the test so the package and
 # the guard cannot disagree about what the text tier is; `tests/test_text_tier.py` enforces it.
-TEXT_TIER = ("jev", "lyrics", "oracle", "prompt", "radio", "render", "spec", "templates", "timeline", "vocabulary")
+TEXT_TIER = ("jev", "lyrics", "oracle", "precheck", "prompt", "radio", "render", "spec", "templates", "timeline", "vocabulary")

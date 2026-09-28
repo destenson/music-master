@@ -59,19 +59,19 @@ EVIDENCE_CLASSES = (MEASUREMENT, DESCRIPTION, SELF_REPORT, ORACLE, TRANSCRIPTION
 # questions or versions. A question in the bank may override any of them, and every verdict
 # records the threshold that actually decided it.
 #
-# The margin gate is already known to be wrong as a single number. Measured against the live
-# service on a five-level question whose answer was in no doubt, the top-two margin came back at
-# 0.03 and at 0.12: Jev puts most of a score's mass on the two adjacent levels, so a margin a
-# two-way noul clears easily is nearly unreachable for a score. Until each score question carries
-# a gate measured for it, expect a bounded score to be reported `uncertain`, and read that as the
-# threshold's fault rather than the song's. The same answers point at the better signal for a
-# *bounded* score: the mass on the passing side of the bound, not the distance between the top two
-# levels.
+# A bounded score is decided on `score_accept` against the mass on the *passing side* of its bound,
+# not on the top-two margin. Jev puts most of a score's mass on the two adjacent levels, so a margin
+# a two-way noul clears easily is nearly unreachable for a score: measured against the live service,
+# a genre question with 0.79 of its mass on the passing levels came back with a 0.13 top-two margin,
+# and one with no doubt about the answer came back at 0.03. The margin asks which of two neighbouring
+# levels won, which is not the question a bound asks. The passing mass asks the bound's own question,
+# and it is what a score verdict is decided on.
 DEFAULT_THRESHOLDS = {
-    "accept": 0.70,      # a noul at or above this is met
-    "reject": 0.30,      # a noul at or below this is unmet
-    "choice_top": 0.60,  # a choice whose top option is below this is uncertain
-    "margin": 0.50,      # the top-two margin an oracle needs to decide a hard requirement
+    "accept": 0.70,        # a noul at or above this is met
+    "reject": 0.30,        # a noul at or below this is unmet
+    "choice_top": 0.60,    # a choice whose top option is below this is uncertain
+    "margin": 0.50,        # the top-two margin an oracle needs to decide a hard noul requirement
+    "score_accept": 0.70,  # the mass a bounded score needs on the passing side of its bound
 }
 
 
@@ -132,7 +132,7 @@ def _slug(text: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in str(text).strip().lower()).strip("_") or "axis"
 
 
-def _target_params(entry: Mapping[str, Any], target: Any) -> list[dict]:
+def _target_params(entry: Mapping[str, Any], target: Any, requirement_id: str | None = None) -> list[dict]:
     """Split a requirement target into one parameter set per question.
 
     Most targets produce exactly one question. A checker whose bank entry declares
@@ -140,6 +140,9 @@ def _target_params(entry: Mapping[str, Any], target: Any) -> list[dict]:
     its own question because they are separate judgements with separate thresholds. An axis key
     ending in ``_max`` is an upper bound -- ``sadness_max: 1`` asks that the song not read as
     sad, which is not the same question as ``wistful: 3`` asking that it does read as wistful.
+
+    Every set carries ``requirement_id``, so a question's ``reads`` can name the target that
+    belongs to its own requirement -- `targets.{requirement_id}` -- rather than the whole map.
     """
     if entry.get("target_split") == "axes" and isinstance(target, Mapping):
         params = []
@@ -154,10 +157,11 @@ def _target_params(entry: Mapping[str, Any], target: Any) -> list[dict]:
                     "axis_id": _slug(axis),
                     "bound": "max" if key.endswith("_max") else "min",
                     "bound_value": value,
+                    "requirement_id": requirement_id,
                 }
             )
         return params
-    params = {"target": _compact(target)}
+    params = {"target": _compact(target), "requirement_id": requirement_id}
     if entry.get("default_bound") is not None:
         params["bound"] = entry.get("default_bound_type", "min")
         params["bound_value"] = entry["default_bound"]
@@ -171,7 +175,7 @@ def _question_from(entry: Mapping[str, Any], requirement: Mapping[str, Any], que
         "checker": requirement.get("verify", ""),
         "type": entry["type"],
         "instructions": _render(entry["instructions"], params),
-        "reads": list(entry.get("reads", [])),
+        "reads": [_render(path, params) for path in entry.get("reads", [])],
         "severity": requirement.get("severity", "soft"),
     }
 
@@ -213,7 +217,7 @@ def build_questions(spec: Mapping[str, Any], bank: Mapping[str, Any] | None = No
         entry = entries.get(checker)
         if entry is None:
             continue
-        params_list = _target_params(entry, requirement.get("target"))
+        params_list = _target_params(entry, requirement.get("target"), requirement.get("id"))
         split = entry.get("target_split") == "axes"
         for index, params in enumerate(params_list):
             # An axis question is always qualified by its axis, so adding a second axis to a
@@ -294,13 +298,19 @@ def read_noul(answer: Mapping[str, Any], thresholds: Mapping[str, float], polari
 
 
 def read_score(question: Mapping[str, Any], answer: Mapping[str, Any], thresholds: Mapping[str, float]) -> dict:
-    """A score against its bound. ``bound`` of ``max`` is an upper bound, anything else a lower
-    bound, which is the distinction a mood target needs. Without a bound there is nothing to
-    decide against, and saying so is more useful than inventing one."""
+    """A score against its bound, decided on the mass on the passing side of that bound.
+
+    ``bound`` of ``max`` is an upper bound, anything else a lower bound, which is the distinction a
+    mood target needs. The top level is reported for the record and does not decide: two adjacent
+    levels of a bounded scale are two ways of saying the same thing, and which of them won is not
+    the question a bound asks. Without a bound there is nothing to decide against, and saying so is
+    more useful than inventing one.
+    """
     distribution = answer.get("distribution")
     if not isinstance(distribution, Sequence) or isinstance(distribution, (str, bytes)) or not distribution:
         return {"verdict": "unverified", "note": "the answer carried no score distribution"}
-    index, top, margin = _distribution_top(distribution)
+    values = [float(value) for value in distribution]
+    index, top, margin = _distribution_top(values)
     level = index + 1
     bound, bound_value = question.get("bound"), question.get("bound_value")
     value = {"level": level, "top_probability": round(top, 6), "bound": bound_value}
@@ -312,17 +322,28 @@ def read_score(question: Mapping[str, Any], answer: Mapping[str, Any], threshold
             "value": value,
             "note": f"level {level} scored, but the requirement names no bound to decide against",
         }
+
     if bound == "max":
-        proposed = "met" if level <= bound_value else "unmet"
-        note = f"level {level} against an upper bound of {bound_value}"
+        passing_mass = sum(value for position, value in enumerate(values, start=1) if position <= bound_value)
     else:
-        proposed = "met" if level >= bound_value else "unmet"
-        note = f"level {level} against a lower bound of {bound_value}"
+        passing_mass = sum(value for position, value in enumerate(values, start=1) if position >= bound_value)
+    value["passing_mass"] = round(passing_mass, 6)
+    accept = float(thresholds.get("score_accept", thresholds["accept"]))
+
+    if passing_mass >= accept:
+        proposed = "met"
+        note = f"{passing_mass:.2f} of the mass is on the passing side of bound {bound_value} (top level {level})"
+    elif 1.0 - passing_mass >= accept:
+        proposed = "unmet"
+        note = f"only {passing_mass:.2f} of the mass is on the passing side of bound {bound_value} (top level {level})"
+    else:
+        proposed = "uncertain"
+        note = f"the passing side of bound {bound_value} holds {passing_mass:.2f}, inside the band (top level {level})"
     return {
         "verdict": proposed,
-        "probability": top,
-        "margin": margin,
-        "threshold": float(bound_value),
+        "probability": passing_mass,
+        "margin": passing_mass,
+        "threshold": accept,
         "value": value,
         "note": note,
     }
@@ -438,7 +459,10 @@ def verdict_for(
     margin = read.get("margin")
     threshold = read.get("threshold")
     classes = {ORACLE}
-    if read["verdict"] == "met":
+    # A bounded score already decided itself on the passing-side mass, so the top-two margin gate --
+    # which is about which of two adjacent levels won -- is not applied to it. Applying both would
+    # cap a well-supported bound at uncertain for a reason that does not bear on the bound.
+    if read["verdict"] == "met" and question_type != "score":
         gated, reason = apply_evidence_gate(
             requirement.get("severity", "soft"),
             read["verdict"],

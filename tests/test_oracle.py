@@ -117,9 +117,24 @@ class ScoreAndChoiceTest(unittest.TestCase):
         self.assertEqual(read["verdict"], "unverified")
         self.assertIn("no bound", read["note"])
 
-    def test_the_reported_probability_is_the_top_option_not_the_level(self) -> None:
+    def test_the_reported_probability_is_the_passing_mass_not_the_top_level(self) -> None:
+        # The bound asks how much of the answer is on its passing side, not which of two adjacent
+        # levels won, so the probability reported is that mass.
         read = self.read_score([0, 0, 0.1, 0.6, 0.3], "min", 3)
-        self.assertAlmostEqual(read["probability"], 0.6)
+        self.assertAlmostEqual(read["probability"], 1.0)
+        self.assertAlmostEqual(read["value"]["passing_mass"], 1.0)
+
+    def test_adjacent_top_levels_do_not_make_a_supported_bound_uncertain(self) -> None:
+        # 0.49 against 0.51 is a top-two margin of 0.02, but every bit of the mass is on the passing
+        # side of the bound. The bound is what the requirement asked about, so it is met.
+        read = self.read_score([0, 0, 0.49, 0.51, 0], "min", 3)
+        self.assertEqual(read["verdict"], "met")
+        self.assertAlmostEqual(read["margin"], 1.0)
+
+    def test_a_split_answer_inside_the_band_is_uncertain(self) -> None:
+        read = self.read_score([0.2, 0.3, 0.2, 0.2, 0.1], "min", 3)
+        self.assertEqual(read["verdict"], "uncertain")
+        self.assertIn("passing side", read["note"])
 
     def test_a_choice_without_its_companion_noul_is_refused(self) -> None:
         # A choice always names a winner, so alone it cannot say whether any option was good.

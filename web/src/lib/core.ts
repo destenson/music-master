@@ -231,10 +231,12 @@ export class MusicMasterCore {
   }
 
   /**
-   * The requirement spec and the exact Jev body for one song.
+   * The requirement spec, the exact Jev body for one song, and the verdicts code already decided.
    *
    * `request` is what the transport posts verbatim, so the page never assembles a question itself:
    * the spec, the state and the typed questions all come from the same Python the battery uses.
+   * `mechanical` is returned alongside it because the caption checks are code, not a judgement, and
+   * a run with no key must still report them.
    */
   jevRequest(request: {
     selections: Selections;
@@ -249,8 +251,11 @@ export class MusicMasterCore {
     theme: string;
     artist_references: string[];
     model?: string | null;
-  }): { spec: unknown; request: JevRequest } {
-    return this.call<{ spec: unknown; request: JevRequest }>("jev_request", request);
+  }): { spec: unknown; request: JevRequest; mechanical: MechanicalVerdict[] } {
+    return this.call<{ spec: unknown; request: JevRequest; mechanical: MechanicalVerdict[] }>(
+      "jev_request",
+      request,
+    );
   }
 
   /**

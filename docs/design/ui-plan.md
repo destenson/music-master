@@ -1,9 +1,10 @@
 # Music Master — UI and front-end plan
 
 Status: plan. M0 (the core package) and a first slice of the UI — the builder, the live caption, the
-timeline, the lyric checker, the generator and the render path, all running in the browser — are
-built; the takes grid, audition, and the live compliance battery are not. Companion to
+timeline, the lyric checker, the generator, the render path and the pre-render check, all running in
+the browser — are built; the takes grid, audition, and the audio-side battery are not. Companion to
 [`compliance-architecture.md`](compliance-architecture.md),
+[`pre-render-check.md`](pre-render-check.md),
 [`tag-vocabulary.md`](tag-vocabulary.md) and [`lyric-templates.md`](lyric-templates.md).
 
 ## 1. Are we ready?
@@ -52,7 +53,7 @@ What is missing, and what the UI must therefore show honestly rather than fake:
    bundle, so the source/build distinction is visible rather than notional.
 2. Put the constraints where the decisions are made: syllable budget next to the line, tag budget
    next to the tags, time budget next to the section.
-3. Make the compliance report the primary output surface, not a footnote — including its
+3. Make the check's report the primary output surface, not a footnote — including its
    `unverified` rows.
 4. Make a take selectable by seed and reproducible on demand.
 5. Keep the creative loop fast: nothing modal, nothing blocking, validation inline.
@@ -338,8 +339,13 @@ noise a user will misread.
 ```
 
 The pane that makes this project worth building is the `UNVERIFIED` block, and it must be visually
-louder than the green ticks. A compliance report that quietly omits what it could not check is
-exactly the artefact this design was written to prevent.
+louder than the green ticks. A report that quietly omits what it could not check is exactly the
+artefact this design was written to prevent.
+
+The mock above is the audio-stage report. What exists today is the pre-render check specified in
+[`pre-render-check.md`](pre-render-check.md): its intent-fidelity rows are the caption, decided in
+code, and the lyrics, decided by the oracle, while the realization block fills in once a measurement
+pass and a captioner exist.
 
 ## 7. Data and persistence
 

@@ -876,10 +876,20 @@ the pipeline actually asks, and it carries two things this fragment leaves out. 
 says what does *not* count, because the near miss is where a judgement is actually made.
 Every score level says what distinguishes it from its neighbour, because a level that is
 only a label invites the model to split the difference between the two it cannot tell
-apart: on a five-level genre question whose levels read "recognisably the genre" and "a
-clear example", the live service returned `{3: 0.48, 4: 0.51}` and the margin gate
-correctly refused to decide. Giving each level its distinguishing clause moved that same
-question to a 0.52–0.59 margin over four runs, which is why the gate stays at 0.5.
+apart.
+
+A bounded score is **not** gated on its top-two margin. Jev puts most of a score's mass on
+two adjacent levels, so a margin a two-way noul clears easily is nearly unreachable for a
+score: on that same genre question the live service returned `{3: 0.48, 4: 0.51}` while
+`1.00` of the mass sat on the passing side of the bound the requirement actually named. A
+score is therefore decided on the mass on the passing side of its bound (`score_accept`,
+default `0.70`), and the top-two margin is recorded but does not decide. The margin gate
+stays where it belongs, on a `noul` at hard severity.
+
+This battery runs at stage 5, against the fact sheet. The check that runs *before* a render
+is a different one with a different decision, and it is specified in
+[`pre-render-check.md`](pre-render-check.md): the caption is decided in code and the lyrics
+are decided by the oracle, both against requirements whose target travels in the state.
 
 ## 8. Gating policy
 

@@ -14,6 +14,7 @@
     ComplianceCounts,
     ComplianceReport,
     ComplianceVerdict,
+    MechanicalVerdict,
     Selections,
   } from "./types";
 
@@ -60,7 +61,10 @@
   let errorText = $state<string | null>(null);
   let controller: AbortController | null = null;
 
-  const canCheck = $derived(!!core && !busy && (dev || hasKey || keyInput.trim() !== ""));
+  // The check always runs: the caption's properties are decided in code and need no key. Only the
+  // lyric questions need the oracle, and their absence is a degradation the report states rather
+  // than a reason to disable the button.
+  const canCheck = $derived(!!core && !busy);
 
   const keyState = $derived(
     dev
@@ -153,7 +157,6 @@
     if (endpoint !== jevEndpoint()) setJevEndpoint(endpoint);
     if (modelValue !== jevModel()) setJevModel(modelValue);
     const key = typed || jevKey();
-    if (!dev && !key) return;
 
     busy = true;
     errorText = null;
@@ -162,6 +165,7 @@
 
     let spec: unknown = null;
     let state: unknown = null;
+    let mechanical: MechanicalVerdict[] = [];
     let answerModel = modelValue;
     let response: unknown = null;
     let failure: string | null = null;
@@ -180,14 +184,22 @@
       });
       spec = prepared.spec;
       state = prepared.request.state;
+      mechanical = prepared.mechanical ?? [];
       answerModel = prepared.request.model || modelValue;
 
-      try {
-        response = await callJev(prepared.request, { key, endpoint, signal: controller.signal });
-      } catch (cause) {
-        if (isAbort(cause)) return;
-        failure = cause instanceof Error ? cause.message : String(cause);
-        errorText = failure;
+      if (dev || key) {
+        try {
+          response = await callJev(prepared.request, { key, endpoint, signal: controller.signal });
+        } catch (cause) {
+          if (isAbort(cause)) return;
+          failure = cause instanceof Error ? cause.message : String(cause);
+          errorText = failure;
+        }
+      } else {
+        // No key is not a failure. The caption's properties are decided in code whatever happens,
+        // and the lyric questions report `unverified` with this as their reason rather than the
+        // page refusing to run.
+        failure = "no oracle key, so the lyrics were not judged; the caption was checked in code";
       }
 
       try {
@@ -198,6 +210,7 @@
           response,
           error: failure,
           song_id: songId,
+          mechanical,
         });
       } catch (cause) {
         errorText = errorText ?? (cause instanceof Error ? cause.message : String(cause));
@@ -215,22 +228,29 @@
 <div class="stack">
   <section class="card">
     <div class="row">
-      <h2>Jev compliance</h2>
+      <h2>Pre-render check</h2>
       <span class="chip" class:meta={!hasKey}>{keyState}</span>
     </div>
 
+    <p class="small" style="margin:0">
+      Checks the two text artifacts before a render is spent on them. The <strong>caption</strong> is
+      decided in code — every tag you selected has to appear in the string that will be sent — and
+      needs no key. The <strong>lyrics</strong> are judged one requirement at a time, and those rows
+      are <code>unverified</code> whenever the oracle is not reached.
+    </p>
+
     {#if dev}
       <p class="small" style="margin:0">
-        In development the request goes through this page's own dev server at <code>/jev</code>,
+        In development the lyric request goes through this page's own dev server at <code>/jev</code>,
         which adds <code>TYPESAFE_API_KEY</code> from its environment — the key never enters this
-        browser, and the call is same-origin so CORS does not apply. The song's caption, chords and
-        lyrics still leave this machine for <code>api.typesafe.ai</code>.
+        browser, and the call is same-origin so CORS does not apply. The caption and the lyrics still
+        leave this machine for <code>api.typesafe.ai</code>.
       </p>
     {:else}
       <p class="small" style="margin:0">
-        Pressing <strong>check compliance</strong> sends this song's caption, chords and lyrics to
-        <code>{endpoint}</code> for a Jev judgement. Nothing else leaves this machine: the key, the
-        selections and the draft stay in this browser.
+        Pressing <strong>check</strong> sends the song's caption and lyrics to <code>{endpoint}</code>
+        for a Jev judgement; the caption is checked here either way. Nothing else leaves this machine:
+        the key, the selections and the draft stay in this browser.
       </p>
 
       <div class="row">
@@ -279,16 +299,14 @@
 
     <div class="row">
       <button class="primary" onclick={check} disabled={!canCheck}>
-        {busy ? "checking…" : "check compliance"}
+        {busy ? "checking…" : "check"}
       </button>
       {#if busy}
         <button onclick={() => controller?.abort()}>stop</button>
       {/if}
-      {#if !dev && !canCheck && !busy}
+      {#if !dev && !hasKey && !keyInput.trim() && !busy}
         <span class="small muted">
-          {hasKey || keyInput.trim()
-            ? ""
-            : "enter a key above to run the check — it is sent only to the endpoint and stays here"}
+          no key: the caption is checked in code, and the lyric questions report unverified
         </span>
       {/if}
     </div>

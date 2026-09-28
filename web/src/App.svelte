@@ -670,7 +670,7 @@
         aria-selected={view === "compliance"}
         onclick={() => (view = "compliance")}
       >
-        Compliance
+        Check
       </button>
     </div>
     <span class="small muted">{status}</span>

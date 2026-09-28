@@ -14,10 +14,11 @@ and a preview auditions the whole song at a couple of sampler steps before commi
 
 Status: the generator works end to end. The vocabulary, the caption renderer, the lyric checker, the
 time budget and the prompt builder are real and packaged as `musicmaster/`, and the browser builds a
-song, renders it, previews it and streams it from a radio station. The compliance battery's seam is
-real too — its question set, uncertainty band, evidence gate and report — and a Jev transport is
-wired to it behind a key the user supplies; with no key, or where the API refuses the page's origin,
-a semantic requirement comes back `unverified` rather than decided.
+song, renders it, previews it and streams it from a radio station. The check that runs before a
+render is real too: the caption is decided in code against the selections, and the lyrics are judged
+one requirement at a time by a Jev transport behind a key the user supplies. With no key, or where
+the API refuses the page's origin, the caption is still checked and every lyric requirement comes
+back `unverified` rather than decided.
 
 ## What it produces
 
@@ -53,6 +54,7 @@ verification does not imply audio compliance, so the checking design reports the
 | Document | What it covers |
 | --- | --- |
 | [`docs/design/compliance-architecture.md`](docs/design/compliance-architecture.md) | The design: the artifact bundle, the prompt artifact, stages, requirement taxonomy, the compliance battery, gating policy, repair loop, risks, validation plan |
+| [`docs/design/pre-render-check.md`](docs/design/pre-render-check.md) | The check that runs before a render: the decision it answers, why the caption is code and the lyrics are the oracle's, the question shape, the gauge, and the non-uses |
 | [`docs/design/tag-vocabulary.md`](docs/design/tag-vocabulary.md) | The tag bins: what a bin declares, the UI controls built from them, how selections render into the comma-separated prompt, and how the vocabulary keeps the UI, the prompt and the compliance battery in step |
 | [`docs/design/radio-stations.md`](docs/design/radio-stations.md) | The radio: what a station states, how a song is drawn from its pools, the four-stage pipeline and the look-ahead buffer, the output layout, and what the radio cannot do |
 | [`docs/design/lyric-templates.md`](docs/design/lyric-templates.md) | Song structures and rhyme schemes as a contract: the writing brief handed to the lyric generator, the bar plan handed to the composer, and the conformance check on the result |
@@ -301,15 +303,28 @@ Chrome may additionally ask permission for a public page to reach a local addres
 answers, the panel says so and prints that command with the real origin filled in, rather than
 surfacing a bare "Failed to fetch".
 
-What it does not do yet, and says so rather than showing an empty pane: interpret a brief into typed
-requirements (no oracle is configured), so there is no compliance report — the generator's output is
-the song. It also needs to be served over HTTP — WASM and ES modules will not load from a `file://`
-URL.
+The **Check** tab verifies the caption and the lyrics before a render is spent on them. The caption
+is compared, in code, against what was selected — every tag that should be sent, nothing that was
+excluded, no contradictory pair, and nothing dropped by the tag budget. The lyrics are judged one
+requirement at a time. With no key and no service the caption is still checked and every lyric
+requirement is reported `unverified` with the reason, which is a report rather than a failure. What
+is not checkable yet is said so rather than shown as an empty pane: a rendered track's genre,
+instrumentation or era need a measurement or an independent caption, and neither exists here. The
+page also needs to be served over HTTP — WASM and ES modules will not load from a `file://` URL.
 
 ## Checking the brief
 
 The generator is the product; checking is what the design aims to add on top of it, and it is why the
 text tier is kept apart from the audio.
+
+**The check that runs before a render** is specified in [`docs/design/pre-render-check.md`](docs/design/pre-render-check.md).
+It answers one decision: given the caption that will be sent and the lyrics that were generated,
+does each requirement the brief implies hold well enough to spend a render on it? The caption is
+decided in code, because it is the tag string the renderer produced and "does it carry the distorted
+guitar" is a containment test over that string. The lyrics are decided by the oracle, one narrow
+question per requirement, with the thing asked for carried in the state so the question compares the
+words to the brief rather than to nothing. Properties of the rendered audio wait for a captioner and
+a measurement pass, and are reported as such rather than guessed at.
 
 Requirements split into mechanical ones that code computes exactly (duration, BPM, key,
 syllables, rhyme, banned words, loudness) and semantic ones that are irreducibly judgments

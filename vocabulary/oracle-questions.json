@@ -2,6 +2,7 @@
   "bank_version": "2",
   "note": "The compliance battery's questions, keyed by checker id. A requirement whose verify field names one of these checkers is turned into a question by musicmaster.oracle.build_questions; adding a semantic requirement is an entry here plus a spec entry, not a code change. Three things make a question answerable and are therefore not optional: the wording names the fields it reads by backticked path, because a model answers the question you wrote and its accuracy falls as unrelated detail grows; every noul says what does *not* count, because the near miss is where a judgement actually gets made; and every score level says what distinguishes it from its neighbours, because a level that is only a label invites a model to split the difference between the two it cannot tell apart. Levels are anchored rather than ranked: a higher level is not a better song, it is a different description, and for a question like absence or explicitness the lower level is the pass.",
   "judging_rules": "Judge the state as written. Do not credit a quality merely because nothing contradicts it, and do not supply a detail the state never gives. Where a field a question names is absent from the state, judge from the fields that are present rather than assuming the missing one either way, and let the absence make the answer weaker rather than stronger. Choose the single level or verdict whose description fits best. The levels are distinguished by what their descriptions say, not by how good the song is.",
+  "stages": "The checker names the artifact, not the moment. A pre-render spec carries requirements whose verify starts with `code.caption.` -- decided in code against the caption string -- and requirements that read `caption`, `lyrics` or `targets.<requirement_id>` -- decided here, on the words. Entries whose reads name `measured`, `chords` or `brief.era` describe the rendered audio and belong to the fact-sheet stage; no pre-render spec carries them, because the fields they need do not exist until a track has been rendered and analysed. A question whose named fields are absent is a construction bug, and the target it compares against always travels in the state under `targets`.",
   "always_ask": ["jev.any_serious_violation"],
   "questions": {
     "jev.theme_adherence": {
@@ -77,11 +78,11 @@
     },
     "jev.hook_payoff": {
       "type": "noul",
-      "reads": ["lyrics", "composition.hook"],
-      "instructions": "Does the section flagged as the hook in `lyrics` deliver a payoff -- a repeatable, memorable line -- rather than an ordinary section?",
+      "reads": ["lyrics", "targets.hook_payoff"],
+      "instructions": "Does `lyrics` deliver the hook the brief asked for in `targets.hook_payoff` -- a repeatable, memorable line of that kind -- rather than an ordinary section?",
       "criteria": {
-        "true": "The hook section carries a short line whose phrasing invites repetition, and it is the line a listener would carry away.",
-        "false": "The hook section is indistinguishable from an ordinary verse. Being the loudest, the last, or the most repeated line is not enough on its own; the line itself has to be the one that sticks."
+        "true": "The section the hook belongs to carries a short line whose phrasing invites repetition, of the kind `targets.hook_payoff` names, and it is the line a listener would carry away.",
+        "false": "No such line. Being the loudest, the last, or the most repeated line is not enough on its own: the line itself has to be the one that sticks, and it has to be the kind asked for."
       }
     },
     "jev.freshness": {
@@ -151,18 +152,18 @@
     },
     "jev.explicitness": {
       "type": "noul",
-      "reads": ["brief", "lyrics"],
-      "instructions": "Does `lyrics` stay within the explicitness limit the brief set, in language, subject matter and implication?",
+      "reads": ["lyrics", "targets.explicitness"],
+      "instructions": "Does `lyrics` stay within the explicitness limit named in `targets.explicitness`, in language, subject matter and implication?",
       "criteria": {
-        "true": "Nothing in the lyric exceeds the limit the brief asked for, in its words or in what a listener would take from them.",
+        "true": "Nothing in the lyric exceeds the limit `targets.explicitness` names, in its words or in what a listener would take from them.",
         "false": "The lyric exceeds the limit, including by implication rather than by an explicit word, and including a double meaning a listener would take as sexual or violent."
       },
       "thresholds": { "accept": 0.8 }
     },
     "jev.artist_pastiche": {
       "type": "noul",
-      "reads": ["brief.exclude_artist", "caption", "chords", "lyrics", "measured"],
-      "instructions": "Does the description in `caption`, together with `chords`, `lyrics` and `measured`, read as a deliberate imitation of the specific artist named in the brief's exclusion, rather than merely sharing a genre with them?",
+      "reads": ["brief.exclude_artist", "caption", "lyrics"],
+      "instructions": "Does the description in `caption`, together with `lyrics`, read as a deliberate imitation of the specific artist named in the brief's exclusion, rather than merely sharing a genre with them?",
       "criteria": {
         "true": "It reproduces that artist's signature closely enough to be heard as an imitation: at least two distinctive traits of that artist appear together, or one is reproduced unmistakably.",
         "false": "It shares a genre at most. Sharing instrumentation, tempo, mood or subject with that artist is not imitation; the test is whether something distinctive of the artist has been copied."
@@ -172,14 +173,15 @@
     },
     "jev.content_policy": {
       "type": "noul",
-      "reads": ["lyrics"],
-      "instructions": "Does `lyrics` contain hateful or harassing content, or content promoting self-harm, directed at any person or group?",
+      "reads": ["lyrics", "targets.{requirement_id}"],
+      "instructions": "Does `lyrics` contain {target}, which the brief excluded?",
       "criteria": {
-        "true": "It contains such content, directed at a person or a group, or it promotes self-harm.",
-        "false": "It does not. Depicting hardship, violence or despair is not this, provided it directs hatred at no group and promotes no self-harm."
+        "true": "The lyric contains {target}: the thing itself, by name or by an unmistakable description of it.",
+        "false": "It does not. A different theme that merely sits near {target} does not count as containing it."
       },
       "polarity": "violation",
-      "thresholds": { "accept": 0.9 }
+      "thresholds": { "accept": 0.9 },
+      "note": "One requirement and one question per excluded thing, so a single question never stands in for a list of exclusions in which one is satisfied and another is not."
     },
     "jev.plagiarism_risk": {
       "type": "noul",
@@ -194,13 +196,13 @@
     },
     "jev.absence_of": {
       "type": "noul",
-      "reads": ["brief", "caption", "lyrics"],
+      "reads": ["caption", "lyrics", "targets.{requirement_id}"],
       "instructions": "Does the song keep {target} out of `caption` and `lyrics`, as the brief asked?",
       "criteria": {
         "true": "Nothing in the caption or lyrics is an instance of what was excluded: not the element itself, and not a synonym or a description only that element would produce.",
         "false": "At least one excluded element is present, including by description rather than by name."
       },
-      "note": "The `avoid` bin is the one bin whose selections are things that must not appear, which is why its labels become an exclusion rather than a target."
+      "note": "The `avoid` bin is the one bin whose selections are things that must not appear, which is why its labels become an exclusion rather than a target. One question is asked per excluded element."
     },
     "jev.tuning_fidelity": {
       "type": "noul",
@@ -213,9 +215,9 @@
     },
     "jev.any_serious_violation": {
       "type": "noul",
-      "reads": ["brief", "caption", "chords", "lyrics", "measured", "planned"],
-      "instructions": "Does anything in `state` indicate that a requirement the user stated was seriously violated?",
- "criteria": {
+      "reads": ["brief", "targets", "requirements", "caption", "lyrics"],
+      "instructions": "Does anything in `brief`, `targets`, `requirements`, `caption` or `lyrics` indicate that a requirement the user stated was seriously violated?",
+      "criteria": {
         "true": "At least one requirement the brief stated is seriously violated: not merely missed, but broken in a way the user would reject the song over.",
         "false": "Nothing stated is seriously violated. A near miss, a quality weaker than asked for, or a requirement nobody could check does not count as a serious violation."
       },

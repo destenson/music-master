@@ -18,7 +18,7 @@ import sys
 if "/repo" not in sys.path:
     sys.path.insert(0, "/repo")
 
-from musicmaster import jev, lyrics, oracle, prompt, radio, render, spec, templates, timeline  # noqa: E402
+from musicmaster import jev, lyrics, oracle, precheck, prompt, radio, render, spec, templates, timeline  # noqa: E402
 
 _vocab = render.load_vocabulary()
 _section_tags = timeline.load(timeline.SECTION_TAGS_PATH)
@@ -273,32 +273,35 @@ def radio_plan(payload):
 
 
 def jev_request(payload):
-    """The RequirementSpec and the request body it becomes, built together and sent by nobody.
+    """The RequirementSpec, the request body it becomes, and the verdicts code already decided.
 
     The page has no spec of its own -- it has selections, a caption, a lyric and a tempo -- so the
-    deterministic half of the Interpret stage runs here, and the same `musicmaster.jev` shaping the
-    CLI uses turns the result into the bytes that would go to the service. Nothing leaves the
-    machine in this call: the page's transport does the sending, which is what lets the page show
-    exactly what would be sent before it is.
+    deterministic half of the check runs here, and the same `musicmaster.jev` shaping the CLI uses
+    turns the result into the bytes that would go to the service. Nothing leaves the machine in this
+    call: the page's transport does the sending, which is what lets the page show exactly what would
+    be sent before it is.
+
+    The caption verdicts are computed here rather than in the browser because they are code, not a
+    judgement, and they are returned alongside the body so a run with no key still reports them
+    instead of showing an empty pane.
     """
     request = json.loads(payload)
-    built = spec.interpret(
-        {
-            "selections": request.get("selections") or {},
-            "bpm": request.get("bpm"),
-            "duration_s": request.get("duration_s"),
-            "template_id": request.get("template_id"),
-            "lyrics": request.get("lyrics") or "",
-            "caption": request.get("caption") or "",
-            "chords": request.get("chords") or "",
-            "theme": request.get("theme") or "",
-            "artist_references": request.get("artist_references") or [],
-        },
-        vocab=_vocab,
-    )
+    draft = {
+        "selections": request.get("selections") or {},
+        "bpm": request.get("bpm"),
+        "duration_s": request.get("duration_s"),
+        "template_id": request.get("template_id"),
+        "lyrics": request.get("lyrics") or "",
+        "caption": request.get("caption") or "",
+        "chords": request.get("chords") or "",
+        "theme": request.get("theme") or "",
+        "artist_references": request.get("artist_references") or [],
+    }
+    built = spec.interpret(draft, vocab=_vocab)
     questions = oracle.build_questions(built["spec"], _questions_bank)
     body = jev.build_request(built["state"], questions, request.get("model") or jev.DEFAULT_MODEL)
-    return json.dumps({"spec": built["spec"], "request": body})
+    mechanical = precheck.caption_verdicts(built["spec"], built["state"], _vocab, draft["selections"])
+    return json.dumps({"spec": built["spec"], "request": body, "mechanical": mechanical})
 
 
 def compliance_report(payload):

@@ -25,8 +25,10 @@ a UI six months later. Bins fix four things at once:
    code changes.
 2. **The prompt is reproducible.** Selections are stored by option **id**, so the same
    selections always render the same string and hash the same bytes.
-3. **The prompt is checkable.** A selected bin with a `maps_to` tells the compliance battery
-   what it now owes the user — select a genre and genre fidelity must be scored.
+3. **The prompt is checkable.** A selected bin with a `maps_to` tells the check what it now owes
+   the user, and which artifact can settle it: select a genre and the caption must carry it, which
+   code can decide; select a mood and the lyric has to read that way, which is the oracle's
+   question. See [`pre-render-check.md`](pre-render-check.md).
 4. **The vocabulary is editable without breaking saved work.** A label can be reworded; the id
    it is stored under does not move.
 
