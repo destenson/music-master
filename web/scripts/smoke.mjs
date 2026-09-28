@@ -17,6 +17,7 @@ import { createHash } from "node:crypto";
 import { loadPyodide } from "pyodide";
 import { parseFindings, slotFor } from "../src/lib/lens.ts";
 import { presetFor, freshSeed, previewSeed, describeMessages } from "../src/lib/comfy.ts";
+import { encodeWav, monoFrom } from "../src/lib/stereo.ts";
 import { freeName, stable } from "../src/lib/draft.ts";
 import { editorTheme } from "../src/lib/lens.ts";
 import { EditorState } from "@codemirror/state";
@@ -290,6 +291,39 @@ check("the variant row's caption differs from the caption",
   abPreview.rows[1].caption !== abPreview.rows[0].caption, true);
 check("the A of an A/B is the graph a plain preview renders",
   JSON.stringify(abPreview.rows[0].workflow), JSON.stringify(plainPreview.rows[0].workflow));
+
+// --- The simultaneous A/B ----------------------------------------------------------------------
+//
+// The merged track is a stereo WAV built in the page: each take downmixed to mono, the current
+// caption on the left and the variant on the right. The channel arithmetic is plain and is checked
+// here; only the decode needs a browser.
+
+console.log("\nstereo split:\n");
+{
+  const left = Float32Array.from([1, -1, 0]);
+  const right = Float32Array.from([-1, 1, 0]);
+  const bytes = encodeWav([left, right], 44100);
+  const view = new DataView(bytes);
+  const text = (offset, length) => String.fromCharCode(...new Uint8Array(bytes, offset, length));
+  check("the merged track is a WAV", [text(0, 4), text(8, 4)], ["RIFF", "WAVE"]);
+  check(
+    "the merged track is stereo 16-bit PCM at the clip's rate",
+    [view.getUint16(22, true), view.getUint16(34, true), view.getUint32(24, true)],
+    [2, 16, 44100],
+  );
+  check("the data chunk holds every frame of both channels", view.getUint32(40, true), 3 * 2 * 2);
+  check(
+    "A lands on the left and B on the right",
+    [0, 1, 2, 3, 4, 5].map((i) => view.getInt16(44 + i * 2, true)),
+    [0x7fff, -0x8000, -0x8000, 0x7fff, 0, 0],
+  );
+  check(
+    "a downmix averages the channels",
+    [...monoFrom([Float32Array.from([1, 0]), Float32Array.from([0, 1])])],
+    [0.5, 0.5],
+  );
+  check("a mono clip is left as it is", [...monoFrom([Float32Array.from([1, -1])])], [1, -1]);
+}
 
 const blank = call("artifacts", {
   song_id: "untitled-song",

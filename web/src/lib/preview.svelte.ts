@@ -17,6 +17,7 @@
  */
 import { fetchOutcome, submitWorkflow } from "./comfy";
 import { renderQueue } from "./render.svelte";
+import { splitStereo } from "./stereo";
 import type { PreviewRow } from "./types";
 
 export interface PreviewVariant {
@@ -85,6 +86,75 @@ export function forgetClip(url: string): void {
   for (const [key, clip] of cache) {
     if (clip.url === url) cache.delete(key);
   }
+  // The merged track was built from that clip, so it points at the same dead link.
+  if (splitState.built.includes(url)) dropSplit();
+}
+
+/**
+ * The simultaneous A/B: one stereo track with the current caption on the left and the variant on
+ * the right, both downmixed to mono first. It is built from the two clips the panel already has, so
+ * it costs no render — only a fetch, a decode and a WAV encode in the page.
+ */
+export const splitState = $state({
+  /** Whether the mode is on. It is a preference, so it stays on across previews in a session. */
+  on: false,
+  busy: false,
+  error: null as string | null,
+  url: null as string | null,
+  /** The two clip URLs the track was built from, so it is rebuilt when either changes. */
+  built: [] as string[],
+});
+
+let splitToken = 0;
+
+/**
+ * Build the merged track, or drop it, to match the mode and the clips that are ready.
+ *
+ * Called when the mode is toggled and whenever a clip lands, rather than from an effect: the work is
+ * async and cancellable, and a stale build has to lose to the newer one instead of overwriting it.
+ */
+export async function refreshSplit(): Promise<void> {
+  const ready = previewState.clips.filter((clip) => clip.url);
+  if (!splitState.on || ready.length !== 2) {
+    dropSplit();
+    return;
+  }
+  const [a, b] = ready;
+  if (splitState.url && splitState.built[0] === a.url && splitState.built[1] === b.url) return;
+
+  const token = ++splitToken;
+  splitState.busy = true;
+  splitState.error = null;
+  try {
+    const url = await splitStereo(a.url as string, b.url as string);
+    if (token !== splitToken) {
+      URL.revokeObjectURL(url);
+      return;
+    }
+    releaseSplit();
+    splitState.url = url;
+    splitState.built = [a.url as string, b.url as string];
+  } catch (cause) {
+    if (token === splitToken) {
+      splitState.error = cause instanceof Error ? cause.message : String(cause);
+    }
+  } finally {
+    if (token === splitToken) splitState.busy = false;
+  }
+}
+
+/** Drop the merged track. An in-flight build is invalidated so it cannot land after this. */
+export function dropSplit(): void {
+  splitToken++;
+  releaseSplit();
+  splitState.busy = false;
+  splitState.error = null;
+}
+
+function releaseSplit(): void {
+  if (splitState.url) URL.revokeObjectURL(splitState.url);
+  splitState.url = null;
+  splitState.built = [];
 }
 
 export const previewState = $state({
@@ -136,12 +206,15 @@ export async function startPreview(variant?: PreviewVariant): Promise<void> {
       ? { name: row.name, caption: row.caption, url: hit.url, cached: true }
       : { name: row.name, caption: row.caption, url: null, cached: false };
   });
+  void refreshSplit();
 
   try {
     for (const [index, row] of built.rows.entries()) {
       const clip = previewState.clips[index];
       if (clip.url || previewState.cancelRequested) continue;
       await renderRow(row, clip);
+      // An A/B can be merged as soon as its second clip lands, not only when both were cached.
+      void refreshSplit();
     }
   } catch (cause) {
     previewState.error = cause instanceof Error ? cause.message : String(cause);

@@ -300,9 +300,13 @@ the arrangement of audio that exists rather than a fresh one, and a seed a rende
 typed into the field — reaches a preview only once a take has been rendered with it. The panel shows
 the seed it is holding. Each caption is previewed as its own graph and the rendered clip is
 remembered, so an A/B sends the tag and reuses the current caption rather than rendering it again; a
-row says `cached` when it came back rather than being rendered. A **new song** is a blank draft you
-name, that you export and commit — the same loop as everything else, since a page cannot write a song
-directory.
+row says `cached` when it came back rather than being rendered. An A/B can also be heard **as one
+track**: the panel downmixes both takes to mono and hard-pans them, the current caption on the left
+and the variant on the right, so the balance control picks a side and the centre is the sum — two
+players started together are not a comparison, because they drift and the ear loses which is which.
+The mix is built in the page from the two clips, so it costs no render. A **new song** is a blank
+draft you name, that you export and commit — the same loop as everything else, since a page cannot
+write a song directory.
 
 **State is browser-local by design.** The working state — selections, lyric, template, tempo, seed, brief — is autosaved to `localStorage` so a reload does not throw an edit away, and any number of **named drafts** can be saved, loaded and deleted from the top bar, so several directions can exist at once. A `differs from repo` marker with one-click revert appears whenever the working state no longer matches the files in `songs/<id>/`. The marker is there because the distinction is real: the song directory is the record, and a page cannot write to it.
 

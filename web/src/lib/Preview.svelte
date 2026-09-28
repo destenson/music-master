@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { forgetClip, previewState, startPreview } from "./preview.svelte";
+  import { dropSplit, forgetClip, previewState, refreshSplit, splitState, startPreview } from "./preview.svelte";
   import type { Bin } from "./types";
 
   /**
@@ -15,6 +15,11 @@
    * language-model pass, but the batch node keeps one generator for the whole batch, so a caption's
    * audio depends on what rode along with it -- and a row that cannot be reproduced on its own is a
    * row that cannot be cached.
+   *
+   * An A/B can also be heard as one track: both takes are downmixed to mono and hard-panned, the
+   * current caption on the left and the variant on the right, so the balance control picks a side
+   * and the centre is the sum. Two players started together are not a comparison -- they drift, and
+   * the ear loses track of which take it is hearing.
    *
    * The control sits in the top bar beside the render actions, so it is reachable from every tab.
    * The work itself is the shared queue in `preview.svelte.ts`, because the per-checkbox A/B button
@@ -160,6 +165,46 @@
           </details>
         </div>
       {/each}
+
+      {#if previewState.clips.length === 2}
+        <div class="row">
+          <label
+            class="row small"
+            title="Downmix each take to mono and play them as one stereo track: the current caption on the left, the variant on the right"
+          >
+            <input
+              type="checkbox"
+              bind:checked={splitState.on}
+              onchange={() => void refreshSplit()}
+            />
+            split A/B — A left, B right
+          </label>
+          {#if splitState.busy}<span class="small muted">mixing…</span>{/if}
+        </div>
+      {/if}
+
+      {#if splitState.on && previewState.clips.length === 2}
+        {#if splitState.url}
+          <div class="preview-clip">
+            <div class="small mono">A left · B right</div>
+            <audio
+              controls
+              src={splitState.url}
+              preload="auto"
+              onerror={() => dropSplit()}
+            ></audio>
+            <p class="small muted" style="margin:0">
+              Both takes are mono and hard-panned: {previewState.clips[0].name} on the left,
+              {previewState.clips[1].name} on the right. Pan hard left or right to hear one alone;
+              the centre is the two together.
+            </p>
+          </div>
+        {:else if splitState.error}
+          <div class="finding error">{splitState.error}</div>
+        {:else}
+          <div class="small muted">mixing the two takes…</div>
+        {/if}
+      {/if}
 
       {#if previewState.clips.length > 1}
         <p class="small muted" style="margin:0">
