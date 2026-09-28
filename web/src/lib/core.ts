@@ -12,6 +12,7 @@ import { asset, withBuild } from "./paths";
 import type {
   Artifacts,
   ComplianceReport,
+  DirectiveRemoval,
   JevRequest,
   LyricReport,
   MechanicalVerdict,
@@ -146,6 +147,18 @@ export class MusicMasterCore {
   /** A structurally correct empty lyric for the template: headers, tags and transitions only. */
   scaffold(request: { template_id: string }): { text: string } {
     return this.call<{ text: string }>("scaffold", request);
+  }
+
+  /**
+   * Take the writing brief's directive lines back out of a generated draft.
+   *
+   * A model that has just read the brief sometimes reproduces one of its lines — `Energy 3/5` is the
+   * common one — inside the section it describes, where the meter check counts it and the renderer
+   * sings it. The rule is `musicmaster.lyrics.strip_directives`, so the page repairs a draft exactly
+   * as the CLI does, and `removed` names what was taken out rather than hiding the edit.
+   */
+  cleanLyric(request: { text: string }): { text: string; removed: DirectiveRemoval[] } {
+    return this.call<{ text: string; removed: DirectiveRemoval[] }>("clean_lyric", request);
   }
 
   /** The writing brief, exactly as `structure_templates.py --brief` prints it. */

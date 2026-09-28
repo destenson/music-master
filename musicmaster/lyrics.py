@@ -227,6 +227,89 @@ class Report:
         self.oracle_tasks.append(m)
 
 
+# --- Brief leakage ----------------------------------------------------------------------
+# A writing brief is a contract, not a lyric, but a model that has just read one sometimes copies
+# a line of it into the section it describes. "Energy 3/5" is the common case: print_brief prints
+# `energy 3/5` among a section's details, and the model writes it as the verse's first line, where
+# the meter check counts it as a phrase and the renderer sings it. Every directive is one of the
+# brief's own line templates, so recognising one is exact and removing it is a repair rather than a
+# judgement. It lives here so the page and the CLI repair a draft the same way.
+DIRECTIVES: list[tuple[str, re.Pattern]] = [
+    ("energy", re.compile(r"^\(?\s*energy(?:\s+level)?\s*[:=]?\s*\d+\s*/\s*\d+\s*\)?$", re.I)),
+    ("section plan", re.compile(r"^\d+\s*bars?\s*,\s*[\d.]+\s*s\b", re.I)),
+    ("syllable ceiling", re.compile(r"^at most\s+\d+\s+syllables?\b", re.I)),
+    ("syllable budget", re.compile(r"^budget\s*[:=]?\s*\d+\s*[-–—]\s*\d+\s*syllables?\b", re.I)),
+    # Two forms are directives: a labelled one ("Rhyme: aabb", "rhyme scheme = ABAB") and the
+    # scheme written uppercase ("rhyme ABAB"), which is how the vocabulary writes a pattern. A bare
+    # lowercase `rhyme <word>` is left alone, because a lyric line may begin that way ("Rhyme
+    # interludes") and stripping it would be the worse mistake.
+    ("rhyme scheme", re.compile(r"^rhyme(?:\s+scheme)?\s*[:=]\s*[A-Za-z() ]{2,14}$", re.I)),
+    ("rhyme scheme", re.compile(r"^rhyme\s+[A-Z() ]{2,12}$")),
+    ("instrumental note", re.compile(r"^instrumental\b.*\bno words here\b", re.I)),
+    ("tag instruction", re.compile(r"^place (?:this|these)\b.*\bunder the header\b", re.I)),
+    ("transition instruction", re.compile(r"^leave this section with\s*:", re.I)),
+    ("hook note", re.compile(r"^this is the hook$", re.I)),
+    ("brief header", re.compile(r"^\d+:\d+\s+total\b", re.I)),
+    ("brief rule", re.compile(
+        r"^(?:- )?(?:\d+\s*-\s*\d+ syllables per line|count syllables per phrase|"
+        r"at most one modifier per tag|up to four standalone performance tags|"
+        r"uppercase inside a line means|keep one core metaphor)\b",
+        re.I,
+    )),
+]
+
+
+def directive_kind(line: str) -> str | None:
+    """The kind of brief directive a line is, or None when it is (or may be) a lyric.
+
+    Each pattern is anchored to the whole line and names a template the brief prints, so a lyric
+    that merely mentions energy or rhyme is not mistaken for one, and a line that is only a tag is
+    left to the tag checker.
+    """
+    stripped = line.strip()
+    if not stripped:
+        return None
+    for kind, pattern in DIRECTIVES:
+        if pattern.match(stripped):
+            return kind
+    return None
+
+
+def strip_directives(text: str) -> dict:
+    """Remove the brief lines a model copied into a draft, and say which were removed.
+
+    Removing a directive can leave a run of blank lines where it sat between two of them, so a run
+    is collapsed to the single blank the lyric grammar expects. Returns
+    ``{"text": ..., "removed": [{"line", "kind", "text"}]}``, with line numbers from the input so a
+    report can point at what the repair did.
+    """
+    kept: list[str] = []
+    removed: list[dict] = []
+    for lineno, line in enumerate(text.splitlines(), start=1):
+        kind = directive_kind(line)
+        if kind is None:
+            kept.append(line)
+        else:
+            removed.append({"line": lineno, "kind": kind, "text": line.strip()})
+    return {"text": re.sub(r"\n{3,}", "\n\n", "\n".join(kept)), "removed": removed}
+
+
+def check_directives(lines: list[str], rep: Report) -> list[dict]:
+    """Report a brief line left in the lyric: it is not words, but the model would sing it."""
+    found: list[dict] = []
+    for lineno, line in enumerate(lines, start=1):
+        kind = directive_kind(line)
+        if kind is None:
+            continue
+        found.append({"line": lineno, "kind": kind, "text": line.strip()})
+        rep.error(
+            f"line {lineno}: '{line.strip()}' is a directive from the writing brief ({kind}), not a "
+            f"lyric; a generated draft has it stripped automatically, so this one was written or "
+            f"pasted by hand"
+        )
+    return found
+
+
 def build_index(st: dict) -> tuple[dict[str, dict], dict[str, dict], dict[str, dict]]:
     sections = {t["label"].casefold(): t for t in st["sections"]}
     modifiers = {t["label"].casefold(): t for t in st["modifiers"]}
@@ -850,6 +933,7 @@ def main(argv: list[str]) -> int:
     rep = Report()
     found = analyse(lines, st, rep)
     check_blank_lines(lines, st, rep)
+    check_directives(lines, rep)
     check_consistency(found, st, vocab, selections, rep)
     check_cliches(lines, rep)
     meter = check_meter_and_rhyme(lines, st, rep, band=band)

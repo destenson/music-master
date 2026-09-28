@@ -6,11 +6,20 @@
   let {
     buildPrompt,
     onDraft,
+    onFinal,
   }: {
     /** The parent owns the brief and the caption, so it owns the prompt. */
     buildPrompt: (theme: string) => string;
     /** Called with the whole draft so far, on every streamed chunk. */
     onDraft: (text: string) => void;
+    /**
+     * Called once with the finished text, after the model stops.
+     *
+     * The streamed draft is shown as it arrives, because watching the lyric appear is the point of
+     * streaming; the finished one is what gets repaired and kept, so a brief line the model copied
+     * is dropped once rather than flickering in and out as each chunk completes it.
+     */
+    onFinal?: (text: string) => void;
   } = $props();
 
   const MODEL_KEY = "mm.ollama.model";
@@ -79,13 +88,14 @@
     error = null;
     controller = new AbortController();
     try {
-      await generate({
+      const text = await generate({
         model,
         base,
         prompt: buildPrompt(theme),
         signal: controller.signal,
         onText: onDraft,
       });
+      onFinal?.(text);
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
         error = cause instanceof Error ? cause.message : String(cause);

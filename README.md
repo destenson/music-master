@@ -116,7 +116,9 @@ A template is a contract rather than a label: it carries the section order, bar 
 section, the rhyme scheme each section is written to, an energy arc, and where the hook is. The
 `structure` bin in the vocabulary points at one via `template_ref`, so choosing a form in the UI is
 what selects the contract. Section sequence and line counts are checked exactly; rhyme conformance
-is advisory, because the detector is spelling-based and demonstrably misses real rhymes.
+is advisory, because the detector is spelling-based and demonstrably misses real rhymes. The brief's
+own notes are not lyrics: a model that copies a line such as `Energy 3/5` into a section has it
+stripped from the finished draft, and the checker reports one that was typed or pasted by hand.
 
 ### The time budget
 

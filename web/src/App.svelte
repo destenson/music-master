@@ -268,6 +268,7 @@
       brief: (templateId, atBpm, forSelections) =>
         instance.brief({ template_id: templateId, bpm: atBpm, duration_s: null, selections: forSelections })
           .brief,
+      cleanLyric: (text) => instance.cleanLyric({ text }),
       artifacts: (request) => instance.artifacts({ ...request, artist_references: [] }),
     });
     return () => setRadioHost(null);
@@ -467,6 +468,27 @@
 
   function applyDraft(draft: string): void {
     lyricText = draft;
+  }
+
+  /**
+   * The finished draft, with the brief's own lines taken back out.
+   *
+   * A model that has just read the brief sometimes writes one of its lines — "Energy 3/5" — into the
+   * section it describes, where the meter check counts it and the renderer would sing it. The rule
+   * lives in the text tier, so the repair here is the same one the CLI applies, and a failure to
+   * repair leaves the draft as the model wrote it rather than throwing it away.
+   */
+  function applyFinalDraft(draft: string): void {
+    if (!core) {
+      lyricText = draft;
+      return;
+    }
+    try {
+      lyricText = core.cleanLyric({ text: draft }).text;
+    } catch (error) {
+      console.error("the lyric repair failed", error);
+      lyricText = draft;
+    }
   }
 
   function scaffoldFromTemplate(): void {
@@ -686,6 +708,7 @@
           check={checkText}
           buildPrompt={buildPromptFor}
           onDraft={applyDraft}
+          onFinal={applyFinalDraft}
           onScaffold={scaffoldFromTemplate}
           onCaret={(line) => (caretLine = line)}
         />

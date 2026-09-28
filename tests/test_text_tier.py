@@ -268,6 +268,82 @@ class LyricsTest(unittest.TestCase):
         self.assertEqual(len(found), 2)
         self.assertTrue(all(f.get("section") for f in found))
 
+    def test_each_brief_directive_is_recognised_and_a_lyric_is_not(self) -> None:
+        # Every directive is one of the brief's own line templates, so recognising it is exact.
+        # "Energy 3/5" is the one that leaks most; the rest are pinned so widening a template does
+        # not quietly start eating lyrics.
+        for line in [
+            "Energy 3/5",
+            "(energy level 4/5)",
+            "8 bars, 32.0s | 4 lines | budget 28-40 syllables | rhyme ABAB | energy 3/5",
+            "at most 42 syllables can be sung in the time available",
+            "budget 28-40 syllables",
+            "rhyme ABAB",
+            "Rhyme: aabb",
+            "instrumental, 8 bars, 32.0s -- no words here",
+            "place these performance tags under the header, one per line: [rapped verse]",
+            "leave this section with: [Break]",
+            "this is the hook",
+            "3:00 total, of which 2:00 is sung and 1:00 is instrumental.",
+            "- 6-10 syllables per line for this delivery; keep lines in",
+        ]:
+            with self.subTest(line=line):
+                self.assertIsNotNone(lyrics.directive_kind(line), f"missed directive {line!r}")
+
+        for line in [
+            "Energy drinks and a pocket full of change",
+            "Rhyme and reason left me on the curb",
+            "Rhyme interludes are all I have to give",
+            "Leave this section with a kiss and a promise",
+            "Place your hands upon the header of the bed",
+            "[Verse 1]",
+            "[Building Energy]",
+        ]:
+            with self.subTest(line=line):
+                self.assertIsNone(lyrics.directive_kind(line), f"ate the lyric {line!r}")
+
+    def test_strip_directives_removes_only_the_brief_lines(self) -> None:
+        draft = (
+            "[Verse 1]\n"
+            "Energy 3/5\n"
+            "Pocket so deep / we don't check the clock\n"
+            "Rent can wait / 'til the morning light\n"
+            "\n"
+            "[Chorus]\n"
+            "\n"
+            "Energy 5/5\n"
+            "\n"
+            "Stamp the floor / 'til the walls reply\n"
+        )
+        result = lyrics.strip_directives(draft)
+        self.assertEqual(
+            [entry["kind"] for entry in result["removed"]], ["energy", "energy"]
+        )
+        self.assertEqual(
+            [entry["line"] for entry in result["removed"]], [2, 8]
+        )
+        # The words, the headers and the single blank between sections survive; the doubles the
+        # removals left behind are collapsed.
+        self.assertEqual(
+            result["text"],
+            "[Verse 1]\n"
+            "Pocket so deep / we don't check the clock\n"
+            "Rent can wait / 'til the morning light\n"
+            "\n"
+            "[Chorus]\n"
+            "\n"
+            "Stamp the floor / 'til the walls reply",
+        )
+
+    def test_a_directive_that_survived_the_repair_is_an_error(self) -> None:
+        # The repair runs on a generated draft; a directive still in the lyric was written or
+        # pasted by hand and is about to be sung, so the checker has to say so.
+        report = lyrics.Report()
+        lyrics.check_directives(["[Verse 1]", "Energy 3/5", "a line"], report)
+        self.assertEqual(len(report.errors), 1)
+        self.assertIn("Energy 3/5", report.errors[0])
+        self.assertIn("directive", report.errors[0])
+
     def test_the_mechanical_rule_is_checked_not_deferred(self) -> None:
         # Rule 4 is decidable, so an instrumental lead vocal must raise an error and must not also
         # appear in the oracle list as a question the checker could have answered itself.

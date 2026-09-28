@@ -165,6 +165,21 @@ export interface LyricReport {
   conformance: Conformance | null;
 }
 
+/**
+ * A writing-brief directive the lyric repair took out of a generated draft.
+ *
+ * The brief is a contract, and a model sometimes copies one of its lines — `Energy 3/5` — into the
+ * section it describes. The repair is exact, and this is the record of what it removed.
+ */
+export interface DirectiveRemoval {
+  /** The line number in the draft as the model wrote it. */
+  line: number;
+  /** Which brief template the line matched, e.g. `energy`. */
+  kind: string;
+  /** The removed line, trimmed. */
+  text: string;
+}
+
 /** The artifacts the render path produces, serialised exactly as they would be written. */
 export interface Artifacts {
   prompt: {

@@ -147,6 +147,18 @@ def scaffold(payload):
     return json.dumps({"text": "\n".join(out)})
 
 
+def clean_lyric(payload):
+    """Take the directives a model copied out of the brief back out of a generated draft.
+
+    The repair is a rule about lyrics rather than about the page, so it is `musicmaster.lyrics`'
+    ``strip_directives`` -- the same function the CLI uses -- and this only shapes its result for
+    the editor. `removed` names what was dropped, so the page can say what it did rather than
+    quietly rewriting the model.
+    """
+    request = json.loads(payload)
+    return json.dumps(lyrics.strip_directives(request.get("text") or ""))
+
+
 def artifacts(payload):
     """The canonical prompt, the composition it pins, and the ComfyUI graph it renders to.
 
@@ -340,6 +352,7 @@ def check_lyric(payload):
     report = lyrics.Report()
     found = lyrics.analyse(lines, _section_tags, report)
     lyrics.check_blank_lines(lines, _section_tags, report)
+    lyrics.check_directives(lines, report)
     lyrics.check_consistency(found, _section_tags, _vocab, selections, report)
     lyrics.check_cliches(lines, report)
     band = tuple(_profile(selections)["band"]) if selections else None

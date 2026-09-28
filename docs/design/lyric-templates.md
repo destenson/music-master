@@ -64,6 +64,19 @@ generator's own documented guidance — the syllable band, the one-modifier rule
 parenthesis semantics, the metaphor discipline — so that the rules arrive with the task rather
 than as a separate set of instructions that can be forgotten.
 
+### 2.1 A directive is not a lyric
+
+The brief is explicit because the rules belong with the task, and the same explicitness is what
+makes a model occasionally copy a line of it into the song. `energy 3/5` is the common one: it sits
+among a section's details, and the model writes it as the verse's first line, where the meter check
+counts it as a phrase and the renderer sings it.
+
+Every directive is one of the brief's own line templates, so code recognises one exactly — a
+whole-line match against the templates `print_brief` emits, never a judgement — and
+`musicmaster.lyrics.strip_directives` removes it and reports what it removed. The generator runs the
+repair on a finished draft, in the page and on the CLI alike, and the checker reports a directive
+that survived as an error, because one still in the lyric was written or pasted by hand.
+
 ## 3. As a bar plan and a time budget
 
 ```bash

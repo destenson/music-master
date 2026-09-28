@@ -13,6 +13,7 @@
     check,
     buildPrompt,
     onDraft,
+    onFinal,
     onScaffold,
     onCaret,
   }: {
@@ -22,6 +23,8 @@
     check: (text: string) => Finding[];
     buildPrompt: (theme: string) => string;
     onDraft: (text: string) => void;
+    /** The finished draft, once the model stops: where the brief's directive lines are stripped. */
+    onFinal: (text: string) => void;
     onScaffold: () => void;
     onCaret: (line: number) => void;
   } = $props();
@@ -120,7 +123,7 @@
       </span>
     </div>
 
-    <Generate {buildPrompt} {onDraft} />
+    <Generate {buildPrompt} {onDraft} {onFinal} />
 
     <LyricsEditor
       bind:this={editor}

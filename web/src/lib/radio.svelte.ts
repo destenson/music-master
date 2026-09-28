@@ -33,7 +33,7 @@ import { generate, ollamaBase } from "./ollama";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
 import { parseTakeName, takeKey, takesFromHistory, type TakeName } from "./takes";
-import type { Artifacts, RadioPlan, RenderResult, Selections } from "./types";
+import type { Artifacts, DirectiveRemoval, RadioPlan, RenderResult, Selections } from "./types";
 
 export type RadioStatus =
   | "planning"
@@ -102,6 +102,13 @@ export interface RadioHost {
   ) => RadioPlan | null;
   render: (selections: Selections) => RenderResult | null;
   brief: (templateId: string, bpm: number, selections: Selections) => string;
+  /**
+   * Take the brief's own directive lines back out of a draft, where the model copied one in.
+   *
+   * It is the text tier's `strip_directives`, so a radio take and a Lyrics-tab draft are repaired
+   * by the same rule rather than by two implementations that drift.
+   */
+  cleanLyric: (text: string) => { text: string; removed: DirectiveRemoval[] };
   artifacts: (request: {
     song_id: string;
     template_id: string;
@@ -267,7 +274,7 @@ function loadHistory(stationId: string): SavedRadioSong[] {
 }
 
 /** Trim what the model wrote down to the lyric: no fence, no preamble, tags intact. */
-export function cleanLyric(text: string): string {
+export function trimPreamble(text: string): string {
   let out = text.trim();
   out = out.replace(/^```[a-zA-Z]*\s*/, "").replace(/```\s*$/, "").trim();
   const first = out.indexOf("[");
@@ -432,7 +439,7 @@ async function produce(song: RadioSong, token: number): Promise<void> {
           stopIt,
         );
         if (token !== session) return;
-        song.lyrics = cleanLyric(text);
+        song.lyrics = host.cleanLyric(trimPreamble(text)).text;
         if (!song.lyrics) throw new Error("the model wrote nothing");
         song.lyricSource = "model";
         song.error = null;

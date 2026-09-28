@@ -34,6 +34,9 @@ Write the finished lyric now.
 - Where the brief gives a rhyme scheme, follow it.
 - Put the transition tag on the last line of the section it leaves, not the one it enters.
 - Write words only for the singable sections; leave the instrumental ones without lyrics.
+- The numbers in the brief — bar counts, seconds, syllable budgets, rhyme schemes, \`energy n/5\` — are
+  instructions to you, not lyrics. Never write one into a section; music-master strips such a line
+  from a finished draft, but a line you never write is a line it does not have to.
 - A caesura marker (/ or |) inside a line marks a phrase break and is never sung. Use it when a line
   would otherwise carry too many syllables in one breath.
 - Output the lyric and nothing else: no preamble, no explanation, no markdown fence.`;
