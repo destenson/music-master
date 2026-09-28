@@ -1,4 +1,4 @@
-# music-master
+# [music-master](https://destenson.github.com/music-master)
 
 An easy-to-use, full-featured music generator.
 
