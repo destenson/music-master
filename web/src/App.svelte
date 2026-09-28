@@ -11,7 +11,7 @@
   import Preview from "./lib/Preview.svelte";
   import Song from "./lib/Song.svelte";
   import Timeline from "./lib/Timeline.svelte";
-  import { freshSeed } from "./lib/comfy";
+  import { freshSeed, previewSeed } from "./lib/comfy";
   import { asset, loadStaticData, MusicMasterCore, type StaticData } from "./lib/core";
   import {
     clear as clearDraft,
@@ -30,7 +30,7 @@
   import { buildPrompt } from "./lib/prompt";
   import { setPreviewBuilder } from "./lib/preview.svelte";
   import { setRadioHost } from "./lib/radio.svelte";
-  import { checkTarget, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
+  import { checkTarget, forgetUsedSeed, rememberTarget, renderQueue, startRender } from "./lib/render.svelte";
   import {
     reloadNow,
     reloadedFor,
@@ -38,7 +38,7 @@
     watchForUpdates,
   } from "./lib/update.svelte";
   import * as S from "./lib/selection";
-  import type { Artifacts, LyricReport, RenderResult, Selections, TimelinePlan } from "./lib/types";
+  import type { Artifacts, LyricRepair, LyricReport, PreviewRow, RenderResult, Selections, TimelinePlan } from "./lib/types";
 
   /** One song for now; the workspace listing comes with the next milestone. */
   const SONG = "rap-metal-groove";
@@ -86,6 +86,8 @@
   let briefText = $state("");
   let selections = $state<Selections>({});
   let lyricText = $state("");
+  /** What the last repair did to a generated draft, so the edit is never silent. */
+  let lyricRepair = $state<LyricRepair | null>(null);
   let caretLine = $state(1);
   let view = $state<View>("builder");
 
@@ -213,22 +215,30 @@
   let artifact = $derived.by(() => artifactsFor(seed));
 
   /**
-   * The preview graph: the same caption the page would send, at full song length and coarse steps.
-   * `variants` are bin/option pairs, each its own row in the batch, so an A/B of a tag is one
-   * submission and differs only by that tag.
+   * The seed a preview and an A/B render with: the seed of the last take. A render's fresh seed — or
+   * one typed into the seed field — does not reach a preview until a take has been rendered with it,
+   * because a preview explains a take and so has to hold that take's arrangement.
+   */
+  let previewSeedValue = $derived(previewSeed(renderQueue.usedSeed, seed));
+
+  /**
+   * The preview graphs: the same caption the page would send, at full song length and coarse steps.
+   * `variants` are bin/option pairs and each becomes its own row, so an A/B of a tag is one graph
+   * for the current caption and one for the variant. Each row is a solo render, because the queue
+   * caches a row and reuses it and a caption rendered inside a batch is not the same take.
    */
   function buildPreview(
     forSelections: Selections,
     steps: number,
     variants: { bin: string; option: string }[],
-  ): { workflow: unknown; captions: string[]; names: string[] } | null {
+  ): { rows: PreviewRow[] } | null {
     if (!core || !templateId) return null;
     try {
       return core.preview({
         song_id: songId,
         template_id: templateId,
         bpm,
-        seed,
+        seed: previewSeedValue,
         selections: forSelections,
         lyrics: lyricText,
         brief: briefText,
@@ -342,6 +352,7 @@
     if (!origin) return;
     selections = JSON.parse(origin.selections) as Selections;
     lyricText = origin.lyric;
+    lyricRepair = null;
     templateId = origin.template;
     bpm = origin.bpm;
     duration = origin.duration;
@@ -380,6 +391,7 @@
   function applySnapshot(snapshot: Snapshot): void {
     selections = JSON.parse(snapshot.selections) as Selections;
     lyricText = snapshot.lyric;
+    lyricRepair = null;
     templateId = snapshot.template;
     bpm = snapshot.bpm;
     duration = snapshot.duration;
@@ -431,6 +443,8 @@
   function newSong(): void {
     songId = "untitled-song";
     seed = freshSeed();
+    // No take exists for a blank song, so there is no previous seed for a preview to hold.
+    forgetUsedSeed();
     artists = "";
     briefText = "";
     selections = {};
@@ -440,6 +454,7 @@
     baseline = "";
     try {
       lyricText = core?.scaffold({ template_id: templateId }).text ?? "";
+      lyricRepair = null;
     } catch (error) {
       console.error("scaffold failed", error);
     }
@@ -468,16 +483,20 @@
   }
 
   function applyDraft(draft: string): void {
+    // A new generation is arriving, so the previous repair's report no longer describes the text.
+    lyricRepair = null;
     lyricText = draft;
   }
 
   /**
-   * The finished draft, with the brief's own lines taken back out.
+   * The finished draft, repaired, with every edit it took reported.
    *
    * A model that has just read the brief sometimes writes one of its lines — "Energy 3/5" — into the
-   * section it describes, where the meter check counts it and the renderer would sing it. The rule
-   * lives in the text tier, so the repair here is the same one the CLI applies, and a failure to
-   * repair leaves the draft as the model wrote it rather than throwing it away.
+   * section it describes, or a tag without its brackets, where the meter check counts it and the
+   * renderer would sing it. The rule lives in the text tier, so the repair here is the same one the
+   * CLI applies, and a failure to repair leaves the draft as the model wrote it rather than throwing
+   * it away. What the repair removed or rewrote is kept, because a silent edit to the words is worse
+   * than the leak it fixed.
    */
   function applyFinalDraft(draft: string): void {
     if (!core) {
@@ -485,10 +504,13 @@
       return;
     }
     try {
-      lyricText = core.cleanLyric({ text: draft }).text;
+      const repaired = core.cleanLyric({ text: draft });
+      lyricText = repaired.text;
+      lyricRepair = repaired.removed.length || repaired.changed.length ? repaired : null;
     } catch (error) {
       console.error("the lyric repair failed", error);
       lyricText = draft;
+      lyricRepair = null;
     }
   }
 
@@ -496,6 +518,7 @@
     if (!core || !templateId) return;
     try {
       lyricText = core.scaffold({ template_id: templateId }).text;
+      lyricRepair = null;
     } catch (error) {
       console.error("scaffold failed", error);
     }
@@ -679,7 +702,7 @@
     >
       re-render {seed}
     </button>
-    <Preview bins={data?.vocabulary.bins ?? []} ready={!!core && !!data} />
+    <Preview bins={data?.vocabulary.bins ?? []} ready={!!core && !!data} seed={previewSeedValue} />
     {#if renderQueue.error}
       <span class="chip warn" title={renderQueue.error}>render failed</span>
     {/if}
@@ -751,12 +774,14 @@
         <Lyrics
           bind:text={lyricText}
           report={lyricReport}
+          repair={lyricRepair}
           pools={data.pools}
           check={checkText}
           buildPrompt={buildPromptFor}
           onDraft={applyDraft}
           onFinal={applyFinalDraft}
           onScaffold={scaffoldFromTemplate}
+          onDismissRepair={() => (lyricRepair = null)}
           onCaret={(line) => (caretLine = line)}
         />
       </div>

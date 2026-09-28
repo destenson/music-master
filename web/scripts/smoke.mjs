@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { loadPyodide } from "pyodide";
 import { parseFindings, slotFor } from "../src/lib/lens.ts";
-import { presetFor, freshSeed, describeMessages } from "../src/lib/comfy.ts";
+import { presetFor, freshSeed, previewSeed, describeMessages } from "../src/lib/comfy.ts";
 import { freeName, stable } from "../src/lib/draft.ts";
 import { editorTheme } from "../src/lib/lens.ts";
 import { EditorState } from "@codemirror/state";
@@ -50,10 +50,26 @@ if (!fs.existsSync(path.join(DIST, "repo", "manifest.json"))) {
 
 // --- The native control ------------------------------------------------------------------
 
+// A draft carrying every leak the lyric repair exists for: a brief directive, tags written without
+// brackets (one the grammar takes on its own line and one it does not), an instrumental note, and a
+// transition glued to the last lyric line. The native control and the page's glue must repair it
+// identically, which also proves the glue can read the vocabulary the repair needs.
+const DIRTY_LYRIC = [
+  "[Verse 1]",
+  "Low energy",
+  "Melodic hook",
+  "The cassette won't turn but the reels still hold",
+  "hard cut",
+  "",
+  "[Chorus]",
+  "(instrumental)",
+  "Energy 3/5",
+].join("\n");
+
 const NATIVE = `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(REPO)})
-from musicmaster import jev, oracle, prompt, radio, render, spec, timeline
+from musicmaster import jev, lyrics, oracle, prompt, radio, render, spec, timeline
 vocab = render.load_vocabulary()
 selections = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "selections.json"))}))["selections"]
 song = json.load(open(${JSON.stringify(path.join(REPO, "songs", SONG, "song.json"))}))
@@ -102,6 +118,7 @@ print(json.dumps({
               "caption": render.render(vocab, radio_plan["selections"])["string"]},
     "jev": {"spec": jev_built["spec"],
             "request": jev.build_request(jev_built["state"], oracle.build_questions(jev_built["spec"]))},
+    "clean": lyrics.strip_directives(${JSON.stringify(DIRTY_LYRIC)}),
 }))
 `;
 
@@ -136,6 +153,15 @@ check("coherence problems", [...rendered.problems].sort(), native.render.problem
 check("delivery profile", rendered.profile, native.profile);
 check("planned sections", plan.rows.length, native.plan.rows);
 check("timeline totals", plan.totals, native.plan.totals);
+
+// The repair reads the tag vocabularies, which the page gets from the mounted repository, so this
+// checks both the repair and that the glue can reach the files it needs. The report is part of the
+// result: what the repair dropped and what it rewrote, never a silent edit.
+const cleaned = call("clean_lyric", { text: DIRTY_LYRIC });
+check("the lyric repair matches the CLI", cleaned, native.clean);
+check("the repair reports what it dropped", cleaned.removed.length, 3);
+check("the repair reports what it rewrote", cleaned.changed.map((entry) => entry.replacement),
+  ["[Low energy]", "[hard cut]"]);
 
 // --- The render path: the browser's artifacts must be the ones the CLI writes -----------------
 
@@ -218,6 +244,52 @@ check(
   Number.isInteger(generated) && generated > 0 && generated <= 0x7fffffff,
   true,
 );
+// A preview and an A/B exist to explain a take, so they hold that take's arrangement: a seed the
+// render path generated, or one typed into the field, does not reach a preview until a take has
+// actually been rendered with it. Before any take there is nothing to hold and the page's seed is
+// what a render would send.
+check("a preview before any take uses the page's seed", previewSeed(null, 4409), 4409);
+check("a preview holds the last take's seed", previewSeed(777, 4409), 777);
+check(
+  "a seed that produced no take does not reach a preview",
+  previewSeed(777, 12345),
+  777,
+);
+
+// A preview row is its own solo graph so the page can cache and reuse it. The batch node keeps one
+// generator for a whole batch, so a caption's audio depends on what rode along with it; a row that
+// cannot be reproduced on its own is a row that cannot be cached. And the base row of an A/B has to
+// be the same graph as a plain preview of the caption, or the cache would never hit.
+const previewRequest = {
+  song_id: song.song_id,
+  template_id: song.template_id,
+  bpm: song.bpm,
+  seed: song.seed,
+  selections,
+  lyrics: lyricsText,
+  brief: briefText,
+  artist_references: song.artist_references ?? [],
+};
+const plainPreview = call("preview", { ...previewRequest, steps: 2 });
+const abPreview = call("preview", {
+  ...previewRequest,
+  steps: 2,
+  variants: [{ bin: "drums", option: "taiko" }],
+});
+check("a plain preview is one row", plainPreview.rows.length, 1);
+check("a preview row is named", plainPreview.rows[0].name, "current");
+check("an A/B is the caption plus the variant", abPreview.rows.map((row) => row.name),
+  ["current", "drums:taiko"]);
+for (const row of abPreview.rows) {
+  const graph = row.workflow;
+  check(`preview row ${row.name} renders a batch of one`, graph["6"]["inputs"]["batch_size"], 1);
+  check(`preview row ${row.name} carries its caption alone`,
+    graph["11"]["inputs"]["captions"].includes("\n"), false);
+}
+check("the variant row's caption differs from the caption",
+  abPreview.rows[1].caption !== abPreview.rows[0].caption, true);
+check("the A of an A/B is the graph a plain preview renders",
+  JSON.stringify(abPreview.rows[0].workflow), JSON.stringify(plainPreview.rows[0].workflow));
 
 const blank = call("artifacts", {
   song_id: "untitled-song",

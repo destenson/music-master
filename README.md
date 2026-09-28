@@ -120,7 +120,15 @@ section, the rhyme scheme each section is written to, an energy arc, and where t
 what selects the contract. Section sequence and line counts are checked exactly; rhyme conformance
 is advisory, because the detector is spelling-based and demonstrably misses real rhymes. The brief's
 own notes are not lyrics: a model that copies a line such as `Energy 3/5` into a section has it
-stripped from the finished draft, and the checker reports one that was typed or pasted by hand.
+stripped from the finished draft, and the checker reports one that was typed or pasted by hand. The
+same repair reads a direction the model wrote without brackets — `Low energy`, `Melodic hook`,
+`(instrumental)` — because the renderer only sees brackets and sings everything else: a tag the
+grammar takes bare is bracketed, a multi-word name it has no tag for is dropped, and a transition
+glued to the last lyric line is moved onto its own line. A one-word name is left alone, because `Raw`
+at the top of a section is as likely a lyric as a direction. Only a tag at a section's edge, or
+directly under one that is already bracketed, is read that way; the same words mid-phrase are a
+lyric. The repair is never silent: the Lyrics tab names every line it dropped or rewrote, with the
+line number to jump to, so what changed in the words is visible rather than assumed.
 
 ### The time budget
 
@@ -282,9 +290,15 @@ one on screen. Neither consults a mode, because a button whose meaning depends o
 panel you might not have open is worse than no button. The Render panel keeps the checkbox for its own
 button, where the seed field is next to it and nothing is hidden. Holding the seed is what keeps the
 arrangement put while the caption varies, which is the only way to hear what a caption change actually
-did rather than hearing it mixed with whatever a different seed would have produced anyway. A **new
-song** is a blank draft you name, that you export and commit — the same loop as everything else, since
-a page cannot write a song directory.
+did rather than hearing it mixed with whatever a different seed would have produced anyway. A
+**preview and an A/B never take a new seed**: they hold the seed of the last take, so a preview is
+the arrangement of audio that exists rather than a fresh one, and a seed a render generated — or one
+typed into the field — reaches a preview only once a take has been rendered with it. The panel shows
+the seed it is holding. Each caption is previewed as its own graph and the rendered clip is
+remembered, so an A/B sends the tag and reuses the current caption rather than rendering it again; a
+row says `cached` when it came back rather than being rendered. A **new song** is a blank draft you
+name, that you export and commit — the same loop as everything else, since a page cannot write a song
+directory.
 
 **State is browser-local by design.** The working state — selections, lyric, template, tempo, seed, brief — is autosaved to `localStorage` so a reload does not throw an edit away, and any number of **named drafts** can be saved, loaded and deleted from the top bar, so several directions can exist at once. A `differs from repo` marker with one-click revert appears whenever the working state no longer matches the files in `songs/<id>/`. The marker is there because the distinction is real: the song directory is the record, and a page cannot write to it.
 

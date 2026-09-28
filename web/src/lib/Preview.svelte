@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { previewState, startPreview } from "./preview.svelte";
+  import { forgetClip, previewState, startPreview } from "./preview.svelte";
   import type { Bin } from "./types";
 
   /**
@@ -10,15 +10,21 @@
    * a full-length pass shows what a tag does to the actual arrangement. Two steps tracks the
    * eight-step render closely.
    *
-   * Several captions go in one submission because the language model's cost is per pass, not per
-   * caption: a full-length song is the same number of sequential tokens whether one caption rides
-   * along or a dozen. That is what makes "what does this tag do" answerable in one go.
+   * Every caption is its own solo graph, and a graph already rendered is reused, so the A of an
+   * A/B is rendered once rather than with every tag it is compared against. A batch would share one
+   * language-model pass, but the batch node keeps one generator for the whole batch, so a caption's
+   * audio depends on what rode along with it -- and a row that cannot be reproduced on its own is a
+   * row that cannot be cached.
    *
    * The control sits in the top bar beside the render actions, so it is reachable from every tab.
    * The work itself is the shared queue in `preview.svelte.ts`, because the per-checkbox A/B button
    * in the Builder starts the same preview and shows its clips here.
+   *
+   * Every preview holds the seed of the last take, so it is a comparison against audio that exists.
+   * A render's fresh seed only reaches a preview once a take has been rendered with it; the panel
+   * shows the seed it is holding rather than leaving that rule invisible.
    */
-  let { bins, ready }: { bins: Bin[]; ready: boolean } = $props();
+  let { bins, ready, seed }: { bins: Bin[]; ready: boolean; seed: number } = $props();
 
   let menu = $state<HTMLElement | null>(null);
 
@@ -68,9 +74,10 @@
       </div>
 
       <p class="small muted" style="margin:0">
-        The whole song at {previewState.steps} sampler step{previewState.steps === 1 ? "" : "s"} — the
-        real arrangement, coarsely denoised, so it is quick and it is not the final audio. Nothing is
-        saved: it plays from ComfyUI's temp directory and is cleaned up there.
+        The whole song at seed <span class="mono">{seed}</span> and {previewState.steps} sampler
+        step{previewState.steps === 1 ? "" : "s"} — the real arrangement, coarsely denoised, so it is
+        quick and it is not the final audio. Nothing is saved: it plays from ComfyUI's temp directory
+        and is cleaned up there.
       </p>
 
       <div class="row">
@@ -119,9 +126,10 @@
       </div>
 
       <p class="small muted" style="margin:0">
-        A/B toggles the option — on if it is off, off if it is on — and renders both captions in one
-        pass, sharing a seed, so what differs is the tag. The same button sits beside every checkbox
-        in the Builder.
+        A/B toggles the option — on if it is off, off if it is on — and renders the variant beside
+        the current caption, sharing seed <span class="mono">{seed}</span>, so what differs is the
+        tag. The current caption is rendered once and reused; a clip already rendered says
+        <em>cached</em>. The same button sits beside every checkbox in the Builder.
       </p>
 
       {#if previewState.error}
@@ -132,8 +140,20 @@
         <div class="preview-clip">
           <div class="small">
             <span class="mono">{clip.name}</span>
+            {#if clip.cached}
+              <span class="chip" title="Already rendered for this caption, seed and target">cached</span>
+            {/if}
           </div>
-          <audio controls src={clip.url} preload="auto"></audio>
+          {#if clip.url}
+            <audio
+              controls
+              src={clip.url}
+              preload="auto"
+              onerror={() => clip.url && forgetClip(clip.url)}
+            ></audio>
+          {:else}
+            <div class="small muted">rendering… {previewState.waited}s</div>
+          {/if}
           <details>
             <summary class="small muted">caption</summary>
             <code>{clip.caption}</code>
@@ -143,7 +163,8 @@
 
       {#if previewState.clips.length > 1}
         <p class="small muted" style="margin:0">
-          Play them back to back: the rows share a seed, so what differs is the tag.
+          Play them back to back: the rows share seed <span class="mono">{seed}</span>, so what
+          differs is the tag.
         </p>
       {/if}
     </div>

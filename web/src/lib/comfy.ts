@@ -408,3 +408,17 @@ const CLIENT_ID = `music-master-${Math.random().toString(36).slice(2, 10)}`;
 export function freshSeed(): number {
   return 1 + Math.floor(Math.random() * 0x7fffffff);
 }
+
+/**
+ * The seed a preview or an A/B renders with: the seed of the last take, never one that has not
+ * produced a take.
+ *
+ * A render may generate a fresh seed — a preview must not. A preview exists to compare captions
+ * against audio, so it holds the previous seed until a take has actually been rendered with a new
+ * one; otherwise a preview of a tag and the take it is meant to explain would not be the same
+ * arrangement. Hand-typing a seed does not move it either, for the same reason. Before any take has
+ * been rendered there is nothing to hold, and the page's current seed is what a render would send.
+ */
+export function previewSeed(lastTake: number | null, current: number): number {
+  return lastTake ?? current;
+}

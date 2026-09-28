@@ -12,10 +12,11 @@ import { asset, withBuild } from "./paths";
 import type {
   Artifacts,
   ComplianceReport,
-  DirectiveRemoval,
   JevRequest,
   LyricReport,
+  LyricRepair,
   MechanicalVerdict,
+  PreviewRow,
   RadioPlan,
   RadioStation,
   RenderResult,
@@ -150,15 +151,16 @@ export class MusicMasterCore {
   }
 
   /**
-   * Take the writing brief's directive lines back out of a generated draft.
+   * Repair a generated draft: take the brief's own lines back out, bracket a tag the model wrote
+   * bare, and put a tag glued to a lyric line on its own line.
    *
    * A model that has just read the brief sometimes reproduces one of its lines — `Energy 3/5` is the
    * common one — inside the section it describes, where the meter check counts it and the renderer
    * sings it. The rule is `musicmaster.lyrics.strip_directives`, so the page repairs a draft exactly
-   * as the CLI does, and `removed` names what was taken out rather than hiding the edit.
+   * as the CLI does, and `removed` and `changed` name every edit rather than hiding it.
    */
-  cleanLyric(request: { text: string }): { text: string; removed: DirectiveRemoval[] } {
-    return this.call<{ text: string; removed: DirectiveRemoval[] }>("clean_lyric", request);
+  cleanLyric(request: { text: string }): LyricRepair {
+    return this.call<LyricRepair>("clean_lyric", request);
   }
 
   /** The writing brief, exactly as `structure_templates.py --brief` prints it. */
@@ -193,8 +195,8 @@ export class MusicMasterCore {
   }
 
   /**
-   * A full-length, coarse preview: the current caption plus one row per bin/option variant, all in
-   * one graph. Cheap per caption because the LM runs once for the whole batch.
+   * A full-length, coarse preview: the current caption plus one row per bin/option variant, each
+   * caption in its own graph so the page can render a row once and reuse it.
    */
   preview(request: {
     song_id: string;
@@ -208,11 +210,8 @@ export class MusicMasterCore {
     variants?: { bin: string; option: string }[];
     steps?: number;
     seconds?: number | null;
-  }): { workflow: unknown; captions: string[]; names: string[] } {
-    return this.call<{ workflow: unknown; captions: string[]; names: string[] }>(
-      "preview",
-      request,
-    );
+  }): { rows: PreviewRow[] } {
+    return this.call<{ rows: PreviewRow[] }>("preview", request);
   }
 
   /**

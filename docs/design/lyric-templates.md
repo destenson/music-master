@@ -77,6 +77,32 @@ whole-line match against the templates `print_brief` emits, never a judgement �
 repair on a finished draft, in the page and on the CLI alike, and the checker reports a directive
 that survived as an error, because one still in the lyric was written or pasted by hand.
 
+The same repair covers three neighbouring leaks, because the renderer reads brackets and nothing
+else, so any direction it cannot see is sung:
+
+- **A tag written bare.** Both vocabularies name every tag, so a whole line equal to a label is a
+  tag that lost its brackets. Where the lyric grammar takes that label on its own line —
+  `low energy`, `hard cut`, a vocal or energy tag — the repair brackets it, so the direction
+  survives. Where it does not — a multi-word name such as `Melodic hook`, or a modifier such as
+  `melodic`, which belongs to a header rather than to a line of its own — the repair drops it,
+  because bracketing it would only invent an unknown tag and the caption already carries the sound.
+  A one-word name is left alone: `Raw` at the top of a section is as likely a lyric line as a
+  direction, and losing a lyric is the worse mistake.
+- **A tag in the wrong place.** A bare label is only read as a tag at a section's edge, or directly
+  under a line that already carries a bracketed tag; the same words in the middle of a phrase are a
+  lyric and are left alone.
+- **A tag glued to a lyric line.** A model sometimes ends a section with the transition on the last
+  lyric line instead of on a line of its own. The repair moves it onto its own line, because that is
+  where a tag sits and where the renderer reads it as a tag rather than as words.
+
+The checker reports each of these on a hand-written lyric as well: the position and the wording are
+exact, so "this line is a tag the renderer will sing" is a finding, not a guess.
+
+The repair is never silent. `strip_directives` returns what it dropped and what it rewrote, each
+with the line number and, for a rewrite, the replacement, and the Lyrics tab shows the list beside
+the draft so a line that was bracketed or moved is something the writer is told about rather than
+something that quietly happened to their words.
+
 ## 3. As a bar plan and a time budget
 
 ```bash

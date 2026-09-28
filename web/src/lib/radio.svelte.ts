@@ -33,7 +33,7 @@ import { generate, ollamaBase } from "./ollama";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
 import { parseTakeName, takeKey, takesFromHistory, type TakeName } from "./takes";
-import type { Artifacts, DirectiveRemoval, RadioPlan, RenderResult, Selections } from "./types";
+import type { Artifacts, LyricRepair, RadioPlan, RenderResult, Selections } from "./types";
 
 export type RadioStatus =
   | "planning"
@@ -103,12 +103,13 @@ export interface RadioHost {
   render: (selections: Selections) => RenderResult | null;
   brief: (templateId: string, bpm: number, selections: Selections) => string;
   /**
-   * Take the brief's own directive lines back out of a draft, where the model copied one in.
+   * Repair a finished draft: the brief's own directive lines come back out, a bare tag is
+   * bracketed, and a tag glued to a lyric line is moved onto its own line.
    *
    * It is the text tier's `strip_directives`, so a radio take and a Lyrics-tab draft are repaired
    * by the same rule rather than by two implementations that drift.
    */
-  cleanLyric: (text: string) => { text: string; removed: DirectiveRemoval[] };
+  cleanLyric: (text: string) => LyricRepair;
   artifacts: (request: {
     song_id: string;
     template_id: string;

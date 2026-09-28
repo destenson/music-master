@@ -166,18 +166,56 @@ export interface LyricReport {
 }
 
 /**
- * A writing-brief directive the lyric repair took out of a generated draft.
+ * A direction the lyric repair dropped from a generated draft.
  *
  * The brief is a contract, and a model sometimes copies one of its lines — `Energy 3/5` — into the
- * section it describes. The repair is exact, and this is the record of what it removed.
+ * section it describes, or writes a multi-word caption name where the grammar has no place for it.
+ * The repair is exact, and this is the record of what it removed. A tag the grammar *does* take bare
+ * is bracketed rather than removed, so it is a `DirectiveChange`.
  */
 export interface DirectiveRemoval {
   /** The line number in the draft as the model wrote it. */
   line: number;
-  /** Which brief template the line matched, e.g. `energy`. */
+  /** Which template or vocabulary label the line matched, e.g. `energy`, `unbracketed name`. */
   kind: string;
   /** The removed line, trimmed. */
   text: string;
+}
+
+/**
+ * A direction the lyric repair rewrote rather than dropped: a bare tag bracketed, or a tag glued to
+ * a lyric line moved onto its own line.
+ */
+export interface DirectiveChange {
+  /** The line number in the draft as the model wrote it. */
+  line: number;
+  /** `unbracketed tag` or `tag on the wrong line`. */
+  kind: string;
+  /** The line as the model wrote it, trimmed. */
+  text: string;
+  /** What that line became. A move's replacement contains the newline it was given. */
+  replacement: string;
+}
+
+/** The repaired draft, and everything the repair did to it. Nothing is silent. */
+export interface LyricRepair {
+  text: string;
+  removed: DirectiveRemoval[];
+  changed: DirectiveChange[];
+}
+
+/**
+ * One caption of a preview: its label, the caption itself, and a graph that renders that caption
+ * alone.
+ *
+ * A row is solo so it is reproducible on its own: the page caches a rendered row and reuses it, and
+ * a caption's audio would not be the same if it shared a batch with a different set of neighbours.
+ */
+export interface PreviewRow {
+  /** `current` for the page's own caption, or `bin:option` for a variant. */
+  name: string;
+  caption: string;
+  workflow: unknown;
 }
 
 /** The artifacts the render path produces, serialised exactly as they would be written. */

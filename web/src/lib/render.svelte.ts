@@ -20,6 +20,35 @@ import {
 } from "./comfy";
 import type { Artifacts } from "./types";
 
+/**
+ * The seed of the last take, remembered across reloads.
+ *
+ * It is what a preview and an A/B hold, so the take a preview explains survives a page reload even
+ * though the queue itself does not. A reload otherwise restores the seed from the draft, which a
+ * hand-typed seed would have overwritten without ever producing a take.
+ */
+const USED_SEED_KEY = "mm.render.seed";
+
+function loadUsedSeed(): number | null {
+  try {
+    const raw = localStorage.getItem(USED_SEED_KEY);
+    if (raw === null) return null;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveUsedSeed(seed: number | null): void {
+  try {
+    if (seed === null) localStorage.removeItem(USED_SEED_KEY);
+    else localStorage.setItem(USED_SEED_KEY, String(seed));
+  } catch {
+    /* not remembering is an acceptable outcome */
+  }
+}
+
 export const renderQueue = $state({
   target: loadTarget() as ComfyTarget,
   probing: false,
@@ -29,7 +58,8 @@ export const renderQueue = $state({
   jobId: null as string | null,
   outcome: null as RenderOutcome | null,
   waited: 0,
-  usedSeed: null as number | null,
+  /** The seed the last renderer submission carried, and so the arrangement a preview holds. */
+  usedSeed: loadUsedSeed() as number | null,
   cancelRequested: false,
   /**
    * The Render panel's preference for its own button, and nothing else's: the top bar carries both
@@ -44,6 +74,15 @@ export const renderQueue = $state({
 
 export function rememberTarget(): void {
   saveTarget(renderQueue.target);
+}
+
+/**
+ * A new song has no take yet, so there is no previous seed to hold: forget the last one rather than
+ * let a preview of the blank song render the arrangement of the song before it.
+ */
+export function forgetUsedSeed(): void {
+  renderQueue.usedSeed = null;
+  saveUsedSeed(null);
 }
 
 /** Whether anything is listening, and whether it will take this key. */
@@ -86,6 +125,7 @@ export async function startRender({ seed, fresh, onSeed, artifactsFor }: StartOp
   if (fresh) onSeed(chosen);
 
   renderQueue.usedSeed = chosen;
+  saveUsedSeed(chosen);
   renderQueue.busy = true;
   renderQueue.cancelRequested = false;
   renderQueue.error = null;

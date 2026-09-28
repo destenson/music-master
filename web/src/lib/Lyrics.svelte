@@ -4,21 +4,31 @@
   import LyricsEditor from "./LyricsEditor.svelte";
   import { fixed } from "./format";
   import { parseFindings, type Finding } from "./lens";
-  import type { LyricReport, TagPools } from "./types";
+  import type {
+    DirectiveChange,
+    DirectiveRemoval,
+    LyricRepair,
+    LyricReport,
+    TagPools,
+  } from "./types";
 
   let {
     text = $bindable(),
     report,
+    repair,
     pools,
     check,
     buildPrompt,
     onDraft,
     onFinal,
     onScaffold,
+    onDismissRepair,
     onCaret,
   }: {
     text: string;
     report: LyricReport | null;
+    /** What the last repair did to a generated draft; null when it changed nothing. */
+    repair: LyricRepair | null;
     pools: TagPools;
     check: (text: string) => Finding[];
     buildPrompt: (theme: string) => string;
@@ -26,6 +36,7 @@
     /** The finished draft, once the model stops: where the brief's directive lines are stripped. */
     onFinal: (text: string) => void;
     onScaffold: () => void;
+    onDismissRepair: () => void;
     onCaret: (line: number) => void;
   } = $props();
 
@@ -80,6 +91,23 @@
       : "waiting for the text tier",
   );
 
+  /** How many lines the last repair dropped or rewrote; zero means there is nothing to show. */
+  const repairs = $derived(repair ? repair.removed.length + repair.changed.length : 0);
+
+  /** The repair's own record, in words: what it dropped, and why that line was not a lyric. */
+  function removalText(entry: DirectiveRemoval): string {
+    return entry.kind === "unbracketed name"
+      ? `dropped “${entry.text}” — a caption name, not a lyric`
+      : `dropped “${entry.text}” — a line from the brief (${entry.kind})`;
+  }
+
+  /** What a rewritten line became, so a bracketed tag and a moved one read differently. */
+  function changeText(entry: DirectiveChange): string {
+    return entry.kind === "unbracketed tag"
+      ? `bracketed “${entry.text}” as “${entry.replacement}”`
+      : `moved “${entry.text}” onto its own line`;
+  }
+
   // The caption can change while the text does not, and the consistency findings depend on it.
   $effect(() => {
     void report;
@@ -124,6 +152,25 @@
     </div>
 
     <Generate {buildPrompt} {onDraft} {onFinal} />
+
+    <!-- A repair on a generated draft is never silent: every line it dropped or rewrote is named,
+         and the line number jumps to where it was. -->
+    {#if repair && repairs}
+      <div class="repair">
+        <div class="row" style="justify-content:space-between">
+          <strong class="small">
+            repaired {repairs} direction{repairs === 1 ? "" : "s"} in the generated draft
+          </strong>
+          <button class="small" onclick={onDismissRepair}>dismiss</button>
+        </div>
+        {#each repair.removed as entry, i (i)}
+          {@render findingRow(removalText(entry), "warn", entry.line, true)}
+        {/each}
+        {#each repair.changed as entry, i (i)}
+          {@render findingRow(changeText(entry), "note", entry.line, true)}
+        {/each}
+      </div>
+    {/if}
 
     <LyricsEditor
       bind:this={editor}

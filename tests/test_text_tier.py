@@ -286,6 +286,12 @@ class LyricsTest(unittest.TestCase):
             "this is the hook",
             "3:00 total, of which 2:00 is sung and 1:00 is instrumental.",
             "- 6-10 syllables per line for this delivery; keep lines in",
+            "(instrumental)",
+            "(no vocals)",
+            # The brief writes the rule one way; a model paraphrases it. Both are directions, and
+            # the renderer would sing either.
+            "- Uppercase inside a line means louder delivery; parentheses mean backing vocal.",
+            "UPPERCASE line means louder",
         ]:
             with self.subTest(line=line):
                 self.assertIsNotNone(lyrics.directive_kind(line), f"missed directive {line!r}")
@@ -296,6 +302,9 @@ class LyricsTest(unittest.TestCase):
             "Rhyme interludes are all I have to give",
             "Leave this section with a kiss and a promise",
             "Place your hands upon the header of the bed",
+            "Uppercase letters on the wall",
+            "Instrumental to the cause",
+            "(everything is instrumental)",
             "[Verse 1]",
             "[Building Energy]",
         ]:
@@ -343,6 +352,155 @@ class LyricsTest(unittest.TestCase):
         self.assertEqual(len(report.errors), 1)
         self.assertIn("Energy 3/5", report.errors[0])
         self.assertIn("directive", report.errors[0])
+
+    def test_a_bare_tag_label_is_recognised_and_a_lyric_is_not(self) -> None:
+        # Both vocabularies name every tag, so a whole line equal to one is a tag that lost its
+        # brackets rather than a guess about English.
+        for line in ["Low energy", "Deadpan delivery", "Melodic hook", "Vocal ad-libs",
+                     "Hummed backing", "Rapid-fire delivery", "hard cut"]:
+            with self.subTest(line=line):
+                self.assertIsNotNone(lyrics.bare_tag(line), f"missed bare tag {line!r}")
+        for line in ["Low energy and a long night", "Deadpan deliveries", "[Low energy]"]:
+            with self.subTest(line=line):
+                self.assertIsNone(lyrics.bare_tag(line), f"ate the lyric {line!r}")
+
+    def test_a_bare_tag_in_a_tag_position_is_bracketed_or_dropped(self) -> None:
+        # A tag the grammar takes on its own line is bracketed, so the direction survives and stops
+        # being sung. A caption word the grammar has no tag for -- `Melodic hook` -- is dropped,
+        # because a bracket would only make it an unknown tag; the caption already carries the sound.
+        draft = (
+            "[Verse 1]\n"
+            "[rap]\n"
+            "Low energy\n"
+            "Melodic hook\n"
+            "The cassette won't turn but the reels still hold\n"
+        )
+        result = lyrics.strip_directives(draft)
+        self.assertEqual(
+            result["text"],
+            "[Verse 1]\n"
+            "[rap]\n"
+            "[Low energy]\n"
+            "The cassette won't turn but the reels still hold",
+        )
+        self.assertEqual([entry["text"] for entry in result["removed"]], ["Melodic hook"])
+        self.assertEqual(
+            [(entry["kind"], entry["text"], entry["replacement"]) for entry in result["changed"]],
+            [("unbracketed tag", "Low energy", "[Low energy]")],
+        )
+
+    def test_a_one_word_name_is_left_to_the_lyric(self) -> None:
+        # `Raw` or `Piano` at the top of a section is as likely a lyric line as a direction, and one
+        # word is not enough to tell them apart; losing a lyric is the worse mistake. A multi-word
+        # name (`Melodic hook`) is a direction, and a one-word *tag* the grammar takes is bracketed.
+        for word in ["Raw", "Piano", "melodic"]:
+            with self.subTest(word=word):
+                self.assertEqual(
+                    lyrics.strip_directives(f"[Verse 1]\n{word}\nThe words are here\n")["text"],
+                    f"[Verse 1]\n{word}\nThe words are here",
+                )
+
+    def test_a_bare_label_between_words_is_left_to_the_lyric(self) -> None:
+        # Precision: the same words in the middle of a phrase are a lyric, and changing them would
+        # be the worse mistake. The one at the section's edge is still a tag.
+        draft = (
+            "[Verse 1]\n"
+            "Deadpan delivery\n"
+            "Low energy\n"
+            "The words begin here\n"
+            "Low energy\n"
+            "The words end here\n"
+        )
+        result = lyrics.strip_directives(draft)
+        self.assertEqual(
+            result["text"],
+            "[Verse 1]\n"
+            "[Low energy]\n"
+            "The words begin here\n"
+            "Low energy\n"
+            "The words end here",
+        )
+
+    def test_a_tag_glued_to_a_lyric_line_is_moved_onto_its_own_line(self) -> None:
+        # A model sometimes ends a section with the transition on the last lyric line instead of on
+        # a line of its own. A tag sits on its own line so the renderer does not sing it with the
+        # words.
+        for draft in ("[Verse 1]\nThe tape still plays[hard cut]\n",
+                      "[Verse 1]\nThe tape still plays [hard cut]\n"):
+            with self.subTest(draft=draft):
+                result = lyrics.strip_directives(draft)
+                self.assertEqual(result["text"], "[Verse 1]\nThe tape still plays\n[hard cut]")
+                self.assertEqual(
+                    [(entry["kind"], entry["replacement"]) for entry in result["changed"]],
+                    [("tag on the wrong line", "The tape still plays\n[hard cut]")],
+                )
+
+    def test_every_repair_is_reported(self) -> None:
+        # Nothing is silent: the caller can say what the repair did because `removed` names every
+        # line it dropped and `changed` every line it rewrote.
+        draft = (
+            "[Verse 1]\n"
+            "Low energy\n"
+            "Melodic hook\n"
+            "Energy 3/5\n"
+            "The words are here[hard cut]\n"
+        )
+        result = lyrics.strip_directives(draft)
+        self.assertEqual(
+            [(entry["kind"], entry["text"]) for entry in result["removed"]],
+            [("unbracketed name", "Melodic hook"), ("energy", "Energy 3/5")],
+        )
+        self.assertEqual(
+            [(entry["kind"], entry["text"], entry["replacement"]) for entry in result["changed"]],
+            [("unbracketed tag", "Low energy", "[Low energy]"),
+             ("tag on the wrong line", "The words are here[hard cut]",
+              "The words are here\n[hard cut]")],
+        )
+
+    def test_the_reported_draft_is_repaired_whole(self) -> None:
+        draft = (
+            "[Intro]\n"
+            "(instrumental)\n"
+            "\n"
+            "[Verse 1]\n"
+            "Deadpan delivery\n"
+            "Low energy\n"
+            "The cassette won't turn but the reels still hold\n"
+            "Static in the left ear / like a small-town pulse\n"
+            "hard cut\n"
+            "\n"
+            "[Chorus]\n"
+            "Melodic hook\n"
+            "Vocal ad-libs\n"
+            "Hummed backing\n"
+            "UPPERCASE line means louder\n"
+            "The tape still plays / the tape still plays\n"
+            "EVERY CRACK IS A FRIEND THAT STAYS\n"
+        )
+        result = lyrics.strip_directives(draft)
+        text = result["text"]
+        for gone in ["Deadpan delivery", "Melodic hook", "Vocal ad-libs", "Hummed backing",
+                     "UPPERCASE line means louder", "(instrumental)"]:
+            self.assertNotIn(gone, text)
+        self.assertIn("[Low energy]", text)
+        self.assertIn("[hard cut]", text)
+        for kept in ["The cassette won't turn but the reels still hold",
+                     "The tape still plays / the tape still plays",
+                     "EVERY CRACK IS A FRIEND THAT STAYS"]:
+            self.assertIn(kept, text)
+        # Six directions were dropped and two rewritten, and the caller can name every one.
+        self.assertEqual(len(result["removed"]), 6)
+        self.assertEqual([entry["text"] for entry in result["changed"]],
+                         ["Low energy", "hard cut"])
+
+    def test_a_surviving_bare_tag_and_a_glued_tag_are_errors(self) -> None:
+        # The repair runs on a generated draft, so either of these left in a lyric was written or
+        # pasted by hand and is about to be sung.
+        report = lyrics.Report()
+        lyrics.check_directives(["[Verse 1]", "Low energy", "words here", "words[hard cut]"], report)
+        self.assertEqual(len(report.errors), 2)
+        self.assertIn("[Low energy]", report.errors[0])
+        self.assertIn("shares a line", report.errors[1])
 
     def test_the_mechanical_rule_is_checked_not_deferred(self) -> None:
         # Rule 4 is decidable, so an instrumental lead vocal must raise an error and must not also

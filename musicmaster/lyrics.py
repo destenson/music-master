@@ -246,6 +246,13 @@ DIRECTIVES: list[tuple[str, re.Pattern]] = [
     ("rhyme scheme", re.compile(r"^rhyme(?:\s+scheme)?\s*[:=]\s*[A-Za-z() ]{2,14}$", re.I)),
     ("rhyme scheme", re.compile(r"^rhyme\s+[A-Z() ]{2,12}$")),
     ("instrumental note", re.compile(r"^instrumental\b.*\bno words here\b", re.I)),
+    # A model often writes the bare note rather than the brief's full line. It is a direction, not
+    # words, and the renderer -- which only reads brackets -- would sing it.
+    ("instrumental note", re.compile(
+        r"^\(\s*(?:instrumental(?:\s+(?:break|section|interlude))?|no vocals?|no words?|silence)"
+        r"\s*\)$",
+        re.I,
+    )),
     ("tag instruction", re.compile(r"^place (?:this|these)\b.*\bunder the header\b", re.I)),
     ("transition instruction", re.compile(r"^leave this section with\s*:", re.I)),
     ("hook note", re.compile(r"^this is the hook$", re.I)),
@@ -253,7 +260,10 @@ DIRECTIVES: list[tuple[str, re.Pattern]] = [
     ("brief rule", re.compile(
         r"^(?:- )?(?:\d+\s*-\s*\d+ syllables per line|count syllables per phrase|"
         r"at most one modifier per tag|up to four standalone performance tags|"
-        r"uppercase inside a line means|keep one core metaphor)\b",
+        # The brief's own line is "uppercase inside a line means ...", but a model paraphrases it
+        # ("UPPERCASE line means louder"), so the rule is recognised by its shape rather than by
+        # the exact wording. A lyric that merely contains "means" does not match.
+        r"uppercase\b[^;]{0,40}\bmeans\b|keep one core metaphor)\b",
         re.I,
     )),
 ]
@@ -275,38 +285,268 @@ def directive_kind(line: str) -> str | None:
     return None
 
 
-def strip_directives(text: str) -> dict:
-    """Remove the brief lines a model copied into a draft, and say which were removed.
+# --- Tags written without brackets -------------------------------------------------------
+# A model that has read the brief, or the caption, sometimes writes a tag as a bare line --
+# `Low energy`, `Deadpan delivery`, `Melodic hook` -- instead of bracketing it. The renderer only
+# reads brackets, so it sings the line. Both vocabularies name every tag exactly, so a whole line
+# equal to a label is a tag that lost its brackets rather than a guess about English.
+_TAG_LABELS: set[str] | None = None
+_STANDALONE_LABELS: set[str] | None = None
+_SECTION_TAGS: dict | None = None
 
-    Removing a directive can leave a run of blank lines where it sat between two of them, so a run
-    is collapsed to the single blank the lyric grammar expects. Returns
-    ``{"text": ..., "removed": [{"line", "kind", "text"}]}``, with line numbers from the input so a
-    report can point at what the repair did.
+# The pools a tag may stand in on its own. `modifiers` is deliberately absent: a modifier belongs
+# to a section header (`[Chorus - anthemic]`), so `[melodic]` alone is not a tag the grammar takes.
+STANDALONE_POOLS = ("transition_tags", "vocal_tags", "energy_tags", "instrumental_section_tags")
+
+
+def _section_tags() -> dict:
+    """The lyric metatag vocabulary, loaded once. A missing file disables the tag test rather than
+    failing the cleaner, which must still strip the brief's own lines."""
+    global _SECTION_TAGS
+    if _SECTION_TAGS is None:
+        try:
+            _SECTION_TAGS = json.loads(SECTION_TAGS_PATH.read_text())
+        except OSError:
+            _SECTION_TAGS = {}
+    return _SECTION_TAGS
+
+
+def standalone_tag_labels() -> set[str]:
+    """The labels the lyric grammar accepts as a bracketed tag on its own line."""
+    global _STANDALONE_LABELS
+    if _STANDALONE_LABELS is None:
+        st = _section_tags()
+        labels: set[str] = set()
+        for key in STANDALONE_POOLS:
+            labels.update(tag["label"].casefold() for tag in st.get(key, []))
+        _STANDALONE_LABELS = labels
+    return _STANDALONE_LABELS
+
+
+def tag_labels() -> set[str]:
+    """Every tag label the vocabularies define, casefolded, loaded once.
+
+    The lyric pools and the caption bins both name directions; a model that has seen either can
+    copy one into a section. A missing vocabulary file yields an empty set, which disables the test
+    rather than failing it.
     """
+    global _TAG_LABELS
+    if _TAG_LABELS is None:
+        labels = set(standalone_tag_labels())
+        st = _section_tags()
+        for tag in st.get("modifiers", []):
+            labels.add(tag["label"].casefold())
+        try:
+            vocab = json.loads(VOCAB_PATH.read_text())
+        except OSError:
+            vocab = {}
+        for bin_ in vocab.get("bins", []):
+            labels.update(option["label"].casefold() for option in bin_.get("options", []))
+        _TAG_LABELS = labels
+    return _TAG_LABELS
+
+
+def bare_tag(line: str) -> str | None:
+    """The tag label a whole line is when it carries no brackets, or None.
+
+    A bracketed line is the checker's business, not this one's, so anything with a bracket is left
+    alone here.
+    """
+    stripped = line.strip()
+    if not stripped or TAG_RE.search(stripped):
+        return None
+    return stripped if stripped.casefold() in tag_labels() else None
+
+
+def _content_line(line: str) -> bool:
+    """Whether a line is words a section is meant to sing.
+
+    A blank, a bracketed tag and a recognised directive are not words, so they do not bound the
+    edge zones a bare tag has to sit in.
+    """
+    stripped = line.strip()
+    if not stripped or TAG_RE.search(stripped):
+        return False
+    return directive_kind(stripped) is None and bare_tag(stripped) is None
+
+
+def _edge_zones(lines: list[str]) -> set[int]:
+    """The zero-based lines at a section's edges: before its first words and after its last.
+
+    Tags belong at a section's edge -- the brief puts the performance tags under the header and the
+    transition on the last line -- so a bare label there is a tag that lost its brackets. A bare
+    label *between* words is left to the lyric, where a lyric is the likelier reading.
+    """
+    st = _section_tags()
+    zones: set[int] = set()
+
+    def close(segment: list[int]) -> None:
+        content = [index for index in segment if _content_line(lines[index])]
+        if not content:
+            zones.update(segment)
+            return
+        first, last = content[0], content[-1]
+        zones.update(index for index in segment if index < first or index > last)
+
+    segment: list[int] = []
+    for index, line in enumerate(lines):
+        match = TAG_RE.search(line)
+        if match and is_section_header(st, match.group(1)):
+            close(segment)
+            segment = []
+            continue
+        segment.append(index)
+    close(segment)
+    return zones
+
+
+def _tag_positions(lines: list[str]) -> set[int]:
+    """The zero-based lines a tag could stand on: a section's edges, or directly after a line that
+    already carries a bracketed tag.
+
+    The second half is what continues a run: once a header or a tag is bracketed, a bare label
+    beneath it is a tag that lost its brackets too, even mid-section.
+    """
+    positions = set(_edge_zones(lines))
+    previous = ""
+    for index, line in enumerate(lines):
+        if not line.strip():
+            continue
+        if TAG_RE.search(previous):
+            positions.add(index)
+        previous = line
+    return positions
+
+
+def _bare_tag_action(lines: list[str], index: int, positions: set[int]) -> str | None:
+    """What a bare tag line is: `bracket` a tag the grammar takes, `remove` a name it does not, or
+    None when the line is (or may be) a lyric.
+
+    A one-word caption name is left alone: `Raw` or `Piano` at the top of a section is as likely to
+    be a lyric line as a direction, and dropping a lyric is the worse mistake. A multi-word name
+    (`Deadpan delivery`, `Melodic hook`) is a direction and the caption already carries the sound.
+    """
+    label = bare_tag(lines[index])
+    if label is None or index not in positions:
+        return None
+    if label.casefold() in standalone_tag_labels():
+        return "bracket"
+    return "remove" if " " in label.strip() else None
+
+
+_TRAILING_TAG_RE = re.compile(r"^(?P<head>.*?)\s*(?P<tag>\[[^\[\]]+\])$")
+
+
+def _split_trailing_tag(line: str) -> tuple[str | None, str | None]:
+    """Split `last words [hard cut]` into `('last words', '[hard cut]')`.
+
+    A tag sits on its own line; a model sometimes glues the section's transition, or a performance
+    tag, to the end of the last lyric line, where the renderer can sing it with the words. Only a
+    tag that follows words is split -- a line of tags alone is already where it belongs.
+    """
+    match = _TRAILING_TAG_RE.match(line.strip())
+    if not match:
+        return None, None
+    head = match.group("head")
+    if not re.sub(r"\[[^\[\]]*\]", "", head).strip():
+        return None, None
+    return head, match.group("tag")
+
+
+def strip_directives(text: str) -> dict:
+    """Repair the directions a model copied into a draft, and say what was removed and what changed.
+
+    Three repairs, each exact: a line of the brief itself is removed; a tag written bare is
+    bracketed when the lyric grammar takes it there and removed when it does not (a multi-word name
+    such as `Melodic hook` is not a lyric tag, and the caption already carries the sound); and a tag
+    glued to the end of a lyric line is moved onto its own line. Removing a line can leave a run of
+    blanks where it sat between two of them, so a run is collapsed to the single blank the lyric
+    grammar expects.
+
+    Nothing is silent: ``removed`` names every line that was dropped and ``changed`` every line that
+    was rewritten, both with the line number from the input, so a caller can show what happened.
+    ``{"text": ..., "removed": [{"line", "kind", "text"}],
+    "changed": [{"line", "kind", "text", "replacement"}]}``
+    """
+    lines = text.splitlines()
+    positions = _tag_positions(lines)
     kept: list[str] = []
     removed: list[dict] = []
-    for lineno, line in enumerate(text.splitlines(), start=1):
+    changed: list[dict] = []
+    for index, line in enumerate(lines):
+        lineno = index + 1
         kind = directive_kind(line)
-        if kind is None:
-            kept.append(line)
-        else:
+        if kind is not None:
             removed.append({"line": lineno, "kind": kind, "text": line.strip()})
-    return {"text": re.sub(r"\n{3,}", "\n\n", "\n".join(kept)), "removed": removed}
+            continue
+        action = _bare_tag_action(lines, index, positions)
+        if action == "remove":
+            removed.append({"line": lineno, "kind": "unbracketed name", "text": line.strip()})
+            continue
+        if action == "bracket":
+            replacement = f"[{line.strip()}]"
+            changed.append({"line": lineno, "kind": "unbracketed tag", "text": line.strip(),
+                            "replacement": replacement})
+            kept.append(replacement)
+            continue
+        head, tag = _split_trailing_tag(line)
+        if tag is not None:
+            changed.append({"line": lineno, "kind": "tag on the wrong line", "text": line.strip(),
+                            "replacement": f"{head}\n{tag}"})
+            kept.append(head)
+            kept.append(tag)
+            continue
+        kept.append(line)
+    return {
+        "text": re.sub(r"\n{3,}", "\n\n", "\n".join(kept)),
+        "removed": removed,
+        "changed": changed,
+    }
 
 
 def check_directives(lines: list[str], rep: Report) -> list[dict]:
-    """Report a brief line left in the lyric: it is not words, but the model would sing it."""
+    """Report a direction left in the lyric: it is not words, but the model would sing it.
+
+    Only a tag in a tag position is reported, and only a bare label the vocabularies name; a bare
+    label between words may be a lyric and is left to the reader.
+    """
+    positions = _tag_positions(lines)
     found: list[dict] = []
-    for lineno, line in enumerate(lines, start=1):
+    for index, line in enumerate(lines):
+        lineno = index + 1
         kind = directive_kind(line)
-        if kind is None:
+        if kind is not None:
+            found.append({"line": lineno, "kind": kind, "text": line.strip()})
+            rep.error(
+                f"line {lineno}: '{line.strip()}' is a directive from the writing brief ({kind}), "
+                f"not a lyric; a generated draft has it stripped automatically, so this one was "
+                f"written or pasted by hand"
+            )
             continue
-        found.append({"line": lineno, "kind": kind, "text": line.strip()})
-        rep.error(
-            f"line {lineno}: '{line.strip()}' is a directive from the writing brief ({kind}), not a "
-            f"lyric; a generated draft has it stripped automatically, so this one was written or "
-            f"pasted by hand"
-        )
+        action = _bare_tag_action(lines, index, positions)
+        if action == "bracket":
+            found.append({"line": lineno, "kind": "tag without brackets", "text": line.strip()})
+            rep.error(
+                f"line {lineno}: '{line.strip()}' is a tag written without brackets, so the "
+                f"renderer would sing it; write it as '[{line.strip()}]' — a generated draft has it "
+                f"bracketed automatically"
+            )
+            continue
+        if action == "remove":
+            found.append({"line": lineno, "kind": "tag without brackets", "text": line.strip()})
+            rep.error(
+                f"line {lineno}: '{line.strip()}' is a direction the lyric grammar has no tag for, "
+                f"so the renderer would sing it; remove it — a generated draft has it stripped "
+                f"automatically"
+            )
+            continue
+        _, tag = _split_trailing_tag(line)
+        if tag is not None:
+            found.append({"line": lineno, "kind": "tag not on its own line", "text": line.strip()})
+            rep.error(
+                f"line {lineno}: the tag '{tag}' shares a line with lyric words; a tag sits on its "
+                f"own line so the renderer does not sing it with the words"
+            )
     return found
 
 

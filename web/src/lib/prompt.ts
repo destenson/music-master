@@ -29,11 +29,18 @@ ${brief}
 
 Write the finished lyric now.
 - Put each section header on its own line, named exactly as the brief names it, in the brief's order.
-- Keep the performance tags the brief lists under their header, one per line.
+- Write every direction as a tag in square brackets, exactly as the brief writes it: \`[Verse 1]\`,
+  \`[rap]\`, \`[low energy]\`. Text without brackets is words and gets sung, so a direction written
+  bare — \`low energy\` on its own line — is a line the vocalist will sing as a lyric.
+- Keep the performance tags the brief lists under their header, one per line, each one bracketed.
 - Write the stated number of lines for each section and stay inside that section's syllable budget.
 - Where the brief gives a rhyme scheme, follow it.
-- Put the transition tag on the last line of the section it leaves, not the one it enters.
-- Write words only for the singable sections; leave the instrumental ones without lyrics.
+- Put the transition tag on its own line at the end of the section it leaves, not on the same line
+  as the last lyric line, and not in the section it enters.
+- Leave the instrumental sections empty: no words, and no \`(instrumental)\` or other note. Nothing
+  but a bracketed tag belongs in a section that is not sung.
+- A caption word — a genre, an instrument, a delivery or a hook name — is not a lyric. The caption
+  above already carries the sound, so never write those words into a section as a line.
 - The numbers in the brief — bar counts, seconds, syllable budgets, rhyme schemes, \`energy n/5\` — are
   instructions to you, not lyrics. Never write one into a section; music-master strips such a line
   from a finished draft, but a line you never write is a line it does not have to.

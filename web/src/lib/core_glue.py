@@ -202,13 +202,26 @@ def artifacts(payload):
     )
 
 
-def preview(payload):
-    """A full-length, coarse preview graph: the current caption plus one row per variant.
+def _preview_row(name, caption, prompt_doc, lyrics, steps, seconds):
+    """One caption as its own graph, so the row is reproducible on its own."""
+    return {
+        "name": name,
+        "caption": caption,
+        "workflow": prompt.build_preview_workflow(
+            prompt_doc, lyrics, [caption], seconds=seconds, steps=steps
+        ),
+    }
 
-    The language model's cost is per pass, not per caption -- a full-length song is the same number
-    of sequential tokens whether one caption rides along or twelve -- so several captions in one
-    submission is how "what does this tag do" gets answered cheaply. The graph ends in
-    PreviewAudio, so a preview never lands in the render output directory.
+
+def preview(payload):
+    """One solo preview graph per caption: the current caption plus one row per variant.
+
+    Each row is its own submission with a single caption in it, because the page caches a row and
+    reuses it. The batch node keeps one generator for a whole batch, so a caption's audio depends on
+    what else rode along with it: a row rendered in a batch of two is not the row a later comparison
+    can reuse. One caption per graph makes a row reproducible, which is what lets the page render
+    the A once and hold it while the variants change. The graph ends in PreviewAudio, so a preview
+    never lands in the render output directory.
 
     Variants are given as bin/option pairs and applied to the page's own selections, so what is
     previewed is the caption the page would actually send.
@@ -231,8 +244,13 @@ def preview(payload):
             "rates": _rates,
         }
     )
-    captions = [built["prompt"]["style"]["rendered_string"]]
-    names = ["current"]
+    lyrics = request["lyrics"]
+    steps = int(request.get("steps") or prompt.PREVIEW_STEPS)
+    seconds = request.get("seconds")
+    rows = [
+        _preview_row("current", built["prompt"]["style"]["rendered_string"], built["prompt"],
+                     lyrics, steps, seconds)
+    ]
     for variant in request.get("variants") or []:
         selections = json.loads(json.dumps(request["selections"]))
         entry = selections.setdefault(variant["bin"], {"options": []})
@@ -241,17 +259,17 @@ def preview(payload):
             options.remove(variant["option"])
         else:
             options.append(variant["option"])
-        captions.append(render.render(_vocab, selections)["string"])
-        names.append(f"{variant['bin']}:{variant['option']}")
-
-    workflow = prompt.build_preview_workflow(
-        built["prompt"],
-        request["lyrics"],
-        captions,
-        seconds=request.get("seconds"),
-        steps=int(request.get("steps") or prompt.PREVIEW_STEPS),
-    )
-    return json.dumps({"workflow": workflow, "captions": captions, "names": names})
+        rows.append(
+            _preview_row(
+                f"{variant['bin']}:{variant['option']}",
+                render.render(_vocab, selections)["string"],
+                built["prompt"],
+                lyrics,
+                steps,
+                seconds,
+            )
+        )
+    return json.dumps({"rows": rows})
 
 
 def radio_plan(payload):

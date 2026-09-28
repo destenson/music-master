@@ -417,6 +417,14 @@ code,
   color: var(--muted);
 }
 
+/* What the lyric repair did to a generated draft: every edit is named, never silent. */
+.repair {
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--line));
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin: 6px 0;
+}
+
 /* A preview row: its label, its player, and the caption it was rendered from. */
 .preview-clip {
   padding: 6px 0;
