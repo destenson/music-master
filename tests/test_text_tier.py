@@ -27,7 +27,7 @@ REPO = Path(__file__).resolve().parent.parent
 PACKAGE = REPO / "musicmaster"
 sys.path.insert(0, str(REPO))
 
-from musicmaster import TEXT_TIER, lyrics, prompt, radio, render, templates, timeline  # noqa: E402
+from musicmaster import TEXT_TIER, lyrics, oracle, prompt, radio, render, templates, timeline  # noqa: E402
 
 ALLOWED_LOCAL = {"musicmaster"}
 
@@ -487,6 +487,7 @@ class EntryPointTest(unittest.TestCase):
             ("timeline", timeline, "build_timeline"),
             ("check_lyrics", lyrics, "analyse"),
             ("radio_stations", radio, "plan_song"),
+            ("check_compliance", oracle, "evaluate"),
         ]:
             with self.subTest(wrapper=wrapper_name):
                 wrapper = importlib.import_module(wrapper_name)
@@ -497,6 +498,7 @@ class EntryPointTest(unittest.TestCase):
         # a user sees is the implementation module's docstring, i.e. it moved with the code.
         for script, module, args in [
             ("vocabulary/check_lyrics.py", lyrics, []),
+            ("vocabulary/check_compliance.py", oracle, []),
             ("vocabulary/structure_templates.py", templates, ["--brief"]),
         ]:
             self.assertTrue(module.__doc__ and module.__doc__.strip())
@@ -520,6 +522,8 @@ class EntryPointTest(unittest.TestCase):
     def test_every_entry_point_runs(self) -> None:
         invocations = [
             ("vocabulary/render_tags.py", ["vocabulary/examples/late-night-trap.json"]),
+            ("vocabulary/check_compliance.py",
+             ["vocabulary/examples/compliance-indie-folk.json"]),
             ("vocabulary/structure_templates.py", ["--list"]),
             ("vocabulary/validate_vocabulary.py", []),
             ("vocabulary/radio_stations.py", ["--list"]),

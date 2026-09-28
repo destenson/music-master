@@ -49,6 +49,30 @@
       "description": "The explicit list of what the system could not satisfy. This is the honest-output contract: it is never empty when overall is not 'compliant'.",
       "items": { "type": "string" }
     },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The two headline counts. 'Twelve met, six of them on description' is a different document from 'twelve met', and only one of them is honest.",
+      "properties": {
+        "met": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "decided_by_measurement": { "type": "integer", "minimum": 0, "description": "Met verdicts resting on arithmetic or signal processing. The number to trust." },
+        "decided_by_description": { "type": "integer", "minimum": 0, "description": "Met verdicts resting on a model's generated account. The number to watch, because it can be inflated without anyone noticing." },
+        "uncertain": { "type": "integer", "minimum": 0 },
+        "unverified": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "cross_check": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The 'is any requirement seriously violated' summary question, reported alongside the individual verdicts and never as a substitute for them.",
+      "properties": {
+        "noul": { "type": ["number", "null"] },
+        "fired": { "type": "boolean" },
+        "agrees_with_individual_verdicts": { "type": "boolean" },
+        "note": { "type": ["string", "null"] }
+      }
+    },
     "iterations": {
       "type": "integer",
       "minimum": 0,
@@ -86,6 +110,36 @@
           "description": "Recorded for completeness and audit, not used for gating; the top-two margin is the discrimination signal."
         },
         "top2_margin": { "type": ["number", "null"] },
+        "enforcement": {
+          "type": ["string", "null"],
+          "enum": ["enforced", "verified", "conditioned + verified", "measured", "unverified", null],
+          "description": "How strongly this requirement could be checked, given the chosen generator. Read from the requirement taxonomy; absent when that mapping has not been made."
+        },
+        "evidence_class": {
+          "type": ["string", "null"],
+          "enum": ["measurement", "description", "self_report", "oracle", "transcription", null],
+          "description": "What kind of evidence the verdict rests on. A hard requirement may not be met on description alone, and a self-report never decides one, so the gate caps such a verdict at 'uncertain' rather than at 'met'."
+        },
+        "supported_by": {
+          "type": "array",
+          "description": "The evidence behind the verdict, each item carrying its own class and source, so a wrong verdict can be traced to the model or measurement that produced it.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["class", "source"],
+            "properties": {
+              "class": { "type": "string", "enum": ["measurement", "description", "self_report", "oracle", "transcription"] },
+              "source": { "type": "string", "description": "Which model or checker, carrying its version or revision, because 'the captioner said so' is not reproducible." },
+              "value": { "description": "The reading itself: a probability, a level with its top probability, or a measured number." },
+              "threshold": { "type": ["number", "null"], "description": "The threshold that decided. Recorded because thresholds do not port between questions, primitives or model versions." },
+              "note": { "type": ["string", "null"] }
+            }
+          }
+        },
+        "note": {
+          "type": ["string", "null"],
+          "description": "Why this verdict and not another, in a sentence: the band it fell in, the gate it missed, or what the evidence was."
+        },
         "measured": {
           "description": "For code and audio checkers: the actual measured value and the target it was compared against.",
           "type": ["object", "null"],

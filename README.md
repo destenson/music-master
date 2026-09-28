@@ -14,8 +14,9 @@ and a preview auditions the whole song at a couple of sampler steps before commi
 
 Status: the generator works end to end. The vocabulary, the caption renderer, the lyric checker, the
 time budget and the prompt builder are real and packaged as `musicmaster/`, and the browser builds a
-song, renders it, previews it and streams it from a radio station. The compliance battery described
-under "Checking the brief" is designed, not built.
+song, renders it, previews it and streams it from a radio station. The compliance battery's seam is
+real too — its question set, uncertainty band, evidence gate and report — but no live oracle is wired
+to it yet, so a semantic requirement comes back `unverified` rather than decided.
 
 ## What it produces
 
@@ -309,15 +310,40 @@ text tier is kept apart from the audio.
 
 Requirements split into mechanical ones that code computes exactly (duration, BPM, key,
 syllables, rhyme, banned words, loudness) and semantic ones that are irreducibly judgments
-(theme, mood, genre, hook, cliché, imitation, explicitness). The mechanical half never
-touches a model. The semantic half goes to a **Jev-like System One model** — typed
-questions over a state, returning calibrated probabilities rather than prose — because code
-can consume the answers directly. The catch is that such a model takes *text only*, so it
-cannot hear the track; the design therefore renders every audio artifact into text
-surrogates (measured MIR facts, chord transcription, vocal transcript, music caption) and
-judges those. And because a requirement that can only be checked after synthesis is
-expensive to fail, the generation path is chosen so most requirements become observable as
-early as possible.
+(theme, mood, genre, hook, cliché, imitation, explicitness). The mechanical half runs today
+and never touches a model.
+
+The semantic half is where the ambition sits. Its seam is built: the question set, the uncertainty
+band, the evidence gate and the report are real and packaged in `musicmaster/oracle.py`. No live
+oracle is wired to it yet — no key is configured and no local model is installed — so a semantic
+requirement comes back `unverified` rather than decided. What it needs is a **Jev-like** model: one
+that answers typed questions over a text state with calibrated probabilities rather than prose, so
+code can consume the answer directly. The "-like" is load-bearing. Jev is the quality reference and
+the easiest to adopt, but it is a hosted API, so it needs a key and it sends the lyrics — the user's
+private intent — off the machine. That is a property of the service, not of the interface: a small
+open model read the same way, straight from its logits in one forward pass, gives the same typed
+answers with no egress at all, and the page's no-server shape points at hosting one in the browser
+beside the Pyodide text tier.
+
+The battery runs without one, because the oracle is a seam rather than a dependency. A **replay**
+oracle serves recorded answers, so the whole path — question, band, gate, verdict, report — is
+exercised with no network, no key and no GPU:
+
+```bash
+python3 vocabulary/check_compliance.py vocabulary/examples/compliance-indie-folk.json
+python3 vocabulary/check_compliance.py vocabulary/examples/compliance-indie-folk.json --json
+```
+
+Every verdict names the class of evidence behind it and the threshold that decided it, and the report
+counts what was decided by measurement against what rests on a model's account of the artifact: a
+report that says "twelve met, six of them on description" is a different document from "twelve met",
+and only one of them is honest. The CLI reports by default and gates only under `--strict`.
+
+The constraint every oracle shares is that it takes *text only*, so it cannot hear the
+track: every audio artifact must first be reduced to a text surrogate (measured MIR facts,
+chord transcription, vocal transcript, music caption). And because a requirement that can
+only be checked after synthesis is expensive to fail, the generation path is chosen so most
+requirements become observable as early as possible.
 
 ## Schemas
 
@@ -402,7 +428,16 @@ The composer sits behind a `MusicGenerator` adapter whose capabilities are decla
 model swap that would weaken any requirement's enforcement mode is a hard error rather than a
 silent downgrade. See `docs/design/compliance-architecture.md` §5.8.
 
-## The three rules that matter most
+## Rules for the semantic checker
+
+The oracle is a seam, not a dependency. Hosted Jev, a local logit-readout model and a
+recorded replay fixture all satisfy one method — `evaluate(state, questions)` — so egress,
+cost and quality are configuration rather than architecture
+([`docs/design/compliance-architecture.md`](docs/design/compliance-architecture.md) §9).
+Hosted Jev is the quality reference and the only one of the three that needs a key; the
+local path is the egress-safe one and is materially weaker, so it should expect more
+`uncertain` verdicts. Whichever is wired up, these rules govern it. They are carried from
+measurements in sibling projects, not from anything this repository has run:
 
 1. **Never ask the model something code can compute exactly.** Counting, arithmetic, dates
    and numeric comparison are documented weak spots.
@@ -411,9 +446,5 @@ silent downgrade. See `docs/design/compliance-architecture.md` §5.8.
 3. **Uncertainty is an outcome, not a pass.** A probability in the uncertain band is
    reported as uncertain and routed to repair or review.
 
-## Related work on this machine
-
-Prior Jev integrations live in `~/src/llamas` (PRP-206),
-`~/src/lance` (PRP-J01 and `spikes/jev`), `~/src/ai-experiments/opencaw`, and
-`~/src/TheoLeeCJ--SemIf-OpenJev` (an open, self-hostable reproduction of the same interface
-pattern). The research document summarises what each measured and what is worth copying.
+Those sibling integrations, and the reusable clients they produced, are catalogued in
+[`docs/research/jev-and-decision-models.md`](docs/research/jev-and-decision-models.md) §3.

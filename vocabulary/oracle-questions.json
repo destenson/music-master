@@ -1,0 +1,201 @@
+{
+  "bank_version": "1",
+  "note": "The compliance battery's questions, keyed by checker id. A requirement whose verify field names one of these checkers is turned into a question by musicmaster.oracle.build_questions; adding a semantic requirement is an entry here plus a spec entry, not a code change. The wording names the fields each question should read, by backticked path, because Jev-style models answer the question you wrote and their accuracy falls as unrelated detail grows. The thresholds below are defaults carried from the sibling projects' operating manual; rule 7 of the gating policy says they must be re-measured per question and per model version, and a verdict records the one that actually decided it. `levels` for a score is ordered weakest to strongest, and `default_bound` is the level a requirement with no numeric target must reach -- level 3 is 'recognisably the thing', which is the weakest defensible pass.",
+  "always_ask": ["jev.any_serious_violation"],
+  "questions": {
+    "jev.theme_adherence": {
+      "type": "noul",
+      "reads": ["brief.theme", "caption", "lyrics"],
+      "instructions": "Do `lyrics` and `caption` together convey a song about the theme named in `brief.theme`, rather than about a different subject?",
+      "criteria": {
+        "true": "The subject of `brief.theme` is identifiable in the words or in the described setting.",
+        "false": "The song is about a different subject, time or place."
+      }
+    },
+    "jev.mood_axis": {
+      "type": "score",
+      "target_split": "axes",
+      "reads": ["caption", "lyrics"],
+      "instructions": "How {axis} does `caption` and `lyrics` read?",
+      "levels": [
+        "Not {axis} at all",
+        "Slightly {axis}",
+        "Moderately {axis}",
+        "Strongly {axis}",
+        "Defined by {axis}"
+      ],
+      "note": "One question per axis in the target. An axis named `x_max` is an upper bound -- the song must not read as x -- while a bare axis is a lower bound."
+    },
+    "jev.genre_fidelity": {
+      "type": "score",
+      "reads": ["brief.genre", "caption", "chords", "measured"],
+      "instructions": "How well do `caption`, `chords` and `measured` fit the genre named in `brief.genre`?",
+      "levels": [
+        "A different genre",
+        "Same broad family, wrong corner",
+        "Recognisably the genre",
+        "A clear example of the genre",
+        "A textbook example of the genre"
+      ],
+      "default_bound": 3
+    },
+    "jev.era_production": {
+      "type": "score",
+      "reads": ["brief.era", "caption", "measured"],
+      "instructions": "How well does the production described in `caption` match the era named in `brief.era`?",
+      "levels": [
+        "A different era",
+        "Adjacent era, wrong decade",
+        "Recognisably the era",
+        "A clear example of the era",
+        "A textbook example of the era"
+      ],
+      "default_bound": 3
+    },
+    "jev.vocal_spec": {
+      "type": "noul",
+      "reads": ["caption", "lyrics"],
+      "instructions": "Does `caption` describe the vocal the brief asked for in `target` -- its type, register and delivery -- rather than a different voice?",
+      "criteria": {
+        "true": "The vocal type, register and delivery asked for are all identifiable in `caption`.",
+        "false": "A different vocal is described, or the voice is left unspecified where the brief required one."
+      }
+    },
+    "jev.instrumentation": {
+      "type": "noul",
+      "reads": ["brief", "caption", "measured"],
+      "instructions": "Is every instrument the brief asked for present in `caption`, with nothing it excluded?",
+      "criteria": {
+        "true": "Each required instrument is named in `caption`, and no excluded one appears.",
+        "false": "A required instrument is missing, or an excluded one is described."
+      }
+    },
+    "jev.hook_payoff": {
+      "type": "noul",
+      "reads": ["lyrics", "composition.hook"],
+      "instructions": "Does the section flagged as the hook in `lyrics` deliver a payoff -- a repeatable, memorable line -- rather than an ordinary section?",
+      "criteria": {
+        "true": "The hook section carries a line a listener could repeat after one hearing.",
+        "false": "The hook section is indistinguishable from an ordinary verse."
+      }
+    },
+    "jev.freshness": {
+      "type": "score",
+      "reads": ["lyrics"],
+      "instructions": "How fresh does `lyrics` read, rather than reaching for the stock phrases of its genre?",
+      "levels": [
+        "Entirely stock phrasing",
+        "Mostly familiar",
+        "Some fresh images among familiar ones",
+        "Distinctly its own",
+        "Nothing about it is borrowed"
+      ],
+      "default_bound": 3
+    },
+    "jev.coherence": {
+      "type": "score",
+      "reads": ["lyrics", "composition"],
+      "instructions": "How coherent is `lyrics` as a single narrative, rather than a set of unrelated images?",
+      "levels": [
+        "Unrelated images",
+        "Loosely associated",
+        "One clear thread",
+        "A developed narrative",
+        "Every section advances the same story"
+      ],
+      "default_bound": 3
+    },
+    "jev.timbre": {
+      "type": "score",
+      "reads": ["brief", "caption"],
+      "instructions": "How well does the texture described in `caption` match the timbre the brief asked for in `target`?",
+      "levels": [
+        "A different texture",
+        "Adjacent, wrong character",
+        "Recognisably the texture",
+        "A clear match",
+        "Exactly the texture asked for"
+      ],
+      "default_bound": 3
+    },
+    "jev.energy": {
+      "type": "score",
+      "reads": ["caption", "measured", "lyrics"],
+      "instructions": "How well do `caption`, `measured` and `lyrics` match the energy the brief asked for in `target`?",
+      "levels": [
+        "Far below the target",
+        "Below the target",
+        "About right",
+        "Above the target",
+        "Far above the target"
+      ],
+      "note": "A target here is directional, not a magnitude, so the bound is set by the spec's own wording."
+    },
+    "jev.groove_fidelity": {
+      "type": "score",
+      "reads": ["brief", "caption", "chords", "measured"],
+      "instructions": "How well does the groove described in `caption` and `measured` match the rhythm the brief asked for in `brief`?",
+      "levels": [
+        "A different feel",
+        "Same family, wrong feel",
+        "Recognisably the feel",
+        "A clear match",
+        "Exactly the feel asked for"
+      ],
+      "default_bound": 3
+    },
+    "jev.explicitness": {
+      "type": "noul",
+      "reads": ["brief", "lyrics"],
+      "instructions": "Does `lyrics` stay within the explicitness limit the brief set, in language, subject matter and implication?",
+      "criteria": {
+        "true": "Nothing in `lyrics` exceeds the limit the brief asked for.",
+        "false": "The lyric exceeds the limit in explicit language, sexual content, or violence."
+      },
+      "thresholds": { "accept": 0.8 }
+    },
+    "jev.artist_pastiche": {
+      "type": "noul",
+      "reads": ["brief.exclude_artist", "caption", "chords", "lyrics", "measured"],
+      "instructions": "Does the description in `caption`, together with `chords`, `lyrics` and `measured`, read as a deliberate imitation of the specific artist named in the brief's exclusion, rather than merely sharing a genre with them?",
+      "criteria": {
+        "true": "It reproduces that artist's distinctive signature closely enough to be heard as an imitation.",
+        "false": "It shares a genre at most; nothing distinctive is reproduced."
+      },
+      "polarity": "violation",
+      "thresholds": { "accept": 0.8 }
+    },
+    "jev.content_policy": {
+      "type": "noul",
+      "reads": ["lyrics"],
+      "instructions": "Does `lyrics` contain hateful or harassing content, or content promoting self-harm, directed at any person or group?",
+      "criteria": {
+        "true": "It contains such content.",
+        "false": "It does not."
+      },
+      "polarity": "violation",
+      "thresholds": { "accept": 0.9 }
+    },
+    "jev.plagiarism_risk": {
+      "type": "noul",
+      "reads": ["lyrics"],
+      "instructions": "Does `lyrics` reproduce a substantial passage of an existing song's words, rather than merely using common phrases?",
+      "criteria": {
+        "true": "A passage is recognisably another song's words.",
+        "false": "It is original, or uses only phrases common to the genre."
+      },
+      "polarity": "violation",
+      "thresholds": { "accept": 0.8 }
+    },
+    "jev.any_serious_violation": {
+      "type": "noul",
+      "reads": ["state"],
+      "instructions": "Does anything in `state` indicate that a requirement the user stated was seriously violated?",
+      "criteria": {
+        "true": "At least one stated requirement is seriously violated.",
+        "false": "Nothing stated is seriously violated."
+      },
+      "note": "A cross-check over the whole state. It never substitutes for the individual answers, because structural invariants between questions do not hold."
+    }
+  }
+}

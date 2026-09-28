@@ -1,0 +1,158 @@
+{
+  "song_id": "indie-folk-coast",
+  "oracle_model": "replay-authored-2026-09-28",
+  "note": "A worked battery with recorded answers, so the seam can be exercised with no network, no key and no GPU. The spec is the abridged indie-folk example from docs/design/compliance-architecture.md §7.1, the state is the fact sheet from §7.2, and the answers are authored to land one requirement in each of the four verdicts: met, unmet, uncertain and unverified. The mechanical verdicts are supplied as if the code and audio checkers had already run.",
+  "spec": {
+    "spec_version": "1",
+    "lane": "audio_first",
+    "oracle": "replay",
+    "requirements": [
+      {
+        "id": "duration",
+        "text": "About three minutes long",
+        "kind": "mechanical",
+        "verify": "audio.dsp.duration",
+        "severity": "hard",
+        "source": "explicit",
+        "stage_enforced": "fact_sheet"
+      },
+      {
+        "id": "tempo",
+        "text": "Around 92 BPM",
+        "kind": "mechanical",
+        "verify": "audio.dsp.tempo",
+        "severity": "hard",
+        "source": "explicit",
+        "stage_enforced": "fact_sheet"
+      },
+      {
+        "id": "key",
+        "text": "In F# minor",
+        "kind": "mechanical",
+        "verify": "audio.dsp.key",
+        "severity": "hard",
+        "source": "explicit",
+        "stage_enforced": "fact_sheet"
+      },
+      {
+        "id": "theme",
+        "text": "About leaving a coastal town in autumn",
+        "kind": "semantic",
+        "verify": "jev.theme_adherence",
+        "severity": "hard",
+        "source": "explicit",
+        "target": "leaving a coastal town in autumn",
+        "stage_enforced": "lyrics"
+      },
+      {
+        "id": "vocals",
+        "text": "A close-mic'd female alto",
+        "kind": "semantic",
+        "verify": "jev.vocal_spec",
+        "severity": "hard",
+        "source": "explicit",
+        "target": { "voice": "female", "register": "alto", "delivery": "close-mic'd" },
+        "stage_enforced": "plan"
+      },
+      {
+        "id": "genre",
+        "text": "Indie folk",
+        "kind": "semantic",
+        "verify": "jev.genre_fidelity",
+        "severity": "hard",
+        "source": "explicit",
+        "target": "indie folk",
+        "stage_enforced": "plan"
+      },
+      {
+        "id": "mood",
+        "text": "Wistful but not sad",
+        "kind": "semantic",
+        "verify": "jev.mood_axis",
+        "severity": "hard",
+        "source": "inferred",
+        "confirmed": true,
+        "target": { "wistful": 3, "sadness_max": 1 },
+        "stage_enforced": "lyrics"
+      },
+      {
+        "id": "no_imitation",
+        "text": "Does not imitate Bon Iver",
+        "kind": "policy",
+        "verify": "jev.artist_pastiche",
+        "severity": "policy",
+        "source": "explicit",
+        "target": "Bon Iver",
+        "stage_enforced": "never"
+      },
+      {
+        "id": "hook",
+        "text": "The chorus lands as a hook",
+        "kind": "semantic",
+        "verify": "human.listening",
+        "severity": "soft",
+        "source": "inferred",
+        "stage_enforced": "never"
+      }
+    ]
+  },
+  "state": {
+    "brief": {
+      "theme": "leaving a coastal town in autumn",
+      "genre": "indie folk",
+      "era": "contemporary",
+      "exclude_artist": "Bon Iver"
+    },
+    "measured": {
+      "duration_s": 184.2,
+      "tempo_bpm": 90.6,
+      "key": "E major",
+      "lufs": -11.4,
+      "vocal_ratio": 0.38
+    },
+    "caption": "Sparse fingerpicked acoustic guitar, close female alto, brushed drums entering mid-song, autumn imagery, restrained dynamics, tape-like warmth",
+    "chords": "F#m - D - A - E (verse); D - A - E - F#m (chorus)",
+    "lyrics": "[Verse]\nSalt on the window, the last bus is boarding\nOctober is folding the light off the bay\n[Chorus]\nSo long, low tide, I am going inland\nAutumn is closing the door on the coast"
+  },
+  "mechanical": [
+    {
+      "requirement_id": "duration",
+      "text": "About three minutes long",
+      "severity": "hard",
+      "checker": "audio.dsp.duration",
+      "verdict": "met",
+      "measured": { "value": 184.2, "target": 180, "within_tolerance": true },
+      "evidence": ["state.measured.duration_s"],
+      "note": "target 180s +/- 12"
+    },
+    {
+      "requirement_id": "tempo",
+      "text": "Around 92 BPM",
+      "severity": "hard",
+      "checker": "audio.dsp.tempo",
+      "verdict": "met",
+      "measured": { "value": 90.6, "target": 92, "within_tolerance": true },
+      "evidence": ["state.measured.tempo_bpm"],
+      "note": "target 92 BPM +/- 4"
+    },
+    {
+      "requirement_id": "key",
+      "text": "In F# minor",
+      "severity": "hard",
+      "checker": "audio.dsp.key",
+      "verdict": "unmet",
+      "measured": { "value": "E major", "target": "F# minor", "within_tolerance": false },
+      "evidence": ["state.measured.key"],
+      "note": "measured E major against a requested F# minor"
+    }
+  ],
+  "answers": {
+    "theme": { "noul": 0.93 },
+    "vocals": { "noul": 0.55 },
+    "genre": { "distribution": [0.01, 0.03, 0.11, 0.55, 0.3] },
+    "mood.wistful": { "distribution": [0.02, 0.05, 0.18, 0.5, 0.25] },
+    "mood.sadness": { "distribution": [0.05, 0.12, 0.3, 0.38, 0.15] },
+    "no_imitation": { "noul": 0.06 },
+    "jev.any_serious_violation": { "noul": 0.04 }
+  }
+}

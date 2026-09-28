@@ -145,6 +145,7 @@ musicmaster/
   lyrics.py       # parse, check, template conformance               (from check_lyrics.py)
   render.py       # render tags, budget, negatives                   (from render_tags.py)
   prompt.py       # canonical prompt, graph rendering, hashing        (from build_and_submit.py)
+  oracle.py       # battery questions, uncertainty band, evidence gate, report; replay oracle
 
   # Boundary -- the manifest is pure (hashing, staleness); reading and writing the song directory is not.
   bundle.py       # song directory, manifest, manifest hashes
@@ -152,7 +153,9 @@ musicmaster/
   # Execute tier -- needs a GPU, a filesystem or a network. Host only.
   generate.py     # Generator protocol, ComfyUI adapter       (from build_and_submit.py)
   measure.py      # mechanical, vocals, transitions, dynamics (from analyse_*.py)
-  oracle.py       # Jev / local / replay
+  # The oracle's transports belong here too -- hosted Jev, a local logit readout -- but the
+  # seam they plug into is core/oracle.py, so a run with no oracle still produces an honest
+  # report instead of an empty pane.
 
   api.py          # what the local backend exposes; the SPA imports the text tier directly
   cli.py          # musicmaster brief|compose|lyrics|prompt|render|verify
