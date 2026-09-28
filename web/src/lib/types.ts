@@ -451,6 +451,8 @@ export interface RadioPlan {
   bpm: number;
   selections: Selections;
   theme: string;
+  /** How that subject is told, rotated on a slower cycle than the subject itself. */
+  angle: string;
   instrumental: boolean;
   /** Where the take's companion files belong. Keyed by the song, not by the kind of take. */
   artifacts_dir: string;

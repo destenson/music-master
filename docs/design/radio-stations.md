@@ -39,6 +39,15 @@ take is derivable from those three values and the browser and the CLI cannot dis
 station is. The renderer draws the seed, exactly as it does for a hand-built song; the position
 names the song and rotates the subject a lyric is written about.
 
+The subject is rotated rather than drawn, and the difference is the point. A station carries five
+subjects, and a draw from five repeats one within any six songs by pigeonhole, so consecutive songs
+regularly came out about the same thing even though the model wrote different words for each. The
+position therefore walks the subjects in order — every subject is played before one returns — and a
+second, slower rotation over a pool shared by every station changes **how the subject is told**
+(`told as a list of things you kept`, `told from the other side of the same night`), so the second
+telling of a subject is a different song rather than a paraphrase. With five subjects and twelve
+ways to tell them, a subject and its telling only meet again after sixty songs.
+
 Three rules keep a draw coherent:
 
 - **Caps are respected.** `count` is clipped by the bin's `max_selections` and by whatever `fixed`
@@ -63,8 +72,9 @@ flight, and starts playback as soon as the **first** is ready rather than waitin
 buffer. A station's finished songs are listed per station in browser storage, because the page
 cannot list ComfyUI's output directory; the files themselves are the durable record.
 
-The lyrics come from the same generator the Lyrics tab uses, with the station's subject as the theme
-and the station's own brief as the contract. A model is optional: with none chosen or reachable, the
+The lyrics come from the same generator the Lyrics tab uses, with the station's subject as the theme,
+the station's rotated angle as the way it is told, and the station's own brief as the contract. A
+model is optional: with none chosen or reachable, the
 song is re-planned as an **instrumental** and the caption stops describing a singer who is not
 there. The panel's **instrumental** checkbox skips the model entirely. Because it is optional, the
 lyric call is bounded rather than open-ended: it is capped at 150 s and runs one at a time — the

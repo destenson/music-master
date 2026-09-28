@@ -659,6 +659,34 @@ class RadioTest(unittest.TestCase):
                         (plan["selections"].get(bin_id) or {}).get("options"), list(options)
                     )
 
+    def test_the_subject_rotates_and_the_telling_rotates_on_its_own_cycle(self) -> None:
+        # A subject drawn at random repeats within any six songs by pigeonhole, which is what made
+        # consecutive songs read as the same song. The position rotates it instead, so every subject
+        # is played before one returns, and the telling changes before the subject does — a subject
+        # that comes back comes back a different way.
+        station = radio.station_by_id(self.doc, self.station)
+        themes, angles = station["themes"], self.doc["angles"]
+        plans = [
+            radio.plan_song(self.doc, self.station, index, seed=900 + index, vocab=self.vocab)
+            for index in range(len(themes) * 3)
+        ]
+        self.assertEqual([plan["theme"] for plan in plans[: len(themes)]], themes)
+        self.assertEqual({plan["angle"] for plan in plans[: len(themes)]}, {angles[0]})
+        for index, plan in enumerate(plans[len(themes) : 2 * len(themes)]):
+            with self.subTest(index=index):
+                self.assertEqual(plan["theme"], plans[index]["theme"])
+                self.assertEqual(plan["angle"], angles[1])
+                self.assertNotEqual(plan["angle"], plans[index]["angle"])
+
+    def test_the_angle_pool_is_validated(self) -> None:
+        broken = json.loads(json.dumps(self.doc))
+        broken["angles"] = ["only one way"]
+        self.assertTrue(any("angles" in problem for problem in radio.validate(
+            self.vocab, self.templates, broken, schema=False)))
+        broken["angles"] = ["told twice", "told twice"]
+        self.assertTrue(any("duplicate" in problem for problem in radio.validate(
+            self.vocab, self.templates, broken, schema=False)))
+
     def test_an_instrumental_plan_describes_no_vocal(self) -> None:
         plan = radio.plan_song(
             self.doc, self.station, 0, seed=7, vocab=self.vocab, instrumental=True

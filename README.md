@@ -170,6 +170,10 @@ delivery and moods that are in character, and how many of them one song carries.
 own coherent subset, so consecutive songs differ in their kit, their synths, their mix and their key
 and still sound like the station. The draw is a pure function of the station, the song's position and
 the seed, and it is conflict-aware: an option that excludes something already chosen is never taken.
+The song's **subject rotates by position**, not by draw — a station carries five, and a random draw
+repeats one within any six songs, so a station plays every subject it has before it plays one again.
+The **way that subject is told** rotates on a slower cycle of its own, from a pool shared by every
+station, so a subject that does come back comes back told a different way.
 
 ```bash
 python3 vocabulary/radio_stations.py            # every station is playable: bins, options, counts, tempos, budget

@@ -16,8 +16,10 @@ Two kinds of statement make up a station:
   bin, so a station can always have live drums and *sometimes* a tambourine as well.
 
 The plan is a pure function of the station, the song's position and a seed. The position names the
-song and rotates its subject; the seed drives every draw, so a take is reproducible from
-``(station, position, seed)`` and the browser and the CLI cannot disagree about what a station is.
+song, rotates its subject, and rotates the way that subject is told on a slower cycle, so five
+subjects do not come back five times the same way; the seed drives every other draw, so a take is
+reproducible from ``(station, position, seed)`` and the browser and the CLI cannot disagree about
+what a station is.
 The renderer draws the seed, exactly as it does for a hand-built song.
 
 The draws are conflict-aware: an option is never taken if it excludes something already chosen, so
@@ -240,6 +242,14 @@ def plan_song(
         selections["hook"] = {"options": ["hook_instrumental"]}
 
     themes = station.get("themes") or []
+    # The position rotates the subject; it is not drawn. A station carries five, so a random draw
+    # repeats one within any six songs by pigeonhole, which is what made consecutive songs read as
+    # the same song. The telling rotates on a slower cycle of its own, so a subject that does come
+    # back comes back told a different way.
+    theme = themes[index % len(themes)] if themes else ""
+    angles = doc.get("angles") or []
+    cycle = len(themes) or 1
+    angle = angles[(index // cycle) % len(angles)] if angles else ""
     song_id = f"{station_id}-{index:03d}"
     return {
         "station_id": station_id,
@@ -249,7 +259,8 @@ def plan_song(
         "template_id": station["template_id"],
         "bpm": selections["tempo"]["value"],
         "selections": selections,
-        "theme": themes[(index + (seed or 0)) % len(themes)] if themes else "",
+        "theme": theme,
+        "angle": angle,
         "instrumental": bool(instrumental),
         **take_path(station_id, song_id, bool(instrumental)),
     }
@@ -336,6 +347,15 @@ def validate(vocab: dict, templates_doc: dict, doc: dict, *, schema: bool = True
             continue
         seen.add(where)
         problems += _check_station(vocab, bins, templates, station)
+
+    angles = doc.get("angles")
+    if angles is not None:
+        if not isinstance(angles, list) or len(angles) < 2:
+            problems.append("'angles' must be a list of at least two ways to tell a song")
+        elif len(set(angles)) != len(angles):
+            problems.append("angles contain a duplicate")
+        elif not all(isinstance(angle, str) and angle.strip() for angle in angles):
+            problems.append("every angle must be a non-empty string")
 
     if not problems:
         problems += _check_plans(vocab, doc)

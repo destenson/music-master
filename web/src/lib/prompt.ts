@@ -13,9 +13,17 @@ export interface PromptInput {
   caption: string;
   /** What the writer wants it to be about. The one part no amount of code can supply. */
   theme: string;
+  /**
+   * How to tell it: the voice, the address, the way in. A radio station rotates one per song, so a
+   * subject that comes back comes back told a different way. Hand-built songs usually have none.
+   */
+  angle?: string;
 }
 
-export function buildPrompt({ brief, caption, theme }: PromptInput): string {
+export function buildPrompt({ brief, caption, theme, angle }: PromptInput): string {
+  const about =
+    theme.trim() || "(unspecified — take the strongest reading of the brief and commit to one idea)";
+  const told = (angle ?? "").trim();
   return `You are writing the lyric for a song. The brief below is a contract: every number in it was
 computed from the arrangement, so honour those counts rather than inventing your own.
 
@@ -23,8 +31,8 @@ WHAT THE SONG SOUNDS LIKE
 ${caption}
 
 WHAT IT SHOULD BE ABOUT
-${theme.trim() || "(unspecified — take the strongest reading of the brief and commit to one idea)"}
-
+${about}
+${told ? `\nHOW IT IS TOLD\n${told}\n` : ""}
 ${brief}
 
 Write the finished lyric now.
@@ -41,7 +49,9 @@ Write the finished lyric now.
   but a bracketed tag belongs in a section that is not sung.
 - A caption word — a genre, an instrument, a delivery or a hook name — is not a lyric. The caption
   above already carries the sound, so never write those words into a section as a line.
-- The numbers in the brief — bar counts, seconds, syllable budgets, rhyme schemes, \`energy n/5\` — are
+${told ? `- Take the angle above as this song's way in: open on the moment or image it names rather than a
+  general statement about the subject, and let it decide the hook.
+` : ""}- The numbers in the brief — bar counts, seconds, syllable budgets, rhyme schemes, \`energy n/5\` — are
   instructions to you, not lyrics. Never write one into a section; music-master strips such a line
   from a finished draft, but a line you never write is a line it does not have to.
 - A caesura marker (/ or |) inside a line marks a phrase break and is never sung. Use it when a line

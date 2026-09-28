@@ -9,6 +9,12 @@
   "properties": {
     "radio_stations_version": { "type": "string", "const": "1" },
     "note": { "type": "string" },
+    "angles": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "Ways to tell a subject, shared by every station and rotated on a slower cycle than a station's themes, so a subject that comes back comes back told a different way."
+    },
     "stations": {
       "type": "array",
       "minItems": 20,
@@ -67,7 +73,7 @@
             "type": "array",
             "minItems": 1,
             "items": { "type": "string", "minLength": 1 },
-            "description": "Subjects a lyric can be written about. Rotated per song, so the station's songs are not about the same thing."
+            "description": "Subjects a lyric can be written about. Rotated by song position, so a station plays every subject it has before it plays one again."
           },
           "keys": {
             "type": "array",

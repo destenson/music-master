@@ -58,6 +58,8 @@ export interface RadioSong {
   bpm: number;
   caption: string;
   theme: string;
+  /** How that subject is told. Empty on a recovered take that did not record one. */
+  angle: string;
   lyrics: string;
   instrumental: boolean;
   lyricSource: "model" | "instrumental";
@@ -82,6 +84,8 @@ export interface SavedRadioSong {
   seed: number;
   caption: string;
   theme: string;
+  /** Absent on records written before the angle existed, so it is read back as empty. */
+  angle?: string;
   instrumental: boolean;
   file: OutputFile | null;
   at: number;
@@ -303,6 +307,7 @@ function createSong(stationId: string): RadioSong {
     bpm: 0,
     caption: "",
     theme: "",
+    angle: "",
     lyrics: "",
     instrumental: radioState.instrumental,
     lyricSource: "instrumental",
@@ -335,6 +340,7 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
     bpm: 0,
     caption: take.caption,
     theme: take.theme,
+    angle: take.angle ?? "",
     lyrics: "",
     instrumental: take.instrumental,
     // The take's own kind, not a default: a recovered sung take is not an instrumental one.
@@ -405,6 +411,7 @@ async function produce(song: RadioSong, token: number): Promise<void> {
     song.selections = plan.selections;
     song.bpm = plan.bpm;
     song.theme = plan.theme;
+    song.angle = plan.angle;
     song.caption = host.render(plan.selections)?.string ?? "";
     if (token !== session) return;
 
@@ -421,7 +428,7 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       song.abort.signal.addEventListener("abort", stopIt, { once: true });
       try {
         const brief = host.brief(plan.template_id, plan.bpm, plan.selections);
-        const prompt = buildPrompt({ brief, caption: song.caption, theme: plan.theme });
+        const prompt = buildPrompt({ brief, caption: song.caption, theme: plan.theme, angle: plan.angle });
         const text = await withTimeout(
           serializeLyrics(() => {
             song.status = "writing";
@@ -790,6 +797,7 @@ function toSaved(song: RadioSong): SavedRadioSong {
     seed: song.seed,
     caption: song.caption,
     theme: song.theme,
+    angle: song.angle,
     instrumental: song.instrumental,
     file: song.file,
     at: song.at,

@@ -1,6 +1,20 @@
 {
   "radio_stations_version": "1",
   "note": "Radio stations. A station fixes its identity (genre, scene, era, tempo and mood range) and declares pools for everything that makes a sound; musicmaster.radio draws a coherent subset from those pools for each song, so consecutive songs differ in instrumentation, production, groove, delivery and key while staying in the genre. The planner owns tempo, structure and key, so no station fixes them. Run `python3 vocabulary/radio_stations.py` to check the document.",
+  "angles": [
+    "told to the person who left",
+    "told as a list of things you kept",
+    "told through one room and everything in it",
+    "told from the other side of the same night",
+    "told as a warning to a younger self",
+    "told as a phone call you never made",
+    "told through what is missing",
+    "told as a countdown to the moment it turned",
+    "told by the one who stayed behind",
+    "told as a letter you will not send",
+    "told out of order, the way it is remembered",
+    "told through a borrowed thing you never gave back"
+  ],
   "stations": [
     {
       "id": "boom-bap-basement",

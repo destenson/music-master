@@ -372,6 +372,23 @@ check(
   radioPlan.artifacts_dir,
 );
 
+// A subject drawn at random repeats within any six songs by pigeonhole, which is what made
+// consecutive radio songs read as the same song. The position rotates it, and the way it is told
+// rotates on a slower cycle, so a subject that comes back comes back differently. Both are read
+// from the document rather than assumed here.
+const stationDoc = JSON.parse(
+  fs.readFileSync(path.join(DIST, "repo", "vocabulary", "radio-stations.json"), "utf8"),
+);
+const neon = stationDoc.stations.find((entry) => entry.id === "neon-drive");
+const cycles = [3, 4, 3 + neon.themes.length].map((index) =>
+  call("radio_plan", { station_id: "neon-drive", index, seed: 12345 }),
+);
+check("the subject rotates by position",
+  cycles.map((plan) => plan.theme), [neon.themes[3], neon.themes[4], neon.themes[3]]);
+check("the telling rotates on its own cycle",
+  cycles.map((plan) => plan.angle),
+  [stationDoc.angles[0], stationDoc.angles[0], stationDoc.angles[1]]);
+
 const radioArtifact = call("artifacts", {
   song_id: radioPlan.song_id,
   template_id: radioPlan.template_id,
@@ -404,6 +421,28 @@ const templatesFile = JSON.parse(
 );
 const template = templatesFile.templates.find((t) => t.id === song.template_id);
 const brief = call("brief", { template_id: song.template_id, bpm: song.bpm, selections });
+
+// How a song is told reaches the model only through the prompt, so the prompt has to carry it, and a
+// hand-built song — which has no angle — has to read exactly as it did before.
+const toldPrompt = buildPrompt({
+  brief: brief.brief,
+  caption: rendered.string,
+  theme: "a subject",
+  angle: stationDoc.angles[0],
+});
+check(
+  "the prompt says how the song is told",
+  toldPrompt.includes("HOW IT IS TOLD") && toldPrompt.includes(stationDoc.angles[0]),
+  true,
+);
+check(
+  "a hand-built song has no telling section",
+  buildPrompt({ brief: brief.brief, caption: rendered.string, theme: "a subject" }).includes(
+    "HOW IT IS TOLD",
+  ),
+  false,
+);
+
 const scaffold = call("scaffold", { template_id: song.template_id });
 const checked = call("check_lyric", {
   text: scaffold.text,
