@@ -632,6 +632,14 @@ class RadioTest(unittest.TestCase):
         self.assertGreaterEqual(len(self.doc["stations"]), 20)
         self.assertLessEqual(len(self.doc["stations"]), 40)
 
+    def test_every_station_carries_enough_subjects(self) -> None:
+        # The subject rotates by position, so a station has only as many distinct songs as it has
+        # subjects before one comes back. Five made the subject return within a half-dozen songs;
+        # the pool is wide enough that a listener hears every subject before one repeats.
+        for station in self.doc["stations"]:
+            with self.subTest(station=station["id"]):
+                self.assertGreaterEqual(len(station["themes"]), 7)
+
     def test_the_schema_and_the_semantic_checks_agree(self) -> None:
         # The schema and the checks below look at different things; a station document that passes
         # one and not the other means one of them has stopped being maintained.
@@ -686,6 +694,42 @@ class RadioTest(unittest.TestCase):
         broken["angles"] = ["told twice", "told twice"]
         self.assertTrue(any("duplicate" in problem for problem in radio.validate(
             self.vocab, self.templates, broken, schema=False)))
+
+    def test_the_detail_rotates_one_per_song(self) -> None:
+        # The detail is what a song is actually made of, and it rotates one per song rather than
+        # being drawn, so it moves even where the subject and the telling have not — a subject and a
+        # telling that meet again do not meet as the same song.
+        details = self.doc["details"]
+        plans = [
+            radio.plan_song(self.doc, self.station, index, seed=700 + index, vocab=self.vocab)
+            for index in range(len(details) + 1)
+        ]
+        self.assertEqual([plan["detail"] for plan in plans[: len(details)]], details)
+        self.assertEqual(plans[len(details)]["detail"], details[0])
+
+    def test_the_detail_pool_is_validated(self) -> None:
+        broken = json.loads(json.dumps(self.doc))
+        broken["details"] = ["only one thing"]
+        self.assertTrue(any("details" in problem for problem in radio.validate(
+            self.vocab, self.templates, broken, schema=False)))
+        broken["details"] = ["made twice", "made twice"]
+        self.assertTrue(any("duplicate" in problem for problem in radio.validate(
+            self.vocab, self.templates, broken, schema=False)))
+
+    def test_the_three_content_axes_do_not_line_up_quickly(self) -> None:
+        # Subject, telling and detail each rotate on their own period. A pool whose length shares no
+        # factor with the others is what stretches the point at which a combination comes back, so
+        # this pins that the detail pool is not a multiple of the theme cycle.
+        themes, angles, details = (
+            len(self.doc["stations"][0]["themes"]),
+            len(self.doc["angles"]),
+            len(self.doc["details"]),
+        )
+        self.assertNotEqual(details % themes, 0)
+        period = details
+        while period % (themes * angles) != 0:
+            period += details
+        self.assertGreater(period, themes * angles)
 
     def test_an_instrumental_plan_describes_no_vocal(self) -> None:
         plan = radio.plan_song(

@@ -15,6 +15,27 @@
     "told out of order, the way it is remembered",
     "told through a borrowed thing you never gave back"
   ],
+  "details": [
+    "set in one room, and never leave it",
+    "built around a single object you can hold",
+    "a conversation that keeps being interrupted",
+    "everything happens in the ten minutes before something does",
+    "named for a place that no longer exists",
+    "one detail returns in every chorus, changed each time",
+    "nothing is named directly, only described",
+    "a promise made to someone who is not there",
+    "the weather is the only thing that changes",
+    "told in the present tense, as it happens",
+    "built from things you would only say out loud once",
+    "the hook is a question with no answer",
+    "two places, cut between, never explained",
+    "an ordinary object treated as a relic",
+    "the same night told twice, once wrong",
+    "heard from another room",
+    "everything described by its sound rather than its name",
+    "a number that keeps coming back",
+    "one long scene with no cut in it"
+  ],
   "stations": [
     {
       "id": "boom-bap-basement",
@@ -31,7 +52,9 @@
         "the last summer before everything changed",
         "an old friend you only see at funerals",
         "a tape that still plays",
-        "a corner store that knew your name"
+        "a corner store that knew your name",
+        "a staircase you know by its fourth step",
+        "the winter the heat got cut off"
       ],
       "keys": [
         {
@@ -298,7 +321,9 @@
         "money that changes everyone around you",
         "the quiet after the club",
         "a promise made at 3am",
-        "a name you have to live up to"
+        "a name you have to live up to",
+        "a night that cost more than it was worth",
+        "the group chat that went quiet"
       ],
       "keys": [
         {
@@ -592,7 +617,9 @@
         "watching your back on the walk home",
         "the brother who took the other road",
         "a name that outlives you",
-        "winter on the estate"
+        "winter on the estate",
+        "a friend's name on a shirt",
+        "a memorial that keeps getting repainted"
       ],
       "keys": [
         {
@@ -876,7 +903,9 @@
         "rain on a window you are not looking at",
         "the book you keep starting again",
         "a slow Sunday with nowhere to be",
-        "a train you take every day"
+        "a train you take every day",
+        "a playlist you have stopped hearing",
+        "the last page of something you did not enjoy"
       ],
       "keys": [
         {
@@ -1158,7 +1187,9 @@
         "headlights in a fogged mirror",
         "a tape left in a stolen deck",
         "the last lap before dawn",
-        "a city that smells of petrol"
+        "a city that smells of petrol",
+        "a friend's car you will never ride in again",
+        "an engine you can hear from three streets away"
       ],
       "keys": [
         {
@@ -1446,7 +1477,9 @@
         "borrowed amps and borrowed time",
         "a girl watching from the fire exit",
         "one more song before the lights",
-        "a demo tape nobody heard"
+        "a demo tape nobody heard",
+        "a setlist written on your hand",
+        "the one venue that still answers the phone"
       ],
       "keys": [
         {
@@ -1718,7 +1751,9 @@
         "light through a curtain at four in the afternoon",
         "someone leaving in slow motion",
         "the sea in winter",
-        "a photograph you cannot throw away"
+        "a photograph you cannot throw away",
+        "a year that went by in a blur",
+        "the long grass at the end of the garden"
       ],
       "keys": [
         {
@@ -1995,7 +2030,9 @@
         "the anger that gets you out of bed",
         "a mirror and a set of weights",
         "refusing to be told no",
-        "the noise inside your own head"
+        "the noise inside your own head",
+        "a promise you made to yourself at fifteen",
+        "the last person who underestimated you"
       ],
       "keys": [
         {
@@ -2278,7 +2315,9 @@
         "a job that owns your hands",
         "the friends who got out",
         "burning it down before it burns you",
-        "a bus ticket you never used"
+        "a bus ticket you never used",
+        "a poster for a show that got cancelled",
+        "the back room of a pub that smells of carpet"
       ],
       "keys": [
         {
@@ -2543,7 +2582,9 @@
         "a hometown you only love from a distance",
         "getting up one more time",
         "everyone singing the same line",
-        "the road that always leads back"
+        "the road that always leads back",
+        "a scar you tell a story about",
+        "the friend who saved you a seat"
       ],
       "keys": [
         {
@@ -2826,7 +2867,9 @@
         "the hum of a building at night",
         "a city built out of glass and cameras",
         "wanting to switch off",
-        "a signal that never stops"
+        "a signal that never stops",
+        "a shift that never gets light",
+        "a password you have to change again"
       ],
       "keys": [
         {
@@ -3123,7 +3166,9 @@
         "the first warm morning of the year",
         "falling for someone on a bus",
         "a tape you made for no one",
-        "the summer you turned eighteen"
+        "the summer you turned eighteen",
+        "a key you were given to a flat",
+        "the first day of a job you might like"
       ],
       "keys": [
         {
@@ -3412,7 +3457,9 @@
         "a night out that fixes everything",
         "the song you will hate yourself for loving",
         "hands up at the chorus",
-        "a summer that never ended"
+        "a summer that never ended",
+        "a photo from a night you barely remember",
+        "the one who kept you upright"
       ],
       "keys": [
         {
@@ -3692,7 +3739,9 @@
         "lying awake next to someone",
         "the year you got better",
         "an apology you never delivered",
-        "a room that still smells of them"
+        "a room that still smells of them",
+        "a hoodie that is not yours",
+        "the group photo you were cropped out of"
       ],
       "keys": [
         {
@@ -3982,7 +4031,9 @@
         "a crush that exists mostly in a group chat",
         "being too much on purpose",
         "the internet at four in the morning",
-        "a screen that loves you back"
+        "a screen that loves you back",
+        "a username you have outgrown",
+        "a compliment from a stranger that ruined your week"
       ],
       "keys": [
         {
@@ -4275,7 +4326,9 @@
         "summer in a city by the water",
         "a romance that lasts one night",
         "the last train you decided to miss",
-        "a bar with a piano"
+        "a bar with a piano",
+        "an answering machine you keep replaying",
+        "a cocktail you only order in one bar"
       ],
       "keys": [
         {
@@ -4559,7 +4612,9 @@
         "neon reflected in a wet windshield",
         "driving away from a version of yourself",
         "a city you will never live in",
-        "the last exit before the sea"
+        "the last exit before the sea",
+        "a service station at four in the morning",
+        "a passenger who fell asleep"
       ],
       "keys": [
         {
@@ -4846,7 +4901,9 @@
         "a stranger you keep catching eyes with",
         "dancing until your legs give out",
         "a night that does not need a story",
-        "the last song before the lights"
+        "the last song before the lights",
+        "a coat check ticket you kept",
+        "the friend you lost in the crowd"
       ],
       "keys": [
         {
@@ -5142,7 +5199,9 @@
         "a body moving without permission",
         "the machine rhythm of a working week",
         "one more track before the sun",
-        "a room with no windows"
+        "a room with no windows",
+        "a rhythm you cannot stop hearing on the walk home",
+        "a night shift that never ends"
       ],
       "keys": [
         {
@@ -5437,7 +5496,9 @@
         "the energy of a crowd at 2am",
         "running on adrenaline and nothing else",
         "a sound system that owns the street",
-        "the sun coming up on a night bus"
+        "the sun coming up on a night bus",
+        "a rewind you will remember for years",
+        "the last train you will not make"
       ],
       "keys": [
         {
@@ -5728,7 +5789,9 @@
         "a thought you almost had",
         "the space between sleeping and waking",
         "light moving across a floor",
-        "a tide going out"
+        "a tide going out",
+        "a room you remember from a fever",
+        "an empty airport before the shops open"
       ],
       "keys": [
         {
@@ -5999,7 +6062,9 @@
         "wine and a record you have heard a hundred times",
         "the quiet after guests leave",
         "an evening that asks nothing of you",
-        "a balcony at midnight"
+        "a balcony at midnight",
+        "a record with a scratch you have come to like",
+        "the last cigarette of the evening"
       ],
       "keys": [
         {
@@ -6296,7 +6361,9 @@
         "a holiday you only half remember",
         "being alone in a crowd",
         "a screen showing nothing",
-        "an escalator to nowhere"
+        "an escalator to nowhere",
+        "a fountain in a shopping centre",
+        "a tape you cannot bring yourself to record over"
       ],
       "keys": [
         {
@@ -6589,7 +6656,9 @@
         "the friend who held you together",
         "a Sunday that heals the week",
         "saying thank you out loud",
-        "a love that finally feels safe"
+        "a love that finally feels safe",
+        "a body that finally feels like yours",
+        "the first meal you cooked for someone new"
       ],
       "keys": [
         {
@@ -6878,7 +6947,9 @@
         "wanting what you cannot say",
         "a hotel room in a city you do not know",
         "the pause before a first kiss",
-        "a jacket that still smells of them"
+        "a jacket that still smells of them",
+        "a voicemail you saved",
+        "a door left unlocked for someone"
       ],
       "keys": [
         {
@@ -7175,7 +7246,9 @@
         "dancing like the rent is not due",
         "the whole street moving at once",
         "a bassline you feel in your teeth",
-        "a night nobody wants to end"
+        "a night nobody wants to end",
+        "a horn line that gets everyone in the room",
+        "the uncle who starts every dance"
       ],
       "keys": [
         {
@@ -7453,7 +7526,9 @@
         "a prayer that is really a promise",
         "the congregation finding one voice",
         "grace you did not earn",
-        "a mother's faith"
+        "a mother's faith",
+        "a hymn you know without the book",
+        "the pew your family always sat in"
       ],
       "keys": [
         {
@@ -7738,7 +7813,9 @@
         "a father who did his best",
         "leaving a town without saying goodbye",
         "the river behind the field",
-        "a dog buried under the oak"
+        "a dog buried under the oak",
+        "a kitchen table with one leg shorter than the rest",
+        "the last time you saw her in the garden"
       ],
       "keys": [
         {
@@ -8018,7 +8095,9 @@
         "the last honest thing you did",
         "a truck stop at three in the morning",
         "a love that ran out of road",
-        "a bar tab older than the truck"
+        "a bar tab older than the truck",
+        "a county line you crossed for good",
+        "a radio station that only plays at night"
       ],
       "keys": [
         {
@@ -8291,7 +8370,9 @@
         "the woman who left with the car",
         "a crossroads at midnight",
         "borrowing trouble you cannot repay",
-        "a pawn shop ring"
+        "a pawn shop ring",
+        "a dog that followed you home",
+        "a name the sheriff still knows"
       ],
       "keys": [
         {
@@ -8578,7 +8659,9 @@
         "a barn dance that runs until dawn",
         "the mountains that raised you",
         "a family that sings whether or not you ask",
-        "a jug of something local"
+        "a jug of something local",
+        "a porch where the music never actually stops",
+        "a fence that needs fixing before winter"
       ],
       "keys": [
         {
@@ -8843,7 +8926,9 @@
         "dancing with a stranger until sunrise",
         "a summer that refuses to end",
         "the whole barrio singing one line",
-        "a phone full of missed calls"
+        "a phone full of missed calls",
+        "a speaker someone's cousin borrowed",
+        "a night the neighbours joined in"
       ],
       "keys": [
         {
@@ -9122,7 +9207,9 @@
         "a band that will not stop",
         "the one night the whole bar is family",
         "a rhythm older than the city",
-        "a song your grandmother knew"
+        "a song your grandmother knew",
+        "a pair of shoes that have done this before",
+        "the song the band plays when someone asks"
       ],
       "keys": [
         {
@@ -9401,7 +9488,9 @@
         "a love that feels easy for once",
         "the whole family dancing badly",
         "a city that knows how to enjoy itself",
-        "a long drive to the coast"
+        "a long drive to the coast",
+        "a plate that keeps getting passed to you",
+        "the moment the music and the weather agree"
       ],
       "keys": [
         {
@@ -9683,7 +9772,9 @@
         "a dance floor at four in the morning",
         "someone catching your eye across the room",
         "the bass you feel before you hear",
-        "a taxi home as the sky goes grey"
+        "a taxi home as the sky goes grey",
+        "a light left on in a kitchen",
+        "the last two people on the floor"
       ],
       "keys": [
         {
@@ -9977,7 +10068,9 @@
         "a song you used to know",
         "rain on a taxi window",
         "a city asleep outside the door",
-        "an old flame across the room"
+        "an old flame across the room",
+        "an ashtray and a glass that is nearly empty",
+        "the doorman who knows your name"
       ],
       "keys": [
         {
@@ -10263,7 +10356,9 @@
         "the sea at the end of the street",
         "a smile from across the room",
         "a holiday that is already a memory",
-        "a caf\u00e9 that never closes"
+        "a caf\u00e9 that never closes",
+        "a table by the window someone is saving",
+        "the last song before the caf\u00e9 closes"
       ],
       "keys": [
         {
@@ -10546,7 +10641,9 @@
         "the moment before everything changes",
         "a landscape with nobody in it",
         "holding on through the winter",
-        "a letter that arrives too late"
+        "a letter that arrives too late",
+        "a fire seen from a long way off",
+        "the year the river changed course"
       ],
       "keys": [
         {
@@ -10835,7 +10932,9 @@
         "the whole world holding its breath",
         "a victory nobody expected",
         "carrying the ones who could not come",
-        "a banner in the wind"
+        "a banner in the wind",
+        "a door opening onto a room full of people",
+        "a flag planted on a hill nobody wanted"
       ],
       "keys": [
         {

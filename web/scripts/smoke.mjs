@@ -23,7 +23,14 @@ import { editorTheme } from "../src/lib/lens.ts";
 import { EditorState } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { proxy } from "svelte/internal/client";
-import { generate } from "../src/lib/ollama.ts";
+import {
+  freshWritingSeed,
+  generate,
+  loadTemperature,
+  saveTemperature,
+  WRITING_SAMPLING,
+  writingSeed,
+} from "../src/lib/ollama.ts";
 import { reloadUrl, stamp } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
 import { parseTakeName, renditionLabels, takesFromHistory, lyricFingerprint } from "../src/lib/takes.ts";
@@ -423,6 +430,13 @@ check("the subject rotates by position",
 check("the telling rotates on its own cycle",
   cycles.map((plan) => plan.angle),
   [stationDoc.angles[0], stationDoc.angles[0], stationDoc.angles[1]]);
+check("the detail rotates one per song",
+  cycles.map((plan) => plan.detail),
+  [3, 4, 3 + neon.themes.length].map(
+    (index) => stationDoc.details[index % stationDoc.details.length],
+  ));
+check("the detail pool does not line up with the other cycles quickly",
+  stationDoc.details.length % neon.themes.length === 0, false);
 
 const radioArtifact = call("artifacts", {
   song_id: radioPlan.song_id,
@@ -1069,6 +1083,60 @@ check(
   "partial",
 );
 globalThis.fetch = realFetch;
+
+// --- Sampling: asking a different question ------------------------------------------------------
+//
+// A prompt is a question; without sampling parameters the server's defaults decide how the model may
+// answer it, and a low-temperature model answers the same question with the same words — which is
+// how a second Generate press, or a second song that drew a similar prompt, came back as the same
+// lyric. So every write sends a temperature and a seed, and the seed is the song's moved by the
+// attempt: reproducible from what was recorded, but a re-ask is a different request.
+
+console.log("\nsampling:\n");
+check("the same attempt is the same seed", writingSeed(4409, 0), writingSeed(4409, 0));
+check("another attempt is another seed", writingSeed(4409, 1) === writingSeed(4409, 0), false);
+check("a different song is a different seed", writingSeed(4409, 0) === writingSeed(4410, 0), false);
+check("a seed stays inside ollama's range", writingSeed(0x7fffffff, 500) < 0x7fffffff, true);
+const fresh = freshWritingSeed();
+check("a fresh seed is positive and in range", fresh >= 1 && fresh < 0x7fffffff, true);
+
+// What actually reaches the wire, which is the whole point: a server that never sees options uses
+// its own defaults however many of them this module defines.
+let sent = null;
+globalThis.fetch = async (_url, init) => {
+  sent = JSON.parse(init.body);
+  return chunksOf(['{"response":"done","done":true}'], true);
+};
+await generate({
+  model: "m",
+  base: "http://example.invalid",
+  prompt: "p",
+  sampling: { temperature: 1.05, top_p: 0.95, repeat_penalty: 1.05, seed: 7 },
+});
+check("sampling rides along as options", sent.options, {
+  temperature: 1.05,
+  top_p: 0.95,
+  repeat_penalty: 1.05,
+  seed: 7,
+});
+await generate({ model: "m", base: "http://example.invalid", prompt: "p" });
+check("a caller that sends no sampling gets the server's defaults", "options" in sent, false);
+globalThis.fetch = realFetch;
+
+// The temperature is the one knob the writer tunes, so it is remembered and clamped.
+const realStorage = globalThis.localStorage;
+const store = new Map();
+globalThis.localStorage = {
+  getItem: (key) => store.get(key) ?? null,
+  setItem: (key, value) => store.set(key, String(value)),
+  removeItem: (key) => store.delete(key),
+};
+check("the temperature defaults when nothing is remembered", loadTemperature(), WRITING_SAMPLING.temperature);
+saveTemperature(1.4);
+check("a temperature is remembered", loadTemperature(), 1.4);
+saveTemperature(9);
+check("a temperature is clamped into range", loadTemperature(), 2);
+globalThis.localStorage = realStorage;
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //

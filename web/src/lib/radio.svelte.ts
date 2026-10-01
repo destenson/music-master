@@ -29,7 +29,14 @@ import {
   viewUrl,
   type OutputFile,
 } from "./comfy";
-import { generate, ollamaBase } from "./ollama";
+import {
+  generate,
+  loadTemperature,
+  ollamaBase,
+  writingSeed,
+  WRITING_SAMPLING,
+  type Sampling,
+} from "./ollama";
 import { readTakeTags } from "./mp3.ts";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
@@ -68,11 +75,18 @@ export interface RadioSong {
   theme: string;
   /** How that subject is told. Empty on a recovered take that did not record one. */
   angle: string;
+  /** What the song is made of — a place, an object, a form. Empty on a recovered take. */
+  detail: string;
   lyrics: string;
   instrumental: boolean;
   lyricSource: "model" | "instrumental";
   /** Where this take sits among the takes that sing the same words, when it is not alone. */
   rendition: Rendition | null;
+  /**
+   * How the lyric model was allowed to answer, recorded so a take is reproducible. The seed is the
+   * song's, moved by the attempt, so asking again after a collision is a different request.
+   */
+  sampling: Sampling | null;
   jobId: string | null;
   waited: number;
   file: OutputFile | null;
@@ -102,6 +116,8 @@ export interface SavedRadioSong {
   bpm?: number;
   /** Where the take sits among the takes that sing the same words. Recomputed on discovery. */
   rendition?: Rendition | null;
+  /** The sampling the lyric was written with, so the take can be written again the same way. */
+  sampling?: Sampling;
   instrumental: boolean;
   file: OutputFile | null;
   at: number;
@@ -324,10 +340,12 @@ function createSong(stationId: string): RadioSong {
     caption: "",
     theme: "",
     angle: "",
+    detail: "",
     lyrics: "",
     instrumental: radioState.instrumental,
     lyricSource: "instrumental",
     rendition: null,
+    sampling: null,
     jobId: null,
     waited: 0,
     file: null,
@@ -361,11 +379,14 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
     caption: take.caption,
     theme: take.theme,
     angle: take.angle ?? "",
+    // A recovered take did not record one: the graph carries the words, not the plan behind them.
+    detail: "",
     lyrics: take.lyrics ?? "",
     instrumental: take.instrumental,
     // The take's own kind, not a default: a recovered sung take is not an instrumental one.
     lyricSource: take.instrumental ? "instrumental" : "model",
     rendition: take.rendition ?? null,
+    sampling: take.sampling ?? null,
     jobId: null,
     waited: 0,
     file: take.file,
@@ -433,6 +454,7 @@ async function produce(song: RadioSong, token: number): Promise<void> {
     song.bpm = plan.bpm;
     song.theme = plan.theme;
     song.angle = plan.angle;
+    song.detail = plan.detail;
     song.caption = host.render(plan.selections)?.string ?? "";
     if (token !== session) return;
 
@@ -449,7 +471,22 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       song.abort.signal.addEventListener("abort", stopIt, { once: true });
       try {
         const brief = host.brief(plan.template_id, plan.bpm, plan.selections);
-        const prompt = buildPrompt({ brief, caption: song.caption, theme: plan.theme, angle: plan.angle });
+        const prompt = buildPrompt({
+          brief,
+          caption: song.caption,
+          theme: plan.theme,
+          angle: plan.angle,
+          detail: plan.detail,
+        });
+        // The song's own seed moves the sampler, so the arrangement and the words vary together and
+        // the take can be written again from what is recorded. The attempt is zero until a collision
+        // asks for another draft.
+        const sampling: Sampling = {
+          ...WRITING_SAMPLING,
+          temperature: loadTemperature(),
+          seed: writingSeed(song.seed, 0),
+        };
+        song.sampling = sampling;
         const text = await withTimeout(
           serializeLyrics(() => {
             song.status = "writing";
@@ -461,6 +498,7 @@ async function produce(song: RadioSong, token: number): Promise<void> {
               // The lyric is the whole answer; a thinking model's reasoning is tens of seconds that
               // nothing downstream can use.
               think: false,
+              sampling,
             });
           }),
           LYRIC_TIMEOUT_MS,
@@ -881,6 +919,7 @@ function toSaved(song: RadioSong): SavedRadioSong {
     lyrics: song.lyrics,
     bpm: song.bpm,
     rendition: song.rendition,
+    sampling: song.sampling ?? undefined,
     instrumental: song.instrumental,
     file: song.file,
     at: song.at,

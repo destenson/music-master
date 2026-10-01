@@ -16,10 +16,10 @@ Two kinds of statement make up a station:
   bin, so a station can always have live drums and *sometimes* a tambourine as well.
 
 The plan is a pure function of the station, the song's position and a seed. The position names the
-song, rotates its subject, and rotates the way that subject is told on a slower cycle, so five
-subjects do not come back five times the same way; the seed drives every other draw, so a take is
-reproducible from ``(station, position, seed)`` and the browser and the CLI cannot disagree about
-what a station is.
+song, rotates its subject, rotates the way that subject is told on a slower cycle, and rotates what
+the song is made of on a faster one, so a subject does not come back the same way or the same song;
+the seed drives every other draw, so a take is reproducible from ``(station, position, seed)`` and
+the browser and the CLI cannot disagree about what a station is.
 The renderer draws the seed, exactly as it does for a hand-built song.
 
 The draws are conflict-aware: an option is never taken if it excludes something already chosen, so
@@ -242,14 +242,19 @@ def plan_song(
         selections["hook"] = {"options": ["hook_instrumental"]}
 
     themes = station.get("themes") or []
-    # The position rotates the subject; it is not drawn. A station carries five, so a random draw
-    # repeats one within any six songs by pigeonhole, which is what made consecutive songs read as
+    # The position rotates the subject; it is not drawn. A station carries seven, so a random draw
+    # repeats one within any eight songs by pigeonhole, which is what made consecutive songs read as
     # the same song. The telling rotates on a slower cycle of its own, so a subject that does come
-    # back comes back told a different way.
+    # back comes back told a different way, and the detail — the place, object or form the song is
+    # actually made of — rotates one per song, so a subject and a telling can meet again without the
+    # song itself repeating. A detail pool whose length shares no factor with the other cycles
+    # stretches the point at which all three line up again.
     theme = themes[index % len(themes)] if themes else ""
     angles = doc.get("angles") or []
     cycle = len(themes) or 1
     angle = angles[(index // cycle) % len(angles)] if angles else ""
+    details = doc.get("details") or []
+    detail = details[index % len(details)] if details else ""
     song_id = f"{station_id}-{index:03d}"
     return {
         "station_id": station_id,
@@ -261,6 +266,7 @@ def plan_song(
         "selections": selections,
         "theme": theme,
         "angle": angle,
+        "detail": detail,
         "instrumental": bool(instrumental),
         **take_path(station_id, song_id, bool(instrumental)),
     }
@@ -356,6 +362,15 @@ def validate(vocab: dict, templates_doc: dict, doc: dict, *, schema: bool = True
             problems.append("angles contain a duplicate")
         elif not all(isinstance(angle, str) and angle.strip() for angle in angles):
             problems.append("every angle must be a non-empty string")
+
+    details = doc.get("details")
+    if details is not None:
+        if not isinstance(details, list) or len(details) < 2:
+            problems.append("'details' must be a list of at least two things a song can be made of")
+        elif len(set(details)) != len(details):
+            problems.append("details contain a duplicate")
+        elif not all(isinstance(detail, str) and detail.strip() for detail in details):
+            problems.append("every detail must be a non-empty string")
 
     if not problems:
         problems += _check_plans(vocab, doc)

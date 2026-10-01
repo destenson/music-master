@@ -18,12 +18,18 @@ export interface PromptInput {
    * subject that comes back comes back told a different way. Hand-built songs usually have none.
    */
   angle?: string;
+  /**
+   * What the song is made of — a place, an object, a form. A station rotates one per song, so a
+   * subject and a telling that meet again do not meet as the same song. Hand-built songs have none.
+   */
+  detail?: string;
 }
 
-export function buildPrompt({ brief, caption, theme, angle }: PromptInput): string {
+export function buildPrompt({ brief, caption, theme, angle, detail }: PromptInput): string {
   const about =
     theme.trim() || "(unspecified — take the strongest reading of the brief and commit to one idea)";
   const told = (angle ?? "").trim();
+  const made = (detail ?? "").trim();
   return `You are writing the lyric for a song. The brief below is a contract: every number in it was
 computed from the arrangement, so honour those counts rather than inventing your own.
 
@@ -32,7 +38,7 @@ ${caption}
 
 WHAT IT SHOULD BE ABOUT
 ${about}
-${told ? `\nHOW IT IS TOLD\n${told}\n` : ""}
+${told ? `\nHOW IT IS TOLD\n${told}\n` : ""}${made ? `\nWHAT IT IS MADE OF\n${made}\n` : ""}
 ${brief}
 
 Write the finished lyric now.
@@ -51,6 +57,8 @@ Write the finished lyric now.
   above already carries the sound, so never write those words into a section as a line.
 ${told ? `- Take the angle above as this song's way in: open on the moment or image it names rather than a
   general statement about the subject, and let it decide the hook.
+` : ""}${made ? `- Build the song out of the detail above: the place, the object or the form it names is what the
+  verses are made of, not something mentioned once on the way to a general statement.
 ` : ""}- The numbers in the brief — bar counts, seconds, syllable budgets, rhyme schemes, \`energy n/5\` — are
   instructions to you, not lyrics. Never write one into a section; music-master strips such a line
   from a finished draft, but a line you never write is a line it does not have to.

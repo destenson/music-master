@@ -453,6 +453,8 @@ export interface RadioPlan {
   theme: string;
   /** How that subject is told, rotated on a slower cycle than the subject itself. */
   angle: string;
+  /** What the song is actually made of — a place, an object, a form — rotated one per song. */
+  detail: string;
   instrumental: boolean;
   /** Where the take's companion files belong. Keyed by the song, not by the kind of take. */
   artifacts_dir: string;

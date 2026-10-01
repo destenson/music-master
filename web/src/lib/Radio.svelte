@@ -300,6 +300,7 @@
                 {#if current.seed}· seed <span class="mono">{current.seed}</span>{/if}
                 {#if current.theme}· about “{current.theme}”{/if}
                 {#if current.angle}· {current.angle}{/if}
+                {#if current.detail}· {current.detail}{/if}
               </div>
               {#if current.instrumental && current.plan && !radioState.instrumental}
                 <div class="finding note">no lyric model was reachable, so this take is instrumental</div>
@@ -435,6 +436,7 @@
                   <span class="small muted mono">{song.index}</span>
                   <span class="small">{song.title}</span>
                   {#if song.theme}<span class="small muted">· {song.theme}</span>{/if}
+                  {#if song.detail}<span class="small muted">· {song.detail}</span>{/if}
                   <span class="spacer" style="flex:1"></span>
                   {#if age}<span class="small muted">{age}</span>{/if}
                   {#if song.rendition}

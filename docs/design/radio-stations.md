@@ -39,14 +39,18 @@ take is derivable from those three values and the browser and the CLI cannot dis
 station is. The renderer draws the seed, exactly as it does for a hand-built song; the position
 names the song and rotates the subject a lyric is written about.
 
-The subject is rotated rather than drawn, and the difference is the point. A station carries five
-subjects, and a draw from five repeats one within any six songs by pigeonhole, so consecutive songs
-regularly came out about the same thing even though the model wrote different words for each. The
-position therefore walks the subjects in order — every subject is played before one returns — and a
-second, slower rotation over a pool shared by every station changes **how the subject is told**
+The subject is rotated rather than drawn, and the difference is the point. A station carries seven
+subjects, and a draw from seven repeats one within any eight songs by pigeonhole, so consecutive
+songs regularly came out about the same thing even though the model wrote different words for each.
+The position therefore walks the subjects in order — every subject is played before one returns — and
+a second, slower rotation over a pool shared by every station changes **how the subject is told**
 (`told as a list of things you kept`, `told from the other side of the same night`), so the second
-telling of a subject is a different song rather than a paraphrase. With five subjects and twelve
-ways to tell them, a subject and its telling only meet again after sixty songs.
+telling of a subject is a different song rather than a paraphrase. A third shared pool, the
+**detail**, rotates one per song and decides what the song is actually made of — `built around a
+single object you can hold`, `the same night told twice, once wrong` — so a subject and a telling
+that do meet again do not meet as the same song. With seven subjects, twelve tellings and nineteen
+details, the three line up again only after 1,596 songs, because the detail pool's length shares no
+factor with the other cycles.
 
 Three rules keep a draw coherent:
 
@@ -73,14 +77,22 @@ buffer. A station's finished songs are listed per station in browser storage, be
 cannot list ComfyUI's output directory; the files themselves are the durable record.
 
 The lyrics come from the same generator the Lyrics tab uses, with the station's subject as the theme,
-the station's rotated angle as the way it is told, and the station's own brief as the contract. A
-model is optional: with none chosen or reachable, the
+the station's rotated angle as the way it is told, the station's rotated detail as what it is made of,
+and the station's own brief as the contract. A model is optional: with none chosen or reachable, the
 song is re-planned as an **instrumental** and the caption stops describing a singer who is not
 there. The panel's **instrumental** checkbox skips the model entirely. Because it is optional, the
 lyric call is bounded rather than open-ended: it is capped at 150 s and runs one at a time — the
 buffer fills several songs at once, and a cloud model answers a parallel burst slowly — and a call
 that times out or fails yields an instrumental take rather than costing the song its place in the
 queue. The panel shows how long each in-progress song has been in its stage.
+
+**A prompt is a question; the sampling is how freely it is answered.** Every lyric call sends a
+temperature and a seed — the song's own seed, moved by the attempt — because with neither, the
+server's defaults decide, and a model at a low temperature answers the same question with the same
+words every time. That is what turned a second Generate press, or a second song that drew a similar
+prompt, into a rendition of the first rather than a new song. The temperature is the writer's knob in
+the Lyrics panel; the seed is recorded with the take, so a lyric can be written again the same way;
+and both ride in ollama's `options`, which the server actually reads.
 
 ## Starting on what the station already has
 

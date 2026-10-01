@@ -1,7 +1,17 @@
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import Collapsible from "./Collapsible.svelte";
-  import { generate, listModels, ollamaBase, setOllamaBase, type OllamaModel } from "./ollama";
+  import {
+    freshWritingSeed,
+    generate,
+    listModels,
+    loadTemperature,
+    ollamaBase,
+    saveTemperature,
+    setOllamaBase,
+    WRITING_SAMPLING,
+    type OllamaModel,
+  } from "./ollama";
 
   let {
     buildPrompt,
@@ -28,6 +38,11 @@
   let model = $state("");
   let base = $state(ollamaBase());
   let theme = $state("");
+  /**
+   * How freely the model may answer. It is sent on every call, and a fresh seed rides with it, so
+   * pressing Generate twice is two requests rather than one request made twice.
+   */
+  let temperature = $state(loadTemperature());
   let busy = $state(false);
   let error = $state<string | null>(null);
   let controller: AbortController | null = null;
@@ -94,6 +109,7 @@
         prompt: buildPrompt(theme),
         signal: controller.signal,
         onText: onDraft,
+        sampling: { ...WRITING_SAMPLING, temperature, seed: freshWritingSeed() },
       });
       onFinal?.(text);
     } catch (cause) {
@@ -140,6 +156,24 @@
         placeholder="what should it be about?"
         bind:value={theme}
         disabled={busy}
+      />
+    </label>
+
+    <label class="row small" title="Higher answers more freely; the brief still pins the counts">
+      temp
+      <input
+        type="number"
+        min="0"
+        max="2"
+        step="0.05"
+        style="width:4.5rem"
+        value={temperature}
+        disabled={busy}
+        onchange={(event) => {
+          const value = Number(event.currentTarget.value);
+          temperature = Number.isFinite(value) ? Math.min(2, Math.max(0, value)) : temperature;
+          saveTemperature(temperature);
+        }}
       />
     </label>
   </div>

@@ -15,6 +15,12 @@
       "items": { "type": "string", "minLength": 1 },
       "description": "Ways to tell a subject, shared by every station and rotated on a slower cycle than a station's themes, so a subject that comes back comes back told a different way."
     },
+    "details": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "type": "string", "minLength": 1 },
+      "description": "What is actually in a song — a setting, an object, a form — shared by every station and rotated one per song, so the subject and the telling can return while the song itself does not."
+    },
     "stations": {
       "type": "array",
       "minItems": 20,

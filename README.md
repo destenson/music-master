@@ -170,10 +170,13 @@ delivery and moods that are in character, and how many of them one song carries.
 own coherent subset, so consecutive songs differ in their kit, their synths, their mix and their key
 and still sound like the station. The draw is a pure function of the station, the song's position and
 the seed, and it is conflict-aware: an option that excludes something already chosen is never taken.
-The song's **subject rotates by position**, not by draw — a station carries five, and a random draw
-repeats one within any six songs, so a station plays every subject it has before it plays one again.
-The **way that subject is told** rotates on a slower cycle of its own, from a pool shared by every
-station, so a subject that does come back comes back told a different way.
+The song's **subject rotates by position**, not by draw — a station carries seven, and a random draw
+repeats one within any eight songs, so a station plays every subject it has before it plays one
+again. The **way that subject is told** rotates on a slower cycle of its own, from a pool shared by
+every station, so a subject that does come back comes back told a different way. A third shared pool,
+the **detail** — the place, the object or the form a song is actually made of — rotates one per song,
+so a subject and a telling that do meet again do not meet as the same song; with seven subjects,
+twelve tellings and nineteen details, the three line up again only after 1,596 songs.
 
 ```bash
 python3 vocabulary/radio_stations.py            # every station is playable: bins, options, counts, tempos, budget
@@ -262,7 +265,11 @@ and the writing brief, both from the text tier: no network, and correct by const
 scaffold passes the checker immediately, with every section, performance tag and transition already
 in place. The model half sends that same brief, plus the caption and a one-line theme, to a model
 through ollama. Cloud models are listed first because the local ones compete for the GPU ComfyUI
-renders on, and the panel states which you have chosen and what leaves the machine.
+renders on, and the panel states which you have chosen and what leaves the machine. **A write sends
+sampling, not just a prompt**: every call carries a temperature and a seed — the temperature is yours
+to set in the panel, the seed is the song's — so pressing Generate again asks a new question instead
+of the same one, and a model that would otherwise answer a prompt identically writes a different
+song.
 
 **The editor is a text file with a grammar lens**, not a structured form, because a lyric that cannot
 round-trip is a trap. The lens reads the same `section-tags.json` the checker reads, so it cannot
