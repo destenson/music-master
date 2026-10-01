@@ -262,9 +262,9 @@
   });
 
   /**
-   * The radio engine needs the text tier, and the app owns it. Registering the four calls it needs
-   * keeps the engine out of the page's state: it asks for a plan, a caption, a brief and a graph,
-   * and never reaches into the form.
+   * The radio engine needs the text tier, and the app owns it. Registering the calls it needs keeps
+   * the engine out of the page's state: it asks for a plan, a caption, a brief, a graph, the
+   * checker's findings and a novelty reading, and never reaches into the form.
    */
   $effect(() => {
     const instance = core;
@@ -280,6 +280,22 @@
         instance.brief({ template_id: templateId, bpm: atBpm, duration_s: null, selections: forSelections })
           .brief,
       cleanLyric: (text) => instance.cleanLyric({ text }),
+      checkLyric: (request) => {
+        try {
+          return instance.checkLyric(request);
+        } catch (error) {
+          console.error("lyric check failed", error);
+          return null;
+        }
+      },
+      novelty: (text, prior) => {
+        try {
+          return instance.novelty({ text, prior });
+        } catch (error) {
+          console.error("novelty failed", error);
+          return null;
+        }
+      },
       artifacts: (request) => instance.artifacts({ ...request, artist_references: [] }),
     });
     return () => setRadioHost(null);

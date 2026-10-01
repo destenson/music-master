@@ -37,6 +37,7 @@ import {
   WRITING_SAMPLING,
   type Sampling,
 } from "./ollama";
+import { bestDraft, type DraftGrade } from "./candidates";
 import { readTakeTags } from "./mp3.ts";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
@@ -48,7 +49,15 @@ import {
   type Rendition,
   type TakeName,
 } from "./takes";
-import type { Artifacts, LyricRepair, RadioPlan, RenderResult, Selections } from "./types";
+import type {
+  Artifacts,
+  LyricReport,
+  LyricRepair,
+  Novelty,
+  RadioPlan,
+  RenderResult,
+  Selections,
+} from "./types";
 
 export type RadioStatus =
   | "planning"
@@ -87,6 +96,8 @@ export interface RadioSong {
    * song's, moved by the attempt, so asking again after a collision is a different request.
    */
   sampling: Sampling | null;
+  /** Which draft the lyric came from, so the field it was chosen out of is on the record. */
+  attempt: number;
   jobId: string | null;
   waited: number;
   file: OutputFile | null;
@@ -118,6 +129,8 @@ export interface SavedRadioSong {
   rendition?: Rendition | null;
   /** The sampling the lyric was written with, so the take can be written again the same way. */
   sampling?: Sampling;
+  /** Which of the drafts written for the song was kept. */
+  attempt?: number;
   instrumental: boolean;
   file: OutputFile | null;
   at: number;
@@ -146,6 +159,19 @@ export interface RadioHost {
    * by the same rule rather than by two implementations that drift.
    */
   cleanLyric: (text: string) => LyricRepair;
+  /**
+   * The checker's findings for a draft, so a candidate that breaks the brief cannot win on novelty.
+   * A null means the text tier could not check it, which is graded as no information rather than as
+   * a pass.
+   */
+  checkLyric: (request: {
+    text: string;
+    selections: Selections;
+    template_id: string;
+    bpm: number;
+  }) => LyricReport | null;
+  /** How new a draft's words are against lyrics the station has already sung. */
+  novelty: (text: string, prior: string[]) => Novelty | null;
   artifacts: (request: {
     song_id: string;
     template_id: string;
@@ -346,6 +372,7 @@ function createSong(stationId: string): RadioSong {
     lyricSource: "instrumental",
     rendition: null,
     sampling: null,
+    attempt: 0,
     jobId: null,
     waited: 0,
     file: null,
@@ -387,6 +414,7 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
     lyricSource: take.instrumental ? "instrumental" : "model",
     rendition: take.rendition ?? null,
     sampling: take.sampling ?? null,
+    attempt: take.attempt ?? 0,
     jobId: null,
     waited: 0,
     file: take.file,
@@ -471,6 +499,9 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       song.abort.signal.addEventListener("abort", stopIt, { once: true });
       try {
         const brief = host.brief(plan.template_id, plan.bpm, plan.selections);
+        // Held in a const because the closure below outlives the narrowing: `plan` is reassigned to
+        // the instrumental fallback in the catch, so TypeScript cannot promise it is non-null there.
+        const writingPlan = plan;
         const prompt = buildPrompt({
           brief,
           caption: song.caption,
@@ -478,36 +509,23 @@ async function produce(song: RadioSong, token: number): Promise<void> {
           angle: plan.angle,
           detail: plan.detail,
         });
-        // The song's own seed moves the sampler, so the arrangement and the words vary together and
-        // the take can be written again from what is recorded. The attempt is zero until a collision
-        // asks for another draft.
-        const sampling: Sampling = {
-          ...WRITING_SAMPLING,
-          temperature: loadTemperature(),
-          seed: writingSeed(song.seed, 0),
-        };
-        song.sampling = sampling;
-        const text = await withTimeout(
+        // The model is asked more than once. A prompt is a question and every answer differs, so the
+        // station writes a small field of drafts and keeps the one that honours the brief and says
+        // the newest thing: the first answer is not privileged, only the best one is.
+        const prior = priorLyrics(song);
+        const chosen = await withTimeout(
           serializeLyrics(() => {
             song.status = "writing";
-            return generate({
-              model: radioState.model,
-              base: ollamaBase(),
-              prompt,
-              signal: lyric.signal,
-              // The lyric is the whole answer; a thinking model's reasoning is tens of seconds that
-              // nothing downstream can use.
-              think: false,
-              sampling,
-            });
+            return writeDrafts(song, writingPlan, prompt, prior, lyric.signal);
           }),
           LYRIC_TIMEOUT_MS,
           "the lyric model did not answer in time",
           stopIt,
         );
         if (token !== session) return;
-        song.lyrics = host.cleanLyric(trimPreamble(text)).text;
-        if (!song.lyrics) throw new Error("the model wrote nothing");
+        song.lyrics = chosen.text;
+        song.sampling = chosen.sampling;
+        song.attempt = chosen.attempt;
         song.lyricSource = "model";
         song.error = null;
         radioState.notice = null;
@@ -598,6 +616,135 @@ async function produce(song: RadioSong, token: number): Promise<void> {
     }
     ensure();
   }
+}
+
+/** How many drafts a song's lyric is chosen from. A lyric is seconds of a model's time; a render is
+ * minutes of a GPU's, so asking two more times to avoid a repeat is nearly free. */
+const LYRIC_DRAFTS = 3;
+
+/**
+ * How long one draft may take.
+ *
+ * The lyric stage's own cap is the backstop for the whole field; this is the shorter budget that
+ * stops a single call that hangs from eating the time the other drafts need.
+ */
+const LYRIC_DRAFT_TIMEOUT_MS = 45_000;
+
+/** How many of the station's earlier lyrics the novelty read compares against. */
+const PRIOR_LIMIT = 20;
+
+/**
+ * The words this station has already sung.
+ *
+ * A station's own takes are the record, so they are what a new draft has to differ from: the
+ * recovered takes carry their lyrics out of their files, the queue carries the ones written this
+ * session, and the played list carries what was actually heard. The list is capped, because the read
+ * compares the candidate against each prior and the nearest few are the ones that matter.
+ */
+function priorLyrics(except: RadioSong): string[] {
+  const out: string[] = [];
+  const remember = (text: string | undefined): void => {
+    const trimmed = (text ?? "").trim();
+    if (trimmed && !out.includes(trimmed)) out.push(trimmed);
+  };
+  for (const take of radioState.available) remember(take.lyrics);
+  for (const other of radioState.queue) if (other.id !== except.id) remember(other.lyrics);
+  for (const take of radioState.history) remember(take.lyrics);
+  return out.slice(0, PRIOR_LIMIT);
+}
+
+/** The draft that was kept, with the sampling that wrote it. */
+interface ChosenDraft {
+  text: string;
+  sampling: Sampling;
+  attempt: number;
+}
+
+/**
+ * Write a field of drafts for one song and keep the best.
+ *
+ * Each draft is generated under its own seed, cleaned the way the editor cleans a draft, then graded:
+ * the checker says whether it honours the brief, and the text tier says how new its words are against
+ * what the station has already sung. A draft that fails to generate is dropped rather than failing
+ * the song, and if every draft fails the caller's instrumental fallback takes over.
+ */
+async function writeDrafts(
+  song: RadioSong,
+  plan: RadioPlan,
+  prompt: string,
+  prior: string[],
+  signal: AbortSignal,
+): Promise<ChosenDraft> {
+  // Taken once: the tier can be unregistered while a draft is in flight, and the drafts already
+  // written should still be judged by the tier that wrote them.
+  const tier = host;
+  if (!tier) throw new Error("the text tier is not ready");
+  const drafts: { grade: DraftGrade; sampling: Sampling }[] = [];
+
+  for (let attempt = 0; attempt < LYRIC_DRAFTS; attempt++) {
+    const sampling: Sampling = {
+      ...WRITING_SAMPLING,
+      temperature: loadTemperature(),
+      seed: writingSeed(song.seed, attempt),
+    };
+    // Its own controller and its own budget, so one draft that hangs is abandoned without taking the
+    // drafts already written — or the ones still to come — with it.
+    const draft = new AbortController();
+    const stopIt = (): void => draft.abort();
+    signal.addEventListener("abort", stopIt, { once: true });
+    let raw: string;
+    try {
+      raw = await withTimeout(
+        generate({
+          model: radioState.model,
+          base: ollamaBase(),
+          prompt,
+          signal: draft.signal,
+          // The lyric is the whole answer; a thinking model's reasoning is tens of seconds that
+          // nothing downstream can use.
+          think: false,
+          sampling,
+        }),
+        LYRIC_DRAFT_TIMEOUT_MS,
+        "a draft did not answer in time",
+        stopIt,
+      );
+    } catch (cause) {
+      // A stop aborts every draft; one draft failing or timing out on its own is not the song's
+      // failure, because another may still land.
+      if (signal.aborted) throw cause;
+      continue;
+    } finally {
+      signal.removeEventListener("abort", stopIt);
+    }
+    const text = tier.cleanLyric(trimPreamble(raw)).text;
+    if (!text) continue;
+    const report = tier.checkLyric({
+      text,
+      selections: plan.selections,
+      template_id: plan.template_id,
+      bpm: plan.bpm,
+    });
+    const meter = tier.novelty(text, prior);
+    drafts.push({
+      sampling,
+      grade: {
+        text,
+        attempt,
+        errors: report?.errors.length ?? 0,
+        warnings: report?.warnings.length ?? 0,
+        matched: report?.conformance?.matched.length ?? 0,
+        // A tier that cannot measure novelty is treated as no information, not as a repeat.
+        novelty: meter?.novelty ?? 1,
+      },
+    });
+  }
+
+  const best = bestDraft(drafts.map((draft) => draft.grade));
+  if (!best) throw new Error("the model wrote nothing");
+  const kept = drafts.find((draft) => draft.grade === best);
+  if (!kept) throw new Error("the winning draft was lost");
+  return { text: best.text, sampling: kept.sampling, attempt: best.attempt };
 }
 
 /** Keep the buffer full: spawn songs until enough are ready or already on their way. */
@@ -920,6 +1067,7 @@ function toSaved(song: RadioSong): SavedRadioSong {
     bpm: song.bpm,
     rendition: song.rendition,
     sampling: song.sampling ?? undefined,
+    attempt: song.attempt,
     instrumental: song.instrumental,
     file: song.file,
     at: song.at,

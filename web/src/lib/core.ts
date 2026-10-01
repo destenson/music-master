@@ -16,6 +16,7 @@ import type {
   LyricReport,
   LyricRepair,
   MechanicalVerdict,
+  Novelty,
   PreviewRow,
   RadioPlan,
   RadioStation,
@@ -143,6 +144,17 @@ export class MusicMasterCore {
     bpm?: number | null;
   }): LyricReport {
     return this.call<LyricReport>("check_lyric", request);
+  }
+
+  /**
+   * How new a lyric's words are against lyrics already sung, decided in the text tier.
+   *
+   * The measure is lexical and exact — a repeated lyric has a word-set overlap of one, a lifted hook
+   * a long shared run — so the page can write several drafts and keep the newest without asking a
+   * model to judge its own work.
+   */
+  novelty(request: { text: string; prior: string[] }): Novelty {
+    return this.call<Novelty>("novelty", request);
   }
 
   /** A structurally correct empty lyric for the template: headers, tags and transitions only. */

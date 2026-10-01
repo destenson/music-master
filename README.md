@@ -269,7 +269,9 @@ renders on, and the panel states which you have chosen and what leaves the machi
 sampling, not just a prompt**: every call carries a temperature and a seed — the temperature is yours
 to set in the panel, the seed is the song's — so pressing Generate again asks a new question instead
 of the same one, and a model that would otherwise answer a prompt identically writes a different
-song.
+song. On the radio it goes further: **three drafts are written and the best is kept**, correct first,
+then conformant, then the newest words against what the station has already sung, so a lyric that
+would have been a rerun is passed over rather than played.
 
 **The editor is a text file with a grammar lens**, not a structured form, because a lyric that cannot
 round-trip is a trap. The lens reads the same `section-tags.json` the checker reads, so it cannot

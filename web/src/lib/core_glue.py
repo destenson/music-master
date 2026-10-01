@@ -407,3 +407,15 @@ def check_lyric(payload):
             "conformance": conformance,
         }
     )
+
+
+def novelty(payload):
+    """How new a draft's words are against lyrics the station has already sung.
+
+    Pure, and the same function the checker's module exports, so the page scores a candidate exactly
+    as the CLI does. It is what lets the radio write several drafts and keep the newest one that still
+    honours the brief, rather than settling for whatever the model happened to answer first.
+    """
+    request = json.loads(payload)
+    return json.dumps(lyrics.novelty(request.get("text") or "", request.get("prior") or []))
+

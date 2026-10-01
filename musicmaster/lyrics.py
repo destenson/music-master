@@ -22,6 +22,7 @@ import json
 import re
 import sys
 import textwrap
+from collections.abc import Sequence
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -822,6 +823,102 @@ def check_cliches(lines: list[str], rep: Report) -> None:
             rep.warn(
                 f"lines {where_a} and {where_b}: overused rhyme pair '{a}'/'{b}'"
             )
+
+
+# A shared phrase is not a repeated song, so a run shorter than the floor is left alone; a run at or
+# past the ceiling is a lift however much of the rest of the lyric is new. Between them the penalty
+# ramps, which is what makes the measure a judgement rather than a cliff.
+RUN_FLOOR = 5
+RUN_CEILING = 20
+
+
+def lyric_words(text: str) -> list[str]:
+    """The words a listener hears, with the staging taken out.
+
+    Section headers, performance tags and ``(instrumental)`` notes are directions to the model, not
+    words anyone sings, so they are dropped before two lyrics are compared. Case is folded: the
+    measure is about what was said, and a model that capitalises a line differently has not written a
+    different song.
+    """
+    without_tags = TAG_RE.sub(" ", text)
+    without_notes = re.sub(r"\([^)]*\)", " ", without_tags)
+    return [word.casefold() for word in re.findall(r"[A-Za-z0-9']+", without_notes)]
+
+
+def longest_shared_run(left: list[str], right: list[str]) -> int:
+    """The longest run of consecutive words two lyrics have in common."""
+    if not left or not right:
+        return 0
+    best = 0
+    previous = [0] * (len(right) + 1)
+    for word in left:
+        current = [0] * (len(right) + 1)
+        for index, other in enumerate(right, start=1):
+            if word == other:
+                current[index] = previous[index - 1] + 1
+                if current[index] > best:
+                    best = current[index]
+        previous = current
+    return best
+
+
+def novelty(candidate: str, prior: Sequence[str]) -> dict:
+    """How new a draft's words are against words the song's station has already sung.
+
+    Two signals, because either alone is easy to fool. A whole lyric repeated has a word-set overlap
+    of one; a draft that keeps a prior hook but rewrites everything around it has a low overlap and a
+    long shared run. They are folded into one number:
+
+    * ``max_overlap`` — the largest Jaccard overlap of word sets with any single prior lyric;
+    * ``longest_run`` — the longest run of consecutive words shared with any prior lyric, scored as a
+      ramp from ``RUN_FLOOR`` (a phrase anyone might write) to ``RUN_CEILING`` (a lift);
+    * ``novelty`` — one minus the larger of the two, so 1.0 shares nothing and 0.0 repeats a take.
+
+    With no prior lyric there is nothing to repeat, and every draft is new.
+    """
+    words = lyric_words(candidate)
+    kept = [
+        (index, other)
+        for index, text in enumerate(prior)
+        for other in [lyric_words(text)]
+        if other
+    ]
+    if not words or not kept:
+        return {
+            "novelty": 1.0,
+            "max_overlap": 0.0,
+            "longest_run": 0,
+            "nearest": None,
+            "words": len(words),
+        }
+
+    candidate_set = set(words)
+    nearest: int | None = None
+    overlap = 0.0
+    run = 0
+    score = 0.0
+    for index, other in kept:
+        union = candidate_set | set(other)
+        here_overlap = len(candidate_set & set(other)) / len(union) if union else 0.0
+        here_run = longest_shared_run(words, other)
+        here_score = max(here_overlap, _run_penalty(here_run))
+        if here_score > score:
+            nearest, overlap, run, score = index, here_overlap, here_run, here_score
+
+    return {
+        "novelty": round(max(0.0, 1.0 - score), 4),
+        "max_overlap": round(overlap, 4),
+        "longest_run": run,
+        "nearest": nearest,
+        "words": len(words),
+    }
+
+
+def _run_penalty(run: int) -> float:
+    """A shared run's share of the ramp, zero at the floor and one at the ceiling."""
+    if run <= RUN_FLOOR:
+        return 0.0
+    return min(1.0, (run - RUN_FLOOR) / (RUN_CEILING - RUN_FLOOR))
 
 
 def check_meter_and_rhyme(lines: list[str], st: dict, rep: Report,

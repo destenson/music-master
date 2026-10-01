@@ -35,6 +35,7 @@ import { reloadUrl, stamp } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
 import { parseTakeName, renditionLabels, takesFromHistory, lyricFingerprint } from "../src/lib/takes.ts";
 import { tagsFromGraph, tagsFromMp3, readTakeTags } from "../src/lib/mp3.ts";
+import { bestDraft, better } from "../src/lib/candidates.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
 const REPO = path.resolve(WEB, "..");
@@ -75,6 +76,16 @@ const DIRTY_LYRIC = [
   "Energy 3/5",
 ].join("\n");
 
+// A candidate and the lyrics a station has already sung, so the novelty reading the page gets can be
+// compared with the one the CLI computes. The measure decides which draft the radio keeps, so the two
+// halves agreeing about it is not optional.
+const NOVELTY_CANDIDATE =
+  "[Verse]\nwe were never going to make it out of here alive tonight\n[Chorus]\nbrand new sentences about a different afternoon";
+const NOVELTY_PRIOR = [
+  "[Verse]\nthe harbour lights are out\n[Chorus]\nand nobody is counting",
+  "[Verse]\nwe were never going to make it out of here alive tonight\n[Chorus]\nsomething else entirely",
+];
+
 const NATIVE = `
 import json, sys
 sys.path.insert(0, ${JSON.stringify(REPO)})
@@ -103,6 +114,7 @@ built = prompt.build({
     "templates_doc": doc,
 })
 radio_plan = radio.plan_song(radio.load_stations(), "neon-drive", 3, seed=12345, vocab=vocab)
+novelty = lyrics.novelty(${JSON.stringify(NOVELTY_CANDIDATE)}, ${JSON.stringify(NOVELTY_PRIOR)})
 jev_draft = {
     "selections": selections,
     "bpm": song["bpm"],
@@ -125,6 +137,7 @@ print(json.dumps({
                   "workflow_text": prompt.serialise(built["workflow"])},
     "radio": {"plan": radio_plan,
               "caption": render.render(vocab, radio_plan["selections"])["string"]},
+    "novelty": novelty,
     "jev": {"spec": jev_built["spec"],
             "request": jev.build_request(jev_built["state"], oracle.build_questions(jev_built["spec"]))},
     "clean": lyrics.strip_directives(${JSON.stringify(DIRTY_LYRIC)}),
@@ -437,6 +450,8 @@ check("the detail rotates one per song",
   ));
 check("the detail pool does not line up with the other cycles quickly",
   stationDoc.details.length % neon.themes.length === 0, false);
+check("the browser measures novelty as the CLI does",
+  call("novelty", { text: NOVELTY_CANDIDATE, prior: NOVELTY_PRIOR }), native.novelty);
 
 const radioArtifact = call("artifacts", {
   song_id: radioPlan.song_id,
@@ -1017,6 +1032,54 @@ check("instrumentals never group, even with identical staging", labels[2], null)
 check("nor does the instrumental beside it", labels[3], null);
 check("a later take of the same words is rendition 2", labels[4], { position: 2, total: 2 });
 check("a take with no words is in no group", labels[5], null);
+
+// --- Choosing between drafts --------------------------------------------------------------------
+//
+// A model answers a prompt differently every time it is asked, so the radio writes a few drafts and
+// keeps the best. "Best" is a priority, not a single number: a draft that honours the brief beats a
+// more novel one that does not. The priority is checked here rather than inferred from a generation.
+
+console.log("\ndrafts:\n");
+const draft = (over) => ({
+  text: "draft",
+  attempt: 0,
+  errors: 0,
+  warnings: 0,
+  matched: 5,
+  novelty: 0.5,
+  ...over,
+});
+check("an empty field has no winner", bestDraft([]), null);
+check(
+  "fewer errors beats more novelty",
+  bestDraft([draft({ errors: 1, novelty: 1 }), draft({ errors: 0, novelty: 0.2 })]).errors,
+  0,
+);
+check(
+  "more matched sections beats more novelty",
+  bestDraft([draft({ matched: 3, novelty: 1 }), draft({ matched: 5, novelty: 0.2 })]).matched,
+  5,
+);
+check(
+  "with correctness equal, the newer words win",
+  bestDraft([draft({ novelty: 0.2 }), draft({ novelty: 0.9 })]).novelty,
+  0.9,
+);
+check(
+  "with novelty equal, fewer warnings win",
+  bestDraft([draft({ warnings: 2 }), draft({ warnings: 0 })]).warnings,
+  0,
+);
+check(
+  "an exact tie keeps the earlier attempt",
+  bestDraft([draft({ attempt: 0 }), draft({ attempt: 1 })]).attempt,
+  0,
+);
+check(
+  "better is the same priority as a predicate",
+  [better(draft({ errors: 0 }), draft({ errors: 1 })), better(draft({ errors: 1 }), draft({ errors: 0 }))],
+  [true, false],
+);
 
 // --- Reactive state: a write must go through the proxy ------------------------------------------
 //

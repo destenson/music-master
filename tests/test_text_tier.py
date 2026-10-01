@@ -558,6 +558,57 @@ class LyricsTest(unittest.TestCase):
                 self.assertEqual(conformance["missing"], [])
                 self.assertEqual(len(conformance["matched"]), len(template["sections"]))
 
+    def test_staging_is_not_words(self) -> None:
+        self.assertEqual(
+            lyrics.lyric_words("[Verse]\nHold The Line\n[Chorus]\n(instrumental)"),
+            ["hold", "the", "line"],
+        )
+
+    def test_nothing_shared_is_entirely_new(self) -> None:
+        # The measure decides which of several drafts to keep, so its edges have to be exact: with no
+        # prior there is nothing to repeat, and two unrelated lyrics share nothing.
+        self.assertEqual(lyrics.novelty("a line nobody has sung", [])["novelty"], 1.0)
+        first = "[Verse]\nthe harbour lights are out\n[Chorus]\nand nobody is counting"
+        second = "[Verse]\na cold engine turning over\n[Chorus]\nin a car park after dark"
+        self.assertEqual(lyrics.novelty(second, [first])["novelty"], 1.0)
+
+    def test_a_repeated_lyric_is_not_novel(self) -> None:
+        text = "[Verse]\nthe harbour lights are out\n[Chorus]\nand nobody is counting"
+        # Staging is not words, so the same words with a different arrangement are still a repeat.
+        restaged = "[Intro]\n[Verse]\nthe harbour lights are out\n[Chorus]\nand nobody is counting"
+        result = lyrics.novelty(restaged, [text])
+        self.assertEqual(result["novelty"], 0.0)
+        self.assertEqual(result["max_overlap"], 1.0)
+        self.assertEqual(result["nearest"], 0)
+
+    def test_a_lifted_hook_is_scored_even_when_the_rest_is_new(self) -> None:
+        hook = "we were never going to make it out of here alive tonight"
+        prior = f"[Verse]\n{hook}\n[Chorus]\nsomething else entirely"
+        # The same hook padded with words that appear nowhere in the prior lyric: the word-set overlap
+        # is only moderate, so the shared run is what sees the lift.
+        lifted = f"[Verse]\n{hook}\n[Chorus]\nbrand new sentences about a different afternoon"
+        result = lyrics.novelty(lifted, [prior])
+        self.assertEqual(result["longest_run"], len(hook.split()))
+        self.assertLess(result["novelty"], 1.0)
+
+    def test_a_short_shared_phrase_does_not_collapse_the_score(self) -> None:
+        # A phrase of a few words is something anyone might write, and the run floor keeps it from
+        # reading as a lift; only the word-set overlap weighs it.
+        prior = "[Verse]\nthe harbour lights are out tonight\n[Chorus]\nand nobody is counting the days"
+        candidate = "[Verse]\na cold engine turning over slow\n[Chorus]\nand nobody is counting the hours"
+        result = lyrics.novelty(candidate, [prior])
+        self.assertEqual(result["longest_run"], 5)
+        self.assertGreater(result["novelty"], 0.5)
+
+    def test_the_nearest_prior_is_reported(self) -> None:
+        priors = [
+            "[Verse]\nthe harbour lights are out\n[Chorus]\nand nobody is counting",
+            "[Verse]\na cold engine turning over\n[Chorus]\nin a car park after dark",
+        ]
+        result = lyrics.novelty("[Verse]\na cold engine turning over\n[Chorus]\nin a car park at dawn", priors)
+        self.assertEqual(result["nearest"], 1)
+        self.assertGreater(result["max_overlap"], 0.5)
+
 
 # --- The render path: the prompt and the graph it renders to ------------------------------
 

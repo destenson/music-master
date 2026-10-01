@@ -166,6 +166,25 @@ export interface LyricReport {
 }
 
 /**
+ * How new a lyric's words are against the ones already sung, from the text tier.
+ *
+ * `novelty` folds the two signals into one number: 1.0 shares nothing and 0.0 repeats a take. The
+ * parts are kept so a panel or a test can say *why* a draft scored as it did.
+ */
+export interface Novelty {
+  /** 1.0 shares nothing with any prior lyric; 0.0 is a repeat. */
+  novelty: number;
+  /** The largest Jaccard overlap of word sets with any single prior lyric. */
+  max_overlap: number;
+  /** The longest run of consecutive words shared with any prior lyric. */
+  longest_run: number;
+  /** Which prior lyric was nearest, by index, or null when nothing was shared. */
+  nearest: number | null;
+  /** How many words the candidate has, staging excluded. */
+  words: number;
+}
+
+/**
  * A direction the lyric repair dropped from a generated draft.
  *
  * The brief is a contract, and a model sometimes copies one of its lines — `Energy 3/5` — into the

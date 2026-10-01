@@ -67,7 +67,7 @@ Three rules keep a draw coherent:
 | Stage | Owner | What it produces |
 | --- | --- | --- |
 | plan | `musicmaster.radio` | selections, tempo, key, template, subject, song id |
-| write | ollama (optional) | a lyric for that subject, or an instrumental take |
+| write | ollama (optional) | a lyric for that subject, chosen from a field of drafts, or an instrumental take |
 | render | ComfyUI | a full 8-step MP3 under the station's output directory |
 | play | the panel | the audio element, skip, save |
 
@@ -81,10 +81,11 @@ the station's rotated angle as the way it is told, the station's rotated detail 
 and the station's own brief as the contract. A model is optional: with none chosen or reachable, the
 song is re-planned as an **instrumental** and the caption stops describing a singer who is not
 there. The panel's **instrumental** checkbox skips the model entirely. Because it is optional, the
-lyric call is bounded rather than open-ended: it is capped at 150 s and runs one at a time — the
-buffer fills several songs at once, and a cloud model answers a parallel burst slowly — and a call
-that times out or fails yields an instrumental take rather than costing the song its place in the
-queue. The panel shows how long each in-progress song has been in its stage.
+lyric call is bounded rather than open-ended: the whole field of drafts is capped at 150 s, each
+draft has a shorter budget of its own so one that hangs cannot eat the others', and the calls run one
+at a time — the buffer fills several songs at once, and a cloud model answers a parallel burst
+slowly — and a call that times out or fails yields an instrumental take rather than costing the song
+its place in the queue. The panel shows how long each in-progress song has been in its stage.
 
 **A prompt is a question; the sampling is how freely it is answered.** Every lyric call sends a
 temperature and a seed — the song's own seed, moved by the attempt — because with neither, the
@@ -93,6 +94,15 @@ words every time. That is what turned a second Generate press, or a second song 
 prompt, into a rendition of the first rather than a new song. The temperature is the writer's knob in
 the Lyrics panel; the seed is recorded with the take, so a lyric can be written again the same way;
 and both ride in ollama's `options`, which the server actually reads.
+
+**A lyric is chosen, not simply taken.** The model is asked three times under different seeds, and
+each draft is cleaned the way the editor cleans one, checked against the brief, and measured against
+the words the station has already sung. Correctness decides first, then form, then newness: a draft
+that breaks the brief never wins on novelty. A draft that fails to generate is dropped rather than
+failing the song, and if every draft fails the take goes instrumental as it always did. The novelty
+measure is lexical and exact — a repeated lyric has a word-set overlap of one, a lifted hook a long
+shared run — and it lives in the text tier, so the CLI and the page cannot disagree about which draft
+is the new one.
 
 ## Starting on what the station already has
 
