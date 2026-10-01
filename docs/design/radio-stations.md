@@ -104,6 +104,47 @@ queue tuple `[number, prompt_id, graph, extra_data, outputs]` — so both are re
 on one. That parsing is pure and unit-tested in the smoke run rather than only exercised against a
 live server.
 
+## A take's own record
+
+A take is not only audio. ComfyUI writes the graph it executed into the MP3's ID3 tags as a `prompt`
+TXXX frame, and that graph is the take's own record: the caption it was given, the words it sang, its
+seed and its tempo. The radio reads it from the file when a station is chosen, so a recovered take
+shows its lyrics and its caption rather than a station id and a number.
+
+That is a change of authority, not only of plumbing. The renderer's `/history` forgets everything
+when it restarts, and the page's saved record is a note *about* a take rather than the take; both can
+disagree with the audio, and a repository song's saved `workflow.json` already does — its caption
+carries tags the executed graph does not. The file cannot disagree with itself. So discovery still
+merges the page's record with the renderer's history to find and name takes, and then asks each file
+what it is: the file's answer wins the caption, the lyrics, the seed and the tempo.
+
+Two things keep the read small. The tag is at the very front, so a Range request for the front is
+enough, and the read stops as soon as the tag's own length says it is complete — a renderer that
+ignores the Range header does not make the page download a whole take to identify it. Both ID3v2.3
+and v2.4 are read, because a frame length is a plain integer in one and a syncsafe integer in the
+other, and both the UTF-8 and UTF-16 text encodings are read for the same reason.
+
+Every read is best-effort. A page refused the bytes — a remote target without CORS — or a target that
+answers nothing keeps the caption and seed the history knew and plays on, because a station that
+cannot read a take can still play it. Files are read a few at a time rather than all at once.
+
+## Renditions
+
+Because the words come out of the graph as text, two takes of one song are found by comparing them,
+with no audio analysis. A lyric fingerprint reduces a lyric to its words: section markers and
+instrumental notes are staging, so the same words arranged differently still compare equal — the same
+song, rendered differently. A take whose lyric has no words at all belongs to no group.
+
+That exclusion is the point. An instrumental take still carries a lyric, and it is made of markers
+alone. Of the takes on disk, the instrumentals share very few distinct section plans, and one plan is
+shared by instrumentals of three different stations; a fingerprint over the raw text would call three
+genres' instrumentals one song.
+
+A take in a group of two or more is labelled with where it sits — `rendition 3 of 11`. It is a label,
+not a layout: every take keeps its place in the station's queue and history, and the label only says
+that these takes sing the same words. A take alone with its words is a rendition of nothing and says
+nothing.
+
 ## Output layout
 
 A radio take is not a repository song, so it does not pretend to live in `songs/<id>/`. The graph
@@ -140,6 +181,9 @@ is coherent, inside the tag budget, and different from the song before it.
 
 - It does not let the model choose the arrangement. The pools are curated data; the draw only
   selects from what an author put in character for the station.
+- It does not treat two takes of one lyric as one song. They are labelled as renditions and each
+  keeps its own place in the queue and the history, because a different rendition is still a
+  different thing to listen to.
 - It does not cancel a render already queued on ComfyUI. Stopping abandons the wait and the model
   call, but a job ComfyUI has begun will finish and its file stays on disk.
 - It cannot play a **v2** target: those surfaces return outputs without a browser-reachable URL, so

@@ -30,9 +30,17 @@ import {
   type OutputFile,
 } from "./comfy";
 import { generate, ollamaBase } from "./ollama";
+import { readTakeTags } from "./mp3.ts";
 import { buildPrompt } from "./prompt";
 import { renderQueue } from "./render.svelte";
-import { parseTakeName, takeKey, takesFromHistory, type TakeName } from "./takes";
+import {
+  parseTakeName,
+  renditionLabels,
+  takeKey,
+  takesFromHistory,
+  type Rendition,
+  type TakeName,
+} from "./takes";
 import type { Artifacts, LyricRepair, RadioPlan, RenderResult, Selections } from "./types";
 
 export type RadioStatus =
@@ -63,6 +71,8 @@ export interface RadioSong {
   lyrics: string;
   instrumental: boolean;
   lyricSource: "model" | "instrumental";
+  /** Where this take sits among the takes that sing the same words, when it is not alone. */
+  rendition: Rendition | null;
   jobId: string | null;
   waited: number;
   file: OutputFile | null;
@@ -86,6 +96,12 @@ export interface SavedRadioSong {
   theme: string;
   /** Absent on records written before the angle existed, so it is read back as empty. */
   angle?: string;
+  /** The words the take sang, read from its own graph. Absent until it is known. */
+  lyrics?: string;
+  /** The tempo the take was rendered at, read from its own graph. */
+  bpm?: number;
+  /** Where the take sits among the takes that sing the same words. Recomputed on discovery. */
+  rendition?: Rendition | null;
   instrumental: boolean;
   file: OutputFile | null;
   at: number;
@@ -311,6 +327,7 @@ function createSong(stationId: string): RadioSong {
     lyrics: "",
     instrumental: radioState.instrumental,
     lyricSource: "instrumental",
+    rendition: null,
     jobId: null,
     waited: 0,
     file: null,
@@ -325,7 +342,10 @@ function createSong(stationId: string): RadioSong {
 
 /**
  * A song the page already has, as a queue entry. It has no plan and needs none: the file exists, so
- * playing it is the whole job, and the fields the panel shows come from the record that was kept.
+ * playing it is the whole job, and the fields the panel shows come from the take's own graph — read
+ * from the file where its bytes could be read, and from the record that was kept where they could
+ * not. Its lyrics therefore survive a reload and a restarted renderer, which the plan alone never
+ * did: the plan is gone, but the words are in the artifact.
  */
 function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
   return {
@@ -337,14 +357,15 @@ function songFromSaved(take: SavedRadioSong, status: RadioStatus): RadioSong {
     status,
     plan: null,
     selections: {},
-    bpm: 0,
+    bpm: take.bpm ?? 0,
     caption: take.caption,
     theme: take.theme,
     angle: take.angle ?? "",
-    lyrics: "",
+    lyrics: take.lyrics ?? "",
     instrumental: take.instrumental,
     // The take's own kind, not a default: a recovered sung take is not an instrumental one.
     lyricSource: take.instrumental ? "instrumental" : "model",
+    rendition: take.rendition ?? null,
     jobId: null,
     waited: 0,
     file: take.file,
@@ -620,6 +641,11 @@ function hardStop(): void {
  * recorded — one this browser had not played yet, or one rendered from somewhere else. They are
  * merged by file, so a take both know about is queued once, and ordered by the renderer's own
  * numbering rather than by either list's idea of it.
+ *
+ * Once the set is known, each take's own file is asked what it is and the set is grouped by lyric,
+ * so a recovered take shows the words it sang and says which of a song's renditions it is. Both are
+ * best-effort: the name and the history are enough to play, which is what happens when a renderer
+ * will not hand this page the bytes.
  */
 async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
   const found = new Map<string, { take: SavedRadioSong; name: TakeName }>();
@@ -648,6 +674,7 @@ async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
         seed: take.seed ?? 0,
         caption: take.caption,
         theme: "",
+        lyrics: take.lyrics,
         instrumental: parsed.instrumental,
         file,
         at: 0,
@@ -657,7 +684,7 @@ async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
     /* the renderer's history is a bonus; what the page saved is the durable record */
   }
 
-  return [...found.values()]
+  const takes = [...found.values()]
     .sort(
       (a, b) =>
         a.name.order - b.name.order ||
@@ -666,6 +693,59 @@ async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
     // The queue orders by this number, so a recovered take is numbered by the render order its file
     // name already carries rather than by a second counter of our own.
     .map(({ take }, index) => ({ ...take, index }));
+
+  await enrichFromFiles(takes);
+
+  // Grouping needs every take's words, so it is done once, after the reads, over the whole set — a
+  // group is a property of the station's takes together, not of any one of them.
+  renditionLabels(takes).forEach((label, index) => {
+    takes[index].rendition = label;
+  });
+
+  // The played list holds the same takes, and a take should not show its words while playing and
+  // lose them the moment it moves to the history.
+  const byFile = new Map<string, SavedRadioSong>();
+  for (const take of takes) if (take.file) byFile.set(takeKey(take.file), take);
+  for (const saved of radioState.history) {
+    if (!saved.file) continue;
+    const filled = byFile.get(takeKey(saved.file));
+    if (!filled) continue;
+    saved.lyrics = filled.lyrics;
+    saved.bpm = filled.bpm;
+    saved.rendition = filled.rendition;
+    if (!saved.caption && filled.caption) saved.caption = filled.caption;
+  }
+  return takes;
+}
+
+/** How many takes are read at once: prompt enough to matter, gentle enough not to burst the target. */
+const TAG_READS = 4;
+
+/**
+ * Fill in each take's identity from its own file.
+ *
+ * The history names the take and gives it a URL; the bytes say what it actually is. Every read is
+ * best-effort — a target that will not hand this page a file leaves the take with whatever the
+ * history knew, because a station that cannot read a take can still play it.
+ */
+async function enrichFromFiles(takes: SavedRadioSong[]): Promise<void> {
+  const queue = takes.filter((take) => take.file);
+  if (!queue.length) return;
+  let at = 0;
+  const worker = async (): Promise<void> => {
+    // The index is claimed before the await, so two workers never read the same take.
+    for (let index = at++; index < queue.length; index = at++) {
+      const take = queue[index];
+      if (!take.file) continue;
+      const tags = await readTakeTags(viewUrl(renderQueue.target.base, take.file));
+      if (!tags) continue;
+      if (tags.caption) take.caption = tags.caption;
+      take.lyrics = tags.lyrics;
+      if (tags.seed !== null) take.seed = tags.seed;
+      if (tags.bpm !== null) take.bpm = tags.bpm;
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(TAG_READS, queue.length) }, worker));
 }
 
 /** How many of a station's own takes to queue at once, so a huge folder cannot flood the list. */
@@ -798,6 +878,9 @@ function toSaved(song: RadioSong): SavedRadioSong {
     caption: song.caption,
     theme: song.theme,
     angle: song.angle,
+    lyrics: song.lyrics,
+    bpm: song.bpm,
+    rendition: song.rendition,
     instrumental: song.instrumental,
     file: song.file,
     at: song.at,

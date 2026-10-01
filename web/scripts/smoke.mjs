@@ -26,7 +26,8 @@ import { proxy } from "svelte/internal/client";
 import { generate } from "../src/lib/ollama.ts";
 import { reloadUrl, stamp } from "../src/lib/paths.ts";
 import { buildPrompt } from "../src/lib/prompt.ts";
-import { parseTakeName, takesFromHistory } from "../src/lib/takes.ts";
+import { parseTakeName, renditionLabels, takesFromHistory, lyricFingerprint } from "../src/lib/takes.ts";
+import { tagsFromGraph, tagsFromMp3, readTakeTags } from "../src/lib/mp3.ts";
 
 const WEB = path.resolve(import.meta.dirname, "..");
 const REPO = path.resolve(WEB, "..");
@@ -769,6 +770,7 @@ check("a take is recovered from the queue-tuple history", recovered[0], {
   subfolder: "radio/neon-drive",
   type: "output",
   caption: "Trap, Dark, Late Night",
+  lyrics: "",
   seed: 42,
 });
 check("a take is recovered from the bare-graph history", recovered[1], {
@@ -776,6 +778,7 @@ check("a take is recovered from the bare-graph history", recovered[1], {
   subfolder: "radio/neon-drive",
   type: "output",
   caption: "Shoegaze, Dreamy",
+  lyrics: "",
   seed: 7,
 });
 check("only this station's takes are recovered", recovered.length, 2);
@@ -785,6 +788,221 @@ check(
   false,
 );
 check("an empty history is not an error", takesFromHistory(null, "radio/neon-drive"), []);
+
+// --- Reading a take out of the file itself ------------------------------------------------------
+//
+// ComfyUI writes the graph it executed into the MP3's ID3 tags as a `prompt` TXXX frame, so a take
+// recovered from disk can show the caption and the words it actually carried rather than whatever
+// the renderer still remembers. The fixtures below are built here rather than checked in: the point
+// is to pin the two ID3 frame-size conventions and the encoding byte, which is exactly what a real
+// file varies in and what a renderer version bump would silently change.
+
+console.log("\nembedded graph:\n");
+
+/** A syncsafe integer: seven bits a byte, which is how ID3v2.4 writes sizes. */
+function syncsafeBytes(value) {
+  return [(value >> 21) & 0x7f, (value >> 14) & 0x7f, (value >> 7) & 0x7f, value & 0x7f];
+}
+
+/** A plain big-endian integer, which is how ID3v2.3 writes a frame size. */
+function plainBytes(value) {
+  return [(value >> 24) & 0xff, (value >> 16) & 0xff, (value >> 8) & 0xff, value & 0xff];
+}
+
+/** One ID3v2 frame, sized the way its version sizes frames. */
+function id3Frame(frameId, payload, version = 4) {
+  const size = version >= 4 ? syncsafeBytes(payload.length) : plainBytes(payload.length);
+  return Uint8Array.from([
+    ...[...frameId].map((character) => character.charCodeAt(0)),
+    ...size,
+    0,
+    0,
+    ...payload,
+  ]);
+}
+
+/** An ID3v2 tag holding the given frames, so the reader can be given the bytes a renderer writes. */
+function id3Tag(frames, version = 4) {
+  const total = frames.reduce((count, frame) => count + frame.length, 0);
+  return Uint8Array.from([
+    ...[..."ID3"].map((character) => character.charCodeAt(0)),
+    version,
+    0,
+    0,
+    ...syncsafeBytes(total),
+    ...frames.flatMap((frame) => [...frame]),
+  ]);
+}
+
+/** A TXXX frame's payload: an encoding byte, the description, a NUL, then the value. */
+function txxx(description, value, encoding = 3) {
+  if (encoding === 3) {
+    const encoder = new TextEncoder();
+    return Uint8Array.from([
+      3,
+      ...encoder.encode(description),
+      0,
+      ...encoder.encode(value),
+    ]);
+  }
+  if (encoding === 1) {
+    const utf16 = new Uint8Array(2 + (description.length + 1 + value.length) * 2);
+    utf16[0] = 0xff;
+    utf16[1] = 0xfe;
+    let at = 2;
+    for (const character of `${description}\u0000${value}`) {
+      const code = character.charCodeAt(0);
+      utf16[at++] = code & 0xff;
+      utf16[at++] = code >> 8;
+    }
+    return Uint8Array.from([1, ...utf16]);
+  }
+  // ISO-8859-1, one byte a character, which is the encoding a v2.3 writer is most likely to use.
+  return Uint8Array.from([0, ...[...`${description}\u0000${value}`].map((c) => c.charCodeAt(0))]);
+}
+
+const GRAPH = JSON.stringify({
+  4: {
+    class_type: "TextEncodeAceStepAudio1.5",
+    inputs: { tags: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", bpm: 92 },
+  },
+  8: { class_type: "KSampler", inputs: { seed: 4409 } },
+});
+
+check("a v2.4 tag is read", tagsFromMp3(id3Tag([id3Frame("TXXX", txxx("prompt", GRAPH))])), {
+  caption: "Trap, Heavy 808 Bass",
+  lyrics: "[Verse]\nHold the line",
+  seed: 4409,
+  bpm: 92,
+});
+check(
+  "a v2.3 tag with a plain frame size is read",
+  tagsFromMp3(id3Tag([id3Frame("TXXX", txxx("prompt", GRAPH), 3)], 3)),
+  { caption: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", seed: 4409, bpm: 92 },
+);
+check(
+  "a UTF-16 value is read",
+  tagsFromMp3(id3Tag([id3Frame("TXXX", txxx("prompt", GRAPH, 1))])),
+  { caption: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", seed: 4409, bpm: 92 },
+);
+check(
+  "an ISO-8859-1 value in a v2.3 tag is read",
+  tagsFromMp3(id3Tag([id3Frame("TXXX", txxx("prompt", GRAPH, 0), 3)], 3)),
+  { caption: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", seed: 4409, bpm: 92 },
+);
+check(
+  "another frame before ours does not hide it",
+  tagsFromMp3(
+    id3Tag([
+      id3Frame("TENC", txxx("encoder", "Lavf")),
+      id3Frame("TXXX", txxx("prompt", GRAPH)),
+    ]),
+  ),
+  { caption: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", seed: 4409, bpm: 92 },
+);
+check("a file with no ID3 tag is not a take", tagsFromMp3(new Uint8Array([0xff, 0xfb, 0x90])), null);
+check(
+  "a tag without our frame is not a take",
+  tagsFromMp3(id3Tag([id3Frame("TENC", txxx("encoder", "Lavf"))])),
+  null,
+);
+check(
+  "a different TXXX description is not ours",
+  tagsFromMp3(id3Tag([id3Frame("TXXX", txxx("comment", GRAPH))])),
+  null,
+);
+check(
+  "trailing bytes after the graph do not make it unreadable",
+  tagsFromMp3(id3Tag([id3Frame("TXXX", txxx("prompt", `${GRAPH}\u0000tail`))])),
+  { caption: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", seed: 4409, bpm: 92 },
+);
+check(
+  "a batch graph is read as its first row",
+  tagsFromGraph({ 11: { class_type: "MyToolbox_AceStepBatchTextEncode", inputs: { captions: "A\nB", lyrics: "words", bpm: 90 } } }),
+  { caption: "A", lyrics: "words", seed: null, bpm: 90 },
+);
+check(
+  "an empty graph is not a take",
+  tagsFromGraph({ 1: { class_type: "UNETLoader", inputs: { unet_name: "x" } } }),
+  null,
+);
+
+// The bytes are read over the network, so the read must stop at the tag: a renderer that ignores the
+// Range header otherwise sends a whole take to identify a few kilobytes at its front. Every refusal
+// is a null, because a page refused the bytes by CORS should fall back to the history, not stop.
+const TAG_BYTES = id3Tag([id3Frame("TXXX", txxx("prompt", GRAPH))]);
+let canceled = false;
+const endless = new ReadableStream({
+  start(controller) {
+    controller.enqueue(TAG_BYTES);
+    controller.enqueue(new Uint8Array(1024 * 1024)); // a body that would not have stopped on its own
+  },
+  cancel() {
+    canceled = true;
+  },
+});
+check(
+  "a take is read from a streamed response",
+  await readTakeTags("http://example.invalid/view", async () => new Response(endless, { status: 206 })),
+  { caption: "Trap, Heavy 808 Bass", lyrics: "[Verse]\nHold the line", seed: 4409, bpm: 92 },
+);
+check("the read stops once the tag is complete", canceled, true);
+check(
+  "a file the page is refused is null, not a throw",
+  await readTakeTags("http://example.invalid/view", async () => {
+    throw new Error("blocked by CORS");
+  }),
+  null,
+);
+check(
+  "an error status is null",
+  await readTakeTags("http://example.invalid/view", async () => new Response("", { status: 404 })),
+  null,
+);
+check(
+  "a response that is not an ID3 file is null",
+  await readTakeTags(
+    "http://example.invalid/view",
+    async () => new Response(new Uint8Array([0xff, 0xfb, 0x90])),
+  ),
+  null,
+);
+
+// --- Renditions: takes that sing the same words -------------------------------------------------
+//
+// Two takes of one song are compared by their words, because the words are the same text in both
+// graphs and the comparison is exact. Section markers are staging, not words, so two arrangements of
+// one lyric still group. An instrumental carries markers alone, which is the trap: 19 instrumental
+// takes in the real corpus share the exact same section plan across three stations, so a fingerprint
+// over the raw text would call three genres' instrumentals one song.
+
+console.log("\nrenditions:\n");
+
+check("staging is stripped from a fingerprint", lyricFingerprint("[Verse]\nHold the line\n[Chorus]"), "Hold the line");
+check("an instrumental has no fingerprint", lyricFingerprint("[Intro]\n[Build]\n[Drop]"), null);
+check("an empty lyric has no fingerprint", lyricFingerprint(""), null);
+check(
+  "the same words staged differently share a fingerprint",
+  lyricFingerprint("[Verse]\nHold the line"),
+  lyricFingerprint("(instrumental)\nHold the line\n[Outro]"),
+);
+
+const WORDED = { lyrics: "[Verse]\nHold the line\n[Chorus]" };
+const OTHER = { lyrics: "[Verse]\nStatic on the wire\n[Chorus]" };
+const labels = renditionLabels([
+  WORDED,
+  OTHER,
+  { lyrics: "[Intro]\n[Build]\n[Drop]" },
+  { lyrics: "[Intro]\n[Build]\n[Drop]" },
+  { lyrics: "[Bridge]\nHold the line" },
+  { lyrics: "" },
+]);
+check("the first take of a lyric is rendition 1", labels[0], { position: 1, total: 2 });
+check("a different lyric is not a rendition", labels[1], null);
+check("instrumentals never group, even with identical staging", labels[2], null);
+check("nor does the instrumental beside it", labels[3], null);
+check("a later take of the same words is rendition 2", labels[4], { position: 2, total: 2 });
+check("a take with no words is in no group", labels[5], null);
 
 // --- Reactive state: a write must go through the proxy ------------------------------------------
 //

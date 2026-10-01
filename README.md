@@ -195,6 +195,13 @@ so a station you have used before never makes you wait for a replacement first. 
 places — the takes this browser saved, and the ones the renderer still remembers, including songs it
 rendered but that were never played — and merges them by file, so nothing is queued twice.
 
+**A take carries its own record.** ComfyUI writes the graph it executed into the MP3's tags, so a
+recovered song shows the caption and the lyrics it actually had, read from the file rather than from
+the renderer's memory — which a restart erases. Because those words are text, two takes that sing the
+same words are found by comparison alone, and each is labelled as a rendition of the same song
+(`rendition 3 of 11`) while keeping its own place in the queue. An instrumental has no words to
+compare, so it is never mistaken for a rendition of another.
+
 ## The core package
 
 Every check lives once, in `musicmaster/`, as a **text tier**: JSON in, JSON out, standard library

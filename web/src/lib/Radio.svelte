@@ -283,8 +283,15 @@
             <div>
               <div class="row" style="justify-content:space-between">
                 <strong>{current.title}</strong>
-                <span class="chip" class:meta={current.instrumental}>
-                  {current.instrumental ? "instrumental" : "sung"}
+                <span class="row" style="gap:4px">
+                  {#if current.rendition}
+                    <span class="chip meta">
+                      rendition {current.rendition.position} of {current.rendition.total}
+                    </span>
+                  {/if}
+                  <span class="chip" class:meta={current.instrumental}>
+                    {current.instrumental ? "instrumental" : "sung"}
+                  </span>
                 </span>
               </div>
               <div class="small muted">
@@ -430,6 +437,9 @@
                   {#if song.theme}<span class="small muted">· {song.theme}</span>{/if}
                   <span class="spacer" style="flex:1"></span>
                   {#if age}<span class="small muted">{age}</span>{/if}
+                  {#if song.rendition}
+                    <span class="chip">rendition {song.rendition.position}/{song.rendition.total}</span>
+                  {/if}
                   {#if song.status === "ready" || song.status === "playing"}
                     <span class="chip" class:meta={song.instrumental}>
                       {song.instrumental ? "instrumental" : "sung"}
@@ -447,6 +457,9 @@
                 <span class="small">{take.title}</span>
                 {#if take.theme}<span class="small muted">· {take.theme}</span>{/if}
                 <span class="spacer" style="flex:1"></span>
+                {#if take.rendition}
+                  <span class="chip">rendition {take.rendition.position}/{take.rendition.total}</span>
+                {/if}
                 <span class="chip" class:meta={take.instrumental}>
                   {take.instrumental ? "instrumental" : "sung"}
                 </span>
@@ -474,7 +487,7 @@
               <div class="row queue-row">
                 <span class="small">{song.title}</span>
                 <span class="small muted">
-                  {song.theme}{#if song.instrumental} · instrumental{/if}
+                  {song.theme}{#if song.instrumental} · instrumental{/if}{#if song.rendition} · rendition {song.rendition.position}/{song.rendition.total}{/if}
                 </span>
                 <span class="spacer" style="flex:1"></span>
                 <span class="small muted">{when(song.at)}</span>
