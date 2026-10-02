@@ -124,16 +124,15 @@ export function takesFromHistory(history: unknown, subfolder: string): ExistingT
 }
 
 /**
- * The words of a lyric, with the staging stripped out, or `null` when there are no words.
+ * The words of a lyric, with the staging stripped out, or `null` when the lyric is all staging.
  *
  * Section markers (`[Chorus]`) and instrumental notes (`(instrumental)`) are directions to the
  * model, not words anyone sings, so two renditions of one song compare equal however each one was
  * staged — the same words in a different structure are the same song, arranged differently.
  *
- * The `null` is the important case. An instrumental take still carries a lyric of markers alone,
- * often the very same ones another instrumental was given, so a fingerprint over the raw text would
- * declare every instrumental of a genre — or of three genres — to be one song. A take with no words
- * belongs to no group.
+ * The `null` is the important case. An instrumental take carries a lyric of markers alone, often the
+ * very same ones another instrumental was given, so a fingerprint over the raw text would declare
+ * every instrumental of a genre — or of three genres — to be one song.
  */
 export function lyricFingerprint(lyrics: string): string | null {
   const words = lyrics
@@ -147,9 +146,9 @@ export function lyricFingerprint(lyrics: string): string | null {
 /**
  * Where each take sits among the takes that sing the same words, aligned by index.
  *
- * A take with no words, or the only take of its words, gets `null`: it is not a rendition of
- * anything, and saying so is better than inventing a group of one. Positions follow the order the
- * takes were given in, so the earliest rendering of a lyric is the first rendition.
+ * A take that is all staging, or the only take of its words, gets `null`: it stands on its own, and
+ * a group of one is a fiction. Positions follow the order the takes were given in, so the earliest
+ * rendering of a lyric is the first rendition.
  */
 export function renditionLabels(takes: readonly { lyrics?: string }[]): (Rendition | null)[] {
   const groups = new Map<string, number[]>();

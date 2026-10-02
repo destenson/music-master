@@ -194,16 +194,18 @@ ticked, the take is planned and captioned as an instrumental instead. The curren
 downloaded, and the songs played on a station are listed there while the browser remembers them.
 
 **Pressing play plays.** A station that has songs already starts on them and renders new ones behind,
-so a station you have used before never makes you wait for a replacement first. It finds them in two
-places — the takes this browser saved, and the ones the renderer still remembers, including songs it
-rendered but that were never played — and merges them by file, so nothing is queued twice.
+so a station you have used before starts playing right away. It asks the renderer what exists — the
+MyToolbox listing route reads the output directory, so the files on disk are the record and every take
+that is there is found. Where that route is unavailable (an older server, a v2 target) it uses the
+addresses this browser remembered, the takes it saved after playing them, and what the renderer still
+remembers, merging them by file so each take is queued once. A station a reload comes back to has its
+saved record read at startup.
 
 **A take carries its own record.** ComfyUI writes the graph it executed into the MP3's tags, so a
-recovered song shows the caption and the lyrics it actually had, read from the file rather than from
-the renderer's memory — which a restart erases. Because those words are text, two takes that sing the
-same words are found by comparison alone, and each is labelled as a rendition of the same song
-(`rendition 3 of 11`) while keeping its own place in the queue. An instrumental has no words to
-compare, so it is never mistaken for a rendition of another.
+recovered song shows the caption and the lyrics it actually had, read from the file that holds them.
+Because those words are text, two takes that sing the same words are found by comparison alone, and
+each is labelled as a rendition of the same song (`rendition 3 of 11`) while keeping its own place in
+the queue.
 
 ## The core package
 
@@ -265,13 +267,12 @@ and the writing brief, both from the text tier: no network, and correct by const
 scaffold passes the checker immediately, with every section, performance tag and transition already
 in place. The model half sends that same brief, plus the caption and a one-line theme, to a model
 through ollama. Cloud models are listed first because the local ones compete for the GPU ComfyUI
-renders on, and the panel states which you have chosen and what leaves the machine. **A write sends
-sampling, not just a prompt**: every call carries a temperature and a seed — the temperature is yours
-to set in the panel, the seed is the song's — so pressing Generate again asks a new question instead
-of the same one, and a model that would otherwise answer a prompt identically writes a different
-song. On the radio it goes further: **three drafts are written and the best is kept**, correct first,
-then conformant, then the newest words against what the station has already sung, so a lyric that
-would have been a rerun is passed over rather than played.
+renders on, and the panel states which you have chosen and what leaves the machine. **A write carries
+sampling as well as a prompt**: every call sends a temperature and a seed — the temperature is yours
+to set in the panel, the seed is the song's — so pressing Generate again asks the model afresh and
+lands on different words. On the radio it goes further: **three drafts are written and the best is
+kept**, correct first, then conformant, then the newest words against what the station has already
+sung, so the station plays a new lyric.
 
 **The editor is a text file with a grammar lens**, not a structured form, because a lyric that cannot
 round-trip is a trap. The lens reads the same `section-tags.json` the checker reads, so it cannot

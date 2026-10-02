@@ -135,7 +135,10 @@ const DEV_PROXY: Record<string, string> = {
 };
 
 export function endpoint(base: string): string {
-  if (import.meta.env.DEV && DEV_PROXY[base]) return DEV_PROXY[base];
+  // `import.meta.env` is Vite's, so the dev proxy applies inside a Vite build; elsewhere the address
+  // is used as given.
+  const dev = import.meta.env?.DEV ?? false;
+  if (dev && DEV_PROXY[base]) return DEV_PROXY[base];
   return base.replace(/\/+$/, "");
 }
 
@@ -387,10 +390,9 @@ export async function fetchOutcome(target: ComfyTarget, pollUrl: string): Promis
 /**
  * The renderer's own history, as it reports it.
  *
- * ComfyUI keeps this in memory, so it holds what the renderer still remembers — including takes this
- * browser did not render, or has forgotten. It is a bonus rather than the record: a restarted
- * renderer remembers nothing, which is why `takes.ts` merges it with the page's own saved takes
- * rather than replacing them. A v2 target has no such route.
+ * ComfyUI keeps this in memory, so it holds the takes the renderer still has in hand, including ones
+ * this browser did not render. The listing route and the page's own record are the authority on what a
+ * station has; this fills in around them. A v2 target has no such route.
  */
 export async function fetchHistory(target: ComfyTarget, limit = 200): Promise<unknown> {
   if (target.protocol === "v2") return {};
@@ -403,6 +405,81 @@ export async function fetchHistory(target: ComfyTarget, limit = 200): Promise<un
 
 /** One id per page load: ComfyUI groups a render's messages under it. */
 const CLIENT_ID = `music-master-${Math.random().toString(36).slice(2, 10)}`;
+
+/** One file in the renderer's output tree, as the listing route reports it. */
+export interface OutputListing {
+  name: string;
+  subfolder: string;
+  path: string;
+  type: string;
+  content_type: string;
+  size: number;
+  mtime: number;
+}
+
+export interface OutputListRequest {
+  subfolder?: string;
+  content_type?: string;
+  ext?: string;
+  sort?: "mtime" | "name" | "size";
+  order?: "asc" | "desc";
+}
+
+/**
+ * What files exist under the renderer's output tree.
+ *
+ * MyToolbox serves `GET /mytoolbox/output_files`, which reads the output directory itself, so the
+ * files on disk are the record and a station's takes are known as they stand on disk.
+ *
+ * Three answers, each meaning something different to the caller:
+ *   - the files, when the route answers;
+ *   - an empty list, when the route answers that the subfolder is absent, which is a station with
+ *     nothing in it yet;
+ *   - `null`, when no route answers — an older server, a v2 target, a refusal — so the caller uses
+ *     the addresses the page remembers.
+ *
+ * The route reports a missing subfolder as a JSON error and an unknown path as an opaque 404, so the
+ * second and third answers are told apart by the body.
+ */
+export async function listOutputFiles(
+  target: ComfyTarget,
+  request: OutputListRequest = {},
+): Promise<OutputListing[] | null> {
+  if (target.protocol === "v2") return null;
+  const query = new URLSearchParams();
+  if (request.subfolder !== undefined) query.set("subfolder", request.subfolder);
+  if (request.content_type) query.set("content_type", request.content_type);
+  if (request.ext) query.set("ext", request.ext);
+  if (request.sort) query.set("sort", request.sort);
+  if (request.order) query.set("order", request.order);
+
+  let response: Response;
+  try {
+    response = await fetch(`${endpoint(target.base)}/mytoolbox/output_files?${query}`, {
+      headers: headers(target),
+    });
+  } catch {
+    return null;
+  }
+
+  if (response.ok) {
+    try {
+      const payload = (await response.json()) as { files?: OutputListing[] };
+      return Array.isArray(payload.files) ? payload.files : [];
+    } catch {
+      return null;
+    }
+  }
+
+  const body = await response.text().catch(() => "");
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown };
+    if (typeof parsed.error === "string") return [];
+  } catch {
+    /* not this route answering */
+  }
+  return null;
+}
 
 /** A fresh seed, so a second render is a different take rather than the same one again. */
 export function freshSeed(): number {

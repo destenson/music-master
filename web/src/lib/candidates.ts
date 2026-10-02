@@ -2,19 +2,18 @@
  * Choosing between the drafts a model wrote for one song.
  *
  * A prompt is a question, and a model answers it differently every time it is asked, so the radio
- * asks more than once and keeps the answer it wants. "Wants" is a priority rather than a single
- * number, and the order is the contract: a draft that honours the brief beats one that does not, and
- * among drafts that do, the newest words win.
+ * asks more than once and keeps the answer it wants. "Wants" is a priority: correctness comes first,
+ * then form, then the newest words.
  *
  * The comparison is pure and free of the model, the network and the DOM, so the smoke run checks the
- * priority directly rather than inferring it from a generation.
+ * priority directly as well as through a generation.
  */
 
 export interface DraftGrade {
   text: string;
   /** Which attempt wrote it, so an exact tie is broken the same way every time. */
   attempt: number;
-  /** The checker's errors. A draft that breaks the brief does not win on novelty. */
+  /** The checker's errors, weighed before novelty. */
   errors: number;
   warnings: number;
   /** Sections the draft matched, from the conformance check. */

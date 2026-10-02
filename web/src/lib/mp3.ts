@@ -3,15 +3,13 @@
  *
  * ACE-Step renders through ComfyUI, and ComfyUI writes the graph it executed into the MP3's ID3 tags
  * as a `prompt` TXXX frame. That graph is the take's own record: the caption it was given, the lyrics
- * it sang, its seed and its tempo. Reading it means a recovered take shows what it actually is,
- * rather than what the renderer still happens to remember — a restarted renderer remembers nothing,
- * and even a saved record can drift from the audio it describes, because the file is the take.
+ * it sang, its seed and its tempo, and the file is the authority on all four.
  *
  * The parsing is pure and free of the DOM and the network, so the smoke run can pin it against
  * hand-built tag bytes without a renderer. Only `readTakeTags` touches IO, and it reads the front of
- * the file: the tag is at the start, so a Range request identifies a take cheaply. Every failure —
- * an unreadable file, a foreign tag, a graph from a different model — comes back as `null`, because
- * a take the page cannot read is still a take it can play from its name and its history.
+ * the file: the tag is at the start, so a Range request identifies a take cheaply. An unreadable
+ * file, a foreign tag, or a graph from a different model comes back as `null`, and the take plays on
+ * from its name and the history the page holds.
  */
 
 /** The part of a take's graph that identifies the take to a listener. */
@@ -34,9 +32,8 @@ const FRAME_HEADER = 10;
 /**
  * The most of a file worth reading for its tag.
  *
- * A graph carrying a full lyric is tens of kilobytes. This is a ceiling rather than a target: the
- * read stops as soon as the tag is complete, and a renderer that ignores the Range header cannot
- * make the page download a whole take to identify it.
+ * A graph carrying a full lyric is tens of kilobytes. This is a ceiling: the read stops as soon as
+ * the tag is complete, so even a renderer that sends the whole file has the read end at the tag.
  */
 const FRONT_LIMIT = 1 << 20;
 
@@ -81,8 +78,8 @@ function partition(value: string): [string, string] {
  * The first complete JSON object in a string.
  *
  * The frame's size is the authority, so normally this parses the whole value. A tag written by a
- * different tool can pad the frame with NULs or trailing bytes after the graph, and a take should
- * not become unreadable over a byte the JSON never used.
+ * different tool can pad the frame with NULs or trailing bytes after the graph, and the object's own
+ * closing brace ends the read.
  */
 function firstJson(value: string): unknown {
   const trimmed = value.replace(/\u0000+$/, "").trim();
@@ -286,9 +283,8 @@ async function frontBytes(response: Response, limit: number): Promise<Uint8Array
 /**
  * Read a take's tags from its playable URL.
  *
- * Every failure is a `null` rather than a throw: a page pointed at a remote renderer may be refused
- * the bytes by CORS, and that is a reason to fall back to the renderer's history, not a reason for a
- * station to stop.
+ * Every failure is a `null`: a page pointed at a remote renderer may be refused the bytes by CORS,
+ * and the station plays on from the history it holds.
  */
 export async function readTakeTags(
   url: string,

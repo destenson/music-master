@@ -18,13 +18,15 @@
  *
  * A full render is slow, so the queue is deliberate: `bufferTarget` songs are kept either ready or
  * in flight, and playback starts as soon as the first is ready rather than waiting for all of them.
- * A station's finished songs are kept per station in browser storage, because the page cannot list
- * ComfyUI's output directory and the files themselves are what the user will go back to.
+ * A station's finished songs are asked of the renderer when the station is chosen, and the takes the
+ * page played are also kept per station in browser storage, because the files themselves are what the
+ * user goes back to.
  */
 import {
   fetchHistory,
   fetchOutcome,
   freshSeed,
+  listOutputFiles,
   submitWorkflow,
   viewUrl,
   type OutputFile,
@@ -193,6 +195,13 @@ export function setRadioHost(fn: RadioHost | null): void {
 
 const SETTINGS_KEY = "mm.radio.settings";
 const HISTORY_KEY = "mm.radio.history";
+/**
+ * The files a station is known to have, per station, as file addresses.
+ *
+ * This is the page's own record of what exists, written as each take is rendered or found, so a
+ * station's catalogue is in hand on a reload and while the renderer is out of reach.
+ */
+const TAKES_KEY = "mm.radio.takes";
 /** The Generator panel's model key, so the radio writes with whichever model is already chosen. */
 const MODEL_KEY = "mm.ollama.model";
 const HISTORY_PER_STATION = 24;
@@ -272,6 +281,16 @@ interface RadioSettings {
 
 const saved = readJson<Partial<RadioSettings>>(SETTINGS_KEY, {});
 
+/**
+ * The page's durable record, read once at startup.
+ *
+ * A reload comes back to the station it was on, so that station's played takes are read here first.
+ * The in-memory history is the working copy that is written back to storage as the user moves
+ * between stations, so it starts as the stored record.
+ */
+let historyMap: Record<string, SavedRadioSong[]> = readJson(HISTORY_KEY, {});
+let takeIndex: Record<string, OutputFile[]> = readJson(TAKES_KEY, {});
+
 export const radioState = $state({
   stationId: saved.stationId ?? "",
   /** Whether the stream is running. The panel owns the audio element; this owns the intent. */
@@ -283,8 +302,8 @@ export const radioState = $state({
   currentId: null as string | null,
   /** Songs created for this station that have not been played yet, including the current one. */
   queue: [] as RadioSong[],
-  /** Played songs for the current station, newest first. */
-  history: [] as SavedRadioSong[],
+  /** Played songs for the current station, newest first, restored from the record on startup. */
+  history: [...(historyMap[saved.stationId ?? ""] ?? [])] as SavedRadioSong[],
   /** How many already-rendered takes the last start began from, so the panel can say so. */
   recovered: 0,
   /**
@@ -309,7 +328,6 @@ export const radioState = $state({
 let session = 0;
 let failures = 0;
 const indices: Record<string, number> = {};
-let historyMap: Record<string, SavedRadioSong[]> = readJson(HISTORY_KEY, {});
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -329,6 +347,33 @@ function rememberHistory(): void {
   if (!radioState.stationId) return;
   historyMap = { ...historyMap, [radioState.stationId]: radioState.history };
   writeJson(HISTORY_KEY, historyMap);
+}
+
+/**
+ * Remember that a station has a file.
+ *
+ * This is the address of what exists, written the moment a take is rendered or found, so the page's
+ * own copy of the station's catalogue is ready whenever the renderer is out of reach.
+ */
+function rememberTake(stationId: string, file: OutputFile | null): void {
+  if (!stationId || !file) return;
+  const known = takeIndex[stationId] ?? [];
+  const key = takeKey(file);
+  if (known.some((entry) => takeKey(entry) === key)) return;
+  takeIndex = { ...takeIndex, [stationId]: [...known, file] };
+  writeJson(TAKES_KEY, takeIndex);
+}
+
+/**
+ * Write a station's set exactly as the renderer lists it.
+ *
+ * The listing is fresh, so this keeps the index in step with the disk: takes that are there are
+ * added, and the page's copy matches the folder.
+ */
+function setTakeIndex(stationId: string, files: OutputFile[]): void {
+  if (!stationId) return;
+  takeIndex = { ...takeIndex, [stationId]: files };
+  writeJson(TAKES_KEY, takeIndex);
 }
 
 function loadHistory(stationId: string): SavedRadioSong[] {
@@ -596,6 +641,9 @@ async function produce(song: RadioSong, token: number): Promise<void> {
       }
       if (token !== session) return;
       song.file = output.file ?? null;
+      // Written the moment it exists, before it is ever played: a rendered take is the station's,
+      // whether or not the buffer ever reaches it.
+      rememberTake(song.stationId, song.file);
       song.url = output.url ?? (output.file ? viewUrl(renderQueue.target.base, output.file) : null);
       song.status = "ready";
       song.at = Date.now();
@@ -819,18 +867,56 @@ function hardStop(): void {
   radioState.recovered = 0;
 }
 
+/** A take the page knows exists but has no record of: the file itself says what it is. */
+function knownTake(stationId: string, file: OutputFile, parsed: TakeName): SavedRadioSong {
+  return {
+    id: `known:${takeKey(file)}`,
+    index: 0,
+    stationId,
+    title: `${stationId} #${parsed.order}`,
+    seed: 0,
+    caption: "",
+    theme: "",
+    lyrics: "",
+    instrumental: parsed.instrumental,
+    file,
+    at: 0,
+  };
+}
+
 /**
- * The takes this station already has, from the page's own record and the renderer's memory.
+ * The station's files as the renderer lists them, or null when no route answers.
  *
- * The saved list is the durable one; the renderer's history is what catches takes the page never
- * recorded — one this browser had not played yet, or one rendered from somewhere else. They are
- * merged by file, so a take both know about is queued once, and ordered by the renderer's own
- * numbering rather than by either list's idea of it.
+ * The listing reads the output directory itself, so it is the authority on what exists. A `null`
+ * comes back when no route answers — an older server, a v2 target, an unreachable one — and the page
+ * then uses the addresses it remembers.
+ */
+async function listStationFiles(stationId: string): Promise<OutputFile[] | null> {
+  const listed = await listOutputFiles(renderQueue.target, {
+    subfolder: `radio/${stationId}`,
+    content_type: "audio",
+    sort: "name",
+    order: "asc",
+  });
+  if (listed === null) return null;
+  return listed.map((file) => ({
+    filename: file.name,
+    subfolder: file.subfolder,
+    type: file.type || "output",
+  }));
+}
+
+/**
+ * The takes this station already has.
  *
- * Once the set is known, each take's own file is asked what it is and the set is grouped by lyric,
- * so a recovered take shows the words it sang and says which of a song's renditions it is. Both are
- * best-effort: the name and the history are enough to play, which is what happens when a renderer
- * will not hand this page the bytes.
+ * The renderer's **listing** decides the set: it reads the output directory, so every take on disk is
+ * found, including one the page holds no record of. The page's saved record then supplies what the
+ * files do not carry: the theme, the angle, and the fact that a take was played. With no listing
+ * route to ask, the page uses the addresses it remembers and the renderer's `/history`.
+ *
+ * The takes are merged by file and ordered by the renderer's own numbering. Once the set is known,
+ * each take's own file is read for its caption and its words, and the set is grouped by lyric, so a
+ * recovered take shows what it sang and where it sits among a song's renditions.
  */
 async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
   const found = new Map<string, { take: SavedRadioSong; name: TakeName }>();
@@ -838,35 +924,55 @@ async function discoverExisting(stationId: string): Promise<SavedRadioSong[]> {
     if (!found.has(key)) found.set(key, { take, name });
   };
 
+  const listed = await listStationFiles(stationId);
+  const exists = listed ? new Set(listed.map(takeKey)) : null;
+
+  // The played record first, because it is the richest: the file graph carries the words and the
+  // caption, while the theme and the angle come from the page's own record. The listing decides which
+  // files the station has.
   for (const saved of radioState.history) {
     const parsed = saved.file ? parseTakeName(stationId, saved.file.filename) : null;
     if (!saved.file || !parsed) continue;
+    if (exists && !exists.has(takeKey(saved.file))) continue;
     remember(takeKey(saved.file), saved, parsed);
+    if (!listed) rememberTake(stationId, saved.file);
   }
 
-  try {
-    const history = await fetchHistory(renderQueue.target);
-    for (const take of takesFromHistory(history, `radio/${stationId}`)) {
-      // A file under this station that does not carry the take naming is not one of ours to place.
-      const parsed = parseTakeName(stationId, take.filename);
+  if (listed) {
+    for (const file of listed) {
+      const parsed = parseTakeName(stationId, file.filename);
       if (!parsed) continue;
-      const file = { filename: take.filename, subfolder: take.subfolder, type: take.type };
-      remember(takeKey(file), {
-        id: `found:${takeKey(file)}`,
-        index: 0,
-        stationId,
-        title: `${stationId} #${parsed.order}`,
-        seed: take.seed ?? 0,
-        caption: take.caption,
-        theme: "",
-        lyrics: take.lyrics,
-        instrumental: parsed.instrumental,
-        file,
-        at: 0,
-      }, parsed);
+      remember(takeKey(file), knownTake(stationId, file, parsed), parsed);
     }
-  } catch {
-    /* the renderer's history is a bonus; what the page saved is the durable record */
+    // The index is refreshed from the listing, so the page's own copy matches the folder.
+    setTakeIndex(stationId, listed);
+  } else {
+    for (const file of takeIndex[stationId] ?? []) {
+      const parsed = parseTakeName(stationId, file.filename);
+      if (!parsed) continue;
+      remember(takeKey(file), knownTake(stationId, file, parsed), parsed);
+    }
+
+    try {
+      const history = await fetchHistory(renderQueue.target);
+      for (const take of takesFromHistory(history, `radio/${stationId}`)) {
+        // A file under this station that does not carry the take naming is not one of ours to place.
+        const parsed = parseTakeName(stationId, take.filename);
+        if (!parsed) continue;
+        const file = { filename: take.filename, subfolder: take.subfolder, type: take.type };
+        remember(takeKey(file), {
+          ...knownTake(stationId, file, parsed),
+          id: `found:${takeKey(file)}`,
+          seed: take.seed ?? 0,
+          caption: take.caption,
+          lyrics: take.lyrics,
+        }, parsed);
+        // Discovered once is remembered from then on, so the renderer forgetting it costs nothing.
+        rememberTake(stationId, file);
+      }
+    } catch {
+      /* the renderer's history is a bonus; what the page saved is the durable record */
+    }
   }
 
   const takes = [...found.values()]

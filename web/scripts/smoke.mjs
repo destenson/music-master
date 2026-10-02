@@ -16,7 +16,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { loadPyodide } from "pyodide";
 import { parseFindings, slotFor } from "../src/lib/lens.ts";
-import { presetFor, freshSeed, previewSeed, describeMessages } from "../src/lib/comfy.ts";
+import { presetFor, freshSeed, previewSeed, describeMessages, listOutputFiles } from "../src/lib/comfy.ts";
 import { encodeWav, monoFrom } from "../src/lib/stereo.ts";
 import { freeName, stable } from "../src/lib/draft.ts";
 import { editorTheme } from "../src/lib/lens.ts";
@@ -78,7 +78,7 @@ const DIRTY_LYRIC = [
 
 // A candidate and the lyrics a station has already sung, so the novelty reading the page gets can be
 // compared with the one the CLI computes. The measure decides which draft the radio keeps, so the two
-// halves agreeing about it is not optional.
+// halves are checked against each other.
 const NOVELTY_CANDIDATE =
   "[Verse]\nwe were never going to make it out of here alive tonight\n[Chorus]\nbrand new sentences about a different afternoon";
 const NOVELTY_PRIOR = [
@@ -1200,6 +1200,78 @@ check("a temperature is remembered", loadTemperature(), 1.4);
 saveTemperature(9);
 check("a temperature is clamped into range", loadTemperature(), 2);
 globalThis.localStorage = realStorage;
+
+// --- Listing what exists ------------------------------------------------------------------------
+//
+// MyToolbox serves a listing route that reads the output directory itself, and the client keeps its
+// three answers apart: the files, an empty folder, and a `null` when no route answers.
+
+console.log("\nlisting:\n");
+const nativeTarget = { base: "http://127.0.0.1:8288", protocol: "native" };
+let listingUrl = "";
+globalThis.fetch = async (url) => {
+  listingUrl = String(url);
+  return new Response(
+    JSON.stringify({
+      files: [
+        {
+          name: "neon-drive_00001.mp3",
+          subfolder: "radio/neon-drive",
+          path: "radio/neon-drive/neon-drive_00001.mp3",
+          type: "output",
+          content_type: "audio",
+          size: 1,
+          mtime: 1,
+        },
+      ],
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+};
+const listed = await listOutputFiles(nativeTarget, {
+  subfolder: "radio/neon-drive",
+  content_type: "audio",
+  sort: "name",
+  order: "asc",
+});
+check("the listing asks the toolbox route", listingUrl.includes("/mytoolbox/output_files?"), true);
+check("as the station's subfolder", listingUrl.includes("subfolder=radio%2Fneon-drive"), true);
+check("only audio", listingUrl.includes("content_type=audio"), true);
+check("the files come back", listed?.length, 1);
+check("with the fields a take address needs", listed?.[0]?.name, "neon-drive_00001.mp3");
+
+globalThis.fetch = async () =>
+  new Response(JSON.stringify({ error: "no such subfolder: radio/gone" }), {
+    status: 404,
+    headers: { "content-type": "application/json" },
+  });
+check(
+  "a folder the route says is missing is an empty station, not a fallback",
+  await listOutputFiles(nativeTarget, { subfolder: "radio/gone" }),
+  [],
+);
+
+globalThis.fetch = async () => new Response("", { status: 404 });
+check(
+  "an absent route is null, so the page falls back to what it remembers",
+  await listOutputFiles(nativeTarget, { subfolder: "radio/neon-drive" }),
+  null,
+);
+
+globalThis.fetch = async () => {
+  throw new Error("unreachable");
+};
+check(
+  "an unreachable renderer is null too",
+  await listOutputFiles(nativeTarget, { subfolder: "radio/neon-drive" }),
+  null,
+);
+check(
+  "a v2 target has no listing route to ask",
+  await listOutputFiles({ base: "https://cloud.comfy.org", protocol: "v2" }, { subfolder: "radio/x" }),
+  null,
+);
+globalThis.fetch = realFetch;
 
 // --- End to end, on request: does the prompt actually produce a valid lyric? -------------------
 //
